@@ -70,14 +70,12 @@ jobs:
         run: npm install -g @railway/cli
 
       - name: Deploy backend to Railway
-        run: railway up --detach
+        run: railway up
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
 
       - name: Verify deployment health
         run: |
-          echo "Waiting for deployment to propagate..."
-          sleep 30
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://backend-production-f835.up.railway.app/health)
           echo "Health check HTTP status: $STATUS"
           if [ "$STATUS" != "200" ]; then
