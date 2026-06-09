@@ -1,4 +1,4 @@
-"""Scan routes: create link/image scans, list history, view + give feedback."""
+"""Scan routes: link, image, QR, message, email, phone scans + history + feedback."""
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -15,8 +15,12 @@ from app.models.models import (
     User,
 )
 from app.schemas.schemas import (
+    EmailScanCreate,
     ImageScanCreate,
     LinkScanCreate,
+    MessageScanCreate,
+    PhoneScanCreate,
+    QRScanCreate,
     ScanFeedback,
     ScanOut,
 )
@@ -133,3 +137,110 @@ def submit_feedback(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Report not found")
     report.user_feedback = payload.feedback
     db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Phase 2 — new input types
+# ---------------------------------------------------------------------------
+
+@router.post("/qr", response_model=ScanOut, status_code=status.HTTP_201_CREATED)
+def create_qr_scan(
+    payload: QRScanCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    _check_quota(db, user)
+    scan = ScanHistory(
+        user_id=user.id, scan_type=ScanType.qr, raw_input=payload.qr_content[:500],
+        status=ScanStatus.pending,
+    )
+    db.add(scan)
+    db.commit()
+    db.refresh(scan)
+
+    scan_service.process_qr_scan(db, scan, payload.qr_content)
+    db.add(ApiUsage(user_id=user.id, provider="safe_browsing"))
+    db.commit()
+    db.refresh(scan)
+    return scan
+
+
+@router.post("/message", response_model=ScanOut, status_code=status.HTTP_201_CREATED)
+def create_message_scan(
+    payload: MessageScanCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    _check_quota(db, user)
+    scan = ScanHistory(
+        user_id=user.id, scan_type=ScanType.message, raw_input=payload.message_text[:500],
+        status=ScanStatus.pending,
+    )
+    db.add(scan)
+    db.commit()
+    db.refresh(scan)
+
+    scan_service.process_message_scan(db, scan, payload.message_text, payload.platform_hint)
+    db.add(ApiUsage(user_id=user.id, provider="openai"))
+    db.commit()
+    db.refresh(scan)
+    return scan
+
+
+@router.post("/email", response_model=ScanOut, status_code=status.HTTP_201_CREATED)
+def create_email_scan(
+    payload: EmailScanCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    if not any([
+        payload.raw_email, payload.sender_email, payload.subject, payload.body_text
+    ]):
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "Provide at least one of: raw_email, sender_email, subject, or body_text.",
+        )
+    _check_quota(db, user)
+    scan = ScanHistory(
+        user_id=user.id, scan_type=ScanType.email,
+        raw_input=f"From: {payload.sender_email or ''} | Subject: {payload.subject or ''}"[:500],
+        status=ScanStatus.pending,
+    )
+    db.add(scan)
+    db.commit()
+    db.refresh(scan)
+
+    scan_service.process_email_scan(
+        db, scan,
+        raw_email=payload.raw_email,
+        sender_email=payload.sender_email,
+        sender_display_name=payload.sender_display_name,
+        reply_to_email=payload.reply_to_email,
+        subject=payload.subject,
+        body_text=payload.body_text,
+    )
+    db.add(ApiUsage(user_id=user.id, provider="openai"))
+    db.commit()
+    db.refresh(scan)
+    return scan
+
+
+@router.post("/phone", response_model=ScanOut, status_code=status.HTTP_201_CREATED)
+def create_phone_scan(
+    payload: PhoneScanCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    _check_quota(db, user)
+    scan = ScanHistory(
+        user_id=user.id, scan_type=ScanType.phone, raw_input=payload.phone_number,
+        status=ScanStatus.pending,
+    )
+    db.add(scan)
+    db.commit()
+    db.refresh(scan)
+
+    scan_service.process_phone_scan(db, scan, payload.phone_number)
+    db.commit()
+    db.refresh(scan)
+    return scan

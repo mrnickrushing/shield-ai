@@ -1,4 +1,4 @@
-"""Pydantic request/response schemas for Phase 1."""
+"""Pydantic request/response schemas for Phase 1 + Phase 2."""
 from datetime import datetime
 
 from pydantic import BaseModel, EmailStr, Field
@@ -81,3 +81,51 @@ class ScanOut(BaseModel):
 
 class ScanFeedback(BaseModel):
     feedback: str = Field(pattern="^(helpful|false_positive)$")
+
+
+# ---------------------------------------------------------------------------
+# Phase 2 — new input types
+# ---------------------------------------------------------------------------
+
+class QRScanCreate(BaseModel):
+    # The mobile app decodes the QR and sends us the raw string content.
+    qr_content: str
+
+
+class MessageScanCreate(BaseModel):
+    message_text: str
+    platform_hint: str = ""  # "sms" | "whatsapp" | "imessage" | "telegram" | ""
+
+
+class EmailScanCreate(BaseModel):
+    raw_email: str | None = None         # Full raw email including headers
+    sender_email: str | None = None
+    sender_display_name: str | None = None
+    reply_to_email: str | None = None
+    subject: str | None = None
+    body_text: str | None = None
+
+
+class PhoneScanCreate(BaseModel):
+    phone_number: str
+
+
+# ---------------------------------------------------------------------------
+# Phase 2 — notifications
+# ---------------------------------------------------------------------------
+
+class DeviceRegister(BaseModel):
+    push_token: str
+    platform: str = Field(pattern="^(ios|android)$")
+
+
+class NotificationOut(BaseModel):
+    id: str
+    title: str
+    body: str
+    scan_id: str | None = None
+    is_read: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

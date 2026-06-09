@@ -61,7 +61,10 @@ api.interceptors.response.use(
   }
 );
 
-// --- Typed endpoints ---
+// ---------------------------------------------------------------------------
+// Shared types
+// ---------------------------------------------------------------------------
+
 export type RiskReport = {
   risk_score: number;
   risk_level: "safe" | "low" | "suspicious" | "high" | "critical";
@@ -73,9 +76,11 @@ export type RiskReport = {
   evidence: Record<string, unknown>;
 };
 
+export type ScanType = "link" | "image" | "qr" | "message" | "email" | "phone";
+
 export type Scan = {
   id: string;
-  scan_type: "link" | "image";
+  scan_type: ScanType;
   status: string;
   raw_input: string;
   created_at: string;
@@ -83,18 +88,62 @@ export type Scan = {
   report: RiskReport | null;
 };
 
+export type Notification = {
+  id: string;
+  title: string;
+  body: string;
+  scan_id: string | null;
+  is_read: boolean;
+  created_at: string;
+};
+
+// ---------------------------------------------------------------------------
+// API surface
+// ---------------------------------------------------------------------------
+
 export const ShieldAPI = {
+  // Auth
   register: (email: string, password: string, display_name: string) =>
     api.post("/auth/register", { email, password, display_name }).then((r) => r.data),
   login: (email: string, password: string) =>
     api.post("/auth/login", { email, password }).then((r) => r.data),
   me: () => api.get("/auth/me").then((r) => r.data),
+
+  // Phase 1 scans
   scanLink: (url: string) =>
     api.post<Scan>("/scans/link", { url }).then((r) => r.data),
   scanImage: (image_base64: string, filename = "screenshot.png") =>
     api.post<Scan>("/scans/image", { image_base64, filename }).then((r) => r.data),
+
+  // Phase 2 scans
+  scanQR: (qr_content: string) =>
+    api.post<Scan>("/scans/qr", { qr_content }).then((r) => r.data),
+  scanMessage: (message_text: string, platform_hint = "") =>
+    api.post<Scan>("/scans/message", { message_text, platform_hint }).then((r) => r.data),
+  scanEmail: (payload: {
+    raw_email?: string;
+    sender_email?: string;
+    sender_display_name?: string;
+    reply_to_email?: string;
+    subject?: string;
+    body_text?: string;
+  }) => api.post<Scan>("/scans/email", payload).then((r) => r.data),
+  scanPhone: (phone_number: string) =>
+    api.post<Scan>("/scans/phone", { phone_number }).then((r) => r.data),
+
+  // Scan history
   listScans: () => api.get<Scan[]>("/scans").then((r) => r.data),
   getScan: (id: string) => api.get<Scan>(`/scans/${id}`).then((r) => r.data),
   feedback: (id: string, feedback: "helpful" | "false_positive") =>
     api.post(`/scans/${id}/feedback`, { feedback }),
+
+  // Notifications
+  registerDevice: (push_token: string, platform: "ios" | "android") =>
+    api.post("/notifications/devices", { push_token, platform }),
+  listNotifications: (unread_only = false) =>
+    api.get<Notification[]>("/notifications", { params: { unread_only } }).then((r) => r.data),
+  markNotificationRead: (id: string) =>
+    api.post(`/notifications/${id}/read`),
+  markAllNotificationsRead: () =>
+    api.post("/notifications/read-all"),
 };
