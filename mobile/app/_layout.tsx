@@ -19,7 +19,9 @@ export default function RootLayout() {
       <StatusBar style="light" />
       <Stack screenOptions={{ headerStyle: { backgroundColor: colors.bg }, headerTintColor: colors.text, contentStyle: { backgroundColor: colors.bg }, headerShadowVisible: false }}>
         <Stack.Screen name="index" options={{ headerShown: false }} />
-        <Stack.Screen name="login" options={{ title: "Shield AI", headerShown: false }} />
+        <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+        <Stack.Screen name="login" options={{ headerShown: false }} />
+        <Stack.Screen name="paywall" options={{ title: "Upgrade to Premium", headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="result" options={{ title: "Risk Report" }} />
         <Stack.Screen name="profile" options={{ title: "Profile" }} />
@@ -28,6 +30,12 @@ export default function RootLayout() {
         <Stack.Screen name="education" options={{ title: "Education Center" }} />
         <Stack.Screen name="lesson" options={{ title: "Lesson" }} />
         <Stack.Screen name="family" options={{ title: "Family Protection" }} />
+        <Stack.Screen name="community" options={{ title: "Community Intel" }} />
+        <Stack.Screen name="notifications" options={{ title: "Notifications" }} />
+        <Stack.Screen name="identity" options={{ title: "Identity Protection" }} />
+        <Stack.Screen name="browser" options={{ title: "Safe Browser", headerShown: false }} />
+        <Stack.Screen name="share" options={{ title: "Report a Scam" }} />
+        <Stack.Screen name="developer" options={{ title: "Developer" }} />
       </Stack>
     </QueryClientProvider>
   );

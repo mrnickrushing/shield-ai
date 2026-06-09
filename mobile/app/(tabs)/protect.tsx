@@ -102,6 +102,15 @@ export default function ProtectScreen() {
         body="Detect fake giveaways, crypto lures, impersonation, and account-takeover phishing."
         onPress={() => router.push("/(tabs)/scan?type=social")}
       />
+
+      <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: "700", letterSpacing: 1.2, textTransform: "uppercase", marginBottom: spacing.sm, marginTop: spacing.md }}>Community</Text>
+      <Card
+        icon="globe-outline"
+        iconColor={colors.primaryBright}
+        title="Community Intel"
+        body="Browse trending scam patterns reported across the Shield AI network."
+        onPress={() => router.push("/community")}
+      />
     </ScrollView>
   );
 }
