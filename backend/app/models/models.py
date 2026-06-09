@@ -1,4 +1,4 @@
-"""Phase 1 + Phase 2 + Phase 4 SQLAlchemy models."""
+"""Phase 1–5 SQLAlchemy models."""
 import enum
 import uuid
 from datetime import datetime, timezone
@@ -76,6 +76,8 @@ class User(Base):
     hashed_password: Mapped[str] = mapped_column(String, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_premium: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_developer: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     profile: Mapped["Profile"] = relationship(back_populates="user", uselist=False)
@@ -323,3 +325,52 @@ class EducationProgress(Base):
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     lesson: Mapped[EducationLesson] = relationship(back_populates="progress")
+
+
+# ---------------------------------------------------------------------------
+# Phase 5 — moat + B2B tables
+# ---------------------------------------------------------------------------
+
+class ApiKey(Base):
+    __tablename__ = "api_keys"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    name: Mapped[str] = mapped_column(String, default="")
+    key_hash: Mapped[str] = mapped_column(String, unique=True)
+    key_prefix: Mapped[str] = mapped_column(String, default="")
+    scopes: Mapped[list] = mapped_column(JSON, default=list)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class CommunityReport(Base):
+    __tablename__ = "community_reports"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
+    scan_id: Mapped[str | None] = mapped_column(ForeignKey("scan_history.id"), nullable=True)
+    report_type: Mapped[str] = mapped_column(String)
+    artifact_text: Mapped[str] = mapped_column(Text, default="")
+    category: Mapped[str] = mapped_column(String, default="")
+    platform_hint: Mapped[str] = mapped_column(String, default="")
+    status: Mapped[str] = mapped_column(String, default="pending")
+    analyst_notes: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class ScamPattern(Base):
+    __tablename__ = "scam_patterns"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    name: Mapped[str] = mapped_column(String, unique=True)
+    description: Mapped[str] = mapped_column(Text, default="")
+    pattern_type: Mapped[str] = mapped_column(String, default="regex")
+    artifact_types: Mapped[list] = mapped_column(JSON, default=list)
+    pattern_data: Mapped[dict] = mapped_column(JSON, default=dict)
+    risk_score_boost: Mapped[int] = mapped_column(Integer, default=0)
+    category: Mapped[str] = mapped_column(String, default="unknown")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    source: Mapped[str] = mapped_column(String, default="analyst")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)

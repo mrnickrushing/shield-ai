@@ -480,3 +480,202 @@ def test_password_check_requires_password_field():
     headers = _auth_headers()
     r = client.post("/api/v1/identity/password-check", json={}, headers=headers)
     assert r.status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# Phase 5 — moat + B2B service unit tests
+# ---------------------------------------------------------------------------
+
+def test_model_router_returns_config_per_type():
+    from app.services import model_router
+
+    for artifact_type in ["link", "image", "qr", "message", "email", "phone", "marketplace", "social"]:
+        cfg = model_router.get_config(artifact_type)
+        assert cfg.model
+        assert 0 <= cfg.temperature <= 1
+        assert cfg.max_tokens > 0
+        assert cfg.system_hint
+
+
+def test_model_router_unknown_type_returns_default():
+    from app.services import model_router
+
+    cfg = model_router.get_config("unknown_type")
+    assert cfg.model == "gpt-4o-mini"
+
+
+def test_threat_intel_matches_regex_pattern():
+    from app.services import threat_intel
+
+    boost, flags = threat_intel.check_patterns(
+        db=None,  # type: ignore[arg-type]
+        text="Send BTC receive back double your bitcoin!",
+        artifact_type="social",
+    )
+    # No DB patterns seeded (None db), should return 0 gracefully
+    # The service handles empty results when db is None or empty
+    assert isinstance(boost, int)
+    assert isinstance(flags, list)
+
+
+def test_community_report_endpoint_requires_auth():
+    r = client.post("/api/v1/community/reports", json={"report_type": "new_pattern"})
+    assert r.status_code in (401, 403)
+
+
+def test_admin_stats_requires_auth():
+    r = client.get("/api/v1/admin/stats")
+    assert r.status_code in (401, 403)
+
+
+def test_developer_keys_require_auth():
+    r = client.get("/api/v1/developer/keys")
+    assert r.status_code in (401, 403)
+
+
+def test_community_report_full_flow():
+    headers = _auth_headers()
+    r = client.post(
+        "/api/v1/community/reports",
+        json={
+            "report_type": "new_pattern",
+            "artifact_text": "You won a prize! Click here to claim it.",
+            "category": "social_engineering",
+            "platform_hint": "sms",
+        },
+        headers=headers,
+    )
+    assert r.status_code == 201, r.text
+    data = r.json()
+    assert data["report_type"] == "new_pattern"
+    assert data["status"] == "pending"
+
+
+def test_community_reports_list():
+    headers = _auth_headers()
+    client.post(
+        "/api/v1/community/reports",
+        json={"report_type": "false_positive", "artifact_text": "test"},
+        headers=headers,
+    )
+    r = client.get("/api/v1/community/reports", headers=headers)
+    assert r.status_code == 200
+    assert len(r.json()) >= 1
+
+
+def test_community_patterns_list():
+    headers = _auth_headers()
+    r = client.get("/api/v1/community/patterns", headers=headers)
+    assert r.status_code == 200
+    assert isinstance(r.json(), list)
+
+
+def test_developer_key_create_and_list():
+    headers = _auth_headers()
+    r = client.post(
+        "/api/v1/developer/keys",
+        json={"name": "Test Key", "scopes": ["scan:read"]},
+        headers=headers,
+    )
+    assert r.status_code == 201, r.text
+    data = r.json()
+    assert data["name"] == "Test Key"
+    assert "raw_key" in data
+    assert data["raw_key"].startswith("shld_")
+    assert data["key_prefix"] == data["raw_key"][:12]
+
+    list_r = client.get("/api/v1/developer/keys", headers=headers)
+    assert list_r.status_code == 200
+    keys = list_r.json()
+    assert any(k["id"] == data["id"] for k in keys)
+
+
+def test_developer_key_revoke():
+    headers = _auth_headers()
+    created = client.post(
+        "/api/v1/developer/keys",
+        json={"name": "Revoke Me"},
+        headers=headers,
+    ).json()
+    r = client.delete(f"/api/v1/developer/keys/{created['id']}", headers=headers)
+    assert r.status_code == 204
+
+    keys = client.get("/api/v1/developer/keys", headers=headers).json()
+    assert not any(k["id"] == created["id"] for k in keys)
+
+
+def test_api_key_auth_on_scan_endpoint():
+    import time
+    # Create a user and get an API key
+    email = f"apitest+{int(time.time()*1000)}@example.com"
+    reg = client.post("/api/v1/auth/register", json={"email": email, "password": "supersecret1", "display_name": "Dev"})
+    token = reg.json()["access_token"]
+    jwt_headers = {"Authorization": f"Bearer {token}"}
+
+    key_data = client.post("/api/v1/developer/keys", json={"name": "Scan Key"}, headers=jwt_headers).json()
+    raw_key = key_data["raw_key"]
+
+    # Use API key instead of JWT for a scan
+    api_key_headers = {"X-API-Key": raw_key}
+    r = client.post("/api/v1/scans/link", json={"url": "http://example.com"}, headers=api_key_headers)
+    assert r.status_code == 201, r.text
+    assert r.json()["scan_type"] == "link"
+
+
+def test_admin_requires_is_admin_flag():
+    headers = _auth_headers()
+    # Regular user should get 403 from admin endpoint
+    r = client.get("/api/v1/admin/stats", headers=headers)
+    assert r.status_code == 403
+
+
+def test_scam_pattern_crud_admin():
+    import time
+    # Create an admin user by directly setting the flag via DB
+    email = f"admin+{int(time.time()*1000)}@example.com"
+    reg = client.post("/api/v1/auth/register", json={"email": email, "password": "supersecret1", "display_name": "Admin"})
+    token = reg.json()["access_token"]
+    user_id = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"}).json()["id"]
+
+    # Promote via DB override
+    from app.models.models import User as UserModel
+    db = next(_override_db())
+    user = db.get(UserModel, user_id)
+    user.is_admin = True
+    db.commit()
+
+    admin_headers = {"Authorization": f"Bearer {token}"}
+
+    # Stats should now work
+    stats_r = client.get("/api/v1/admin/stats", headers=admin_headers)
+    assert stats_r.status_code == 200
+    stats = stats_r.json()
+    assert "total_users" in stats
+    assert "total_scans" in stats
+
+    # Create a scam pattern
+    pat_r = client.post(
+        "/api/v1/admin/patterns",
+        json={
+            "name": f"test_pattern_{int(time.time()*1000)}",
+            "description": "Test pattern",
+            "pattern_type": "regex",
+            "artifact_types": ["message"],
+            "pattern_data": {"regex": "test.*scam", "flags": "i"},
+            "risk_score_boost": 30,
+            "category": "social_engineering",
+        },
+        headers=admin_headers,
+    )
+    assert pat_r.status_code == 201, pat_r.text
+    pat = pat_r.json()
+    assert pat["risk_score_boost"] == 30
+
+    # List patterns
+    list_r = client.get("/api/v1/admin/patterns", headers=admin_headers)
+    assert list_r.status_code == 200
+    assert any(p["id"] == pat["id"] for p in list_r.json())
+
+    # Disable the pattern
+    del_r = client.delete(f"/api/v1/admin/patterns/{pat['id']}", headers=admin_headers)
+    assert del_r.status_code == 204

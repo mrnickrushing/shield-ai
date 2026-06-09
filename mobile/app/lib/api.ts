@@ -49,11 +49,152 @@ api.interceptors.response.use(
   }
 );
 
-export type RiskReport = { risk_score: number; risk_level: "safe" | "low" | "suspicious" | "high" | "critical"; threat_category: string; confidence: number; explanation: string; red_flags: string[]; recommended_actions: string[]; evidence: Record<string, unknown> };
-export type Scan = { id: string; scan_type: "link" | "image" | "qr" | "message" | "email" | "phone"; status: string; raw_input: string; created_at: string; completed_at: string | null; report: RiskReport | null };
-export type UserProfile = { id: string; email: string; is_premium: boolean; display_name: string; simple_language_mode: boolean; large_text_mode: boolean };
-export type Incident = { id: string; incident_type: string; status: string; title: string; amount_lost: number | null; currency: string; notes: string; linked_scan_id: string | null; steps_completed: string[]; created_at: string; updated_at: string };
-export type TrustedContact = { id: string; name: string; phone: string; email: string; relationship_label: string; created_at: string };
+// ---------------------------------------------------------------------------
+// Shared types
+// ---------------------------------------------------------------------------
+
+export type RiskReport = {
+  risk_score: number;
+  risk_level: "safe" | "low" | "suspicious" | "high" | "critical";
+  threat_category: string;
+  confidence: number;
+  explanation: string;
+  red_flags: string[];
+  recommended_actions: string[];
+  evidence: Record<string, unknown>;
+};
+
+export type ScanType =
+  | "link"
+  | "image"
+  | "qr"
+  | "message"
+  | "email"
+  | "phone"
+  | "marketplace"
+  | "social";
+
+export type Scan = {
+  id: string;
+  scan_type: ScanType;
+  status: string;
+  raw_input: string;
+  created_at: string;
+  completed_at: string | null;
+  report: RiskReport | null;
+};
+
+export type UserProfile = {
+  id: string;
+  email: string;
+  is_premium: boolean;
+  display_name: string;
+  simple_language_mode: boolean;
+  large_text_mode: boolean;
+};
+
+export type Incident = {
+  id: string;
+  incident_type: string;
+  status: string;
+  title: string;
+  amount_lost: number | null;
+  currency: string;
+  notes: string;
+  linked_scan_id: string | null;
+  steps_completed: string[];
+  created_at: string;
+  updated_at: string;
+};
+
+export type TrustedContact = {
+  id: string;
+  name: string;
+  phone: string;
+  email: string;
+  relationship_label: string;
+  created_at: string;
+};
+
+export type Notification = {
+  id: string;
+  title: string;
+  body: string;
+  scan_id: string | null;
+  is_read: boolean;
+  created_at: string;
+};
+
+export type BreachInfo = {
+  name: string;
+  title: string;
+  domain: string;
+  breach_date: string;
+  pwn_count: number;
+  data_classes: string[];
+  is_verified: boolean;
+};
+
+export type BreachResult = {
+  email: string;
+  breach_count: number;
+  severity: "none" | "low" | "medium" | "high";
+  breaches: BreachInfo[];
+  actions: string[];
+  disclaimer: string;
+  data_available: boolean;
+  checked_at: string;
+};
+
+export type IdentityAlert = {
+  id: string;
+  alert_type: string;
+  email: string;
+  detail: Record<string, unknown>;
+  is_read: boolean;
+  created_at: string;
+};
+
+export type ApiKeyOut = {
+  id: string;
+  name: string;
+  key_prefix: string;
+  scopes: string[];
+  is_active: boolean;
+  created_at: string;
+  last_used_at: string | null;
+};
+
+export type ApiKeyCreated = ApiKeyOut & { raw_key: string };
+
+export type CommunityReportType = "false_positive" | "missed_scam" | "new_pattern";
+
+export type CommunityReportOut = {
+  id: string;
+  report_type: CommunityReportType;
+  artifact_text: string;
+  category: string;
+  platform_hint: string;
+  status: string;
+  created_at: string;
+};
+
+export type ScamPatternOut = {
+  id: string;
+  name: string;
+  description: string;
+  pattern_type: string;
+  artifact_types: string[];
+  risk_score_boost: number;
+  category: string;
+  is_active: boolean;
+  source: string;
+  created_at: string;
+};
+
+// ---------------------------------------------------------------------------
+// API surface
+// ---------------------------------------------------------------------------
 
 export const ShieldAPI = {
   register: (email: string, password: string, display_name: string) => api.post("/auth/register", { email, password, display_name }).then((r) => r.data),
@@ -64,18 +205,77 @@ export const ShieldAPI = {
   scanImage: (image_base64: string, filename = "screenshot.png") => api.post<Scan>("/scans/image", { image_base64, filename }).then((r) => r.data),
   listScans: () => api.get<Scan[]>("/scans").then((r) => r.data),
   getScan: (id: string) => api.get<Scan>(`/scans/${id}`).then((r) => r.data),
-  feedback: (id: string, feedback: "helpful" | "false_positive") => api.post(`/scans/${id}/feedback`, { feedback }),
-  getWizardSteps: (incident_type: string) => api.get(`/recovery/wizard/${incident_type}`).then((r) => r.data),
-  createIncident: (payload: { incident_type: string; linked_scan_id?: string; title?: string }) => api.post<Incident>("/recovery/incidents", payload).then((r) => r.data),
-  listIncidents: () => api.get<Incident[]>("/recovery/incidents").then((r) => r.data),
-  getIncident: (id: string) => api.get<Incident>(`/recovery/incidents/${id}`).then((r) => r.data),
-  updateIncident: (id: string, payload: Partial<Incident>) => api.patch<Incident>(`/recovery/incidents/${id}`, payload).then((r) => r.data),
-  addEvidence: (incident_id: string, payload: { evidence_type: string; content: string; label?: string }) => api.post(`/recovery/incidents/${incident_id}/evidence`, payload).then((r) => r.data),
-  getIncidentSummary: (id: string) => api.get(`/recovery/incidents/${id}/summary`).then((r) => r.data),
-  listContacts: () => api.get<TrustedContact[]>("/family/contacts").then((r) => r.data),
-  addContact: (payload: { name: string; phone?: string; email?: string; relationship_label?: string }) => api.post<TrustedContact>("/family/contacts", payload).then((r) => r.data),
-  removeContact: (id: string) => api.delete(`/family/contacts/${id}`),
-  listLessons: (threat_category?: string) => api.get("/education/lessons", { params: threat_category ? { threat_category } : {} }).then((r) => r.data),
-  getLesson: (id: string) => api.get(`/education/lessons/${id}`).then((r) => r.data),
-  completeLesson: (id: string, payload: { answers: number[] }) => api.post(`/education/lessons/${id}/complete`, payload).then((r) => r.data),
+  feedback: (id: string, feedback: "helpful" | "false_positive") =>
+    api.post(`/scans/${id}/feedback`, { feedback }),
+
+  // Notifications
+  registerDevice: (push_token: string, platform: "ios" | "android") =>
+    api.post("/notifications/devices", { push_token, platform }),
+  listNotifications: (unread_only = false) =>
+    api.get<Notification[]>("/notifications", { params: { unread_only } }).then((r) => r.data),
+  markNotificationRead: (id: string) =>
+    api.post(`/notifications/${id}/read`),
+  markAllNotificationsRead: () =>
+    api.post("/notifications/read-all"),
+
+  // Recovery wizard
+  getWizardSteps: (incident_type: string) =>
+    api.get(`/recovery/wizard/${incident_type}`).then((r) => r.data),
+  createIncident: (payload: { incident_type: string; linked_scan_id?: string; title?: string }) =>
+    api.post<Incident>("/recovery/incidents", payload).then((r) => r.data),
+  listIncidents: () =>
+    api.get<Incident[]>("/recovery/incidents").then((r) => r.data),
+  getIncident: (id: string) =>
+    api.get<Incident>(`/recovery/incidents/${id}`).then((r) => r.data),
+  updateIncident: (id: string, payload: Partial<Incident>) =>
+    api.patch<Incident>(`/recovery/incidents/${id}`, payload).then((r) => r.data),
+  addEvidence: (incident_id: string, payload: { evidence_type: string; content: string; label?: string }) =>
+    api.post(`/recovery/incidents/${incident_id}/evidence`, payload).then((r) => r.data),
+  getIncidentSummary: (id: string) =>
+    api.get(`/recovery/incidents/${id}/summary`).then((r) => r.data),
+
+  // Family protection
+  listContacts: () =>
+    api.get<TrustedContact[]>("/family/contacts").then((r) => r.data),
+  addContact: (payload: { name: string; phone?: string; email?: string; relationship_label?: string }) =>
+    api.post<TrustedContact>("/family/contacts", payload).then((r) => r.data),
+  removeContact: (id: string) =>
+    api.delete(`/family/contacts/${id}`),
+
+  // Education
+  listLessons: (threat_category?: string) =>
+    api.get("/education/lessons", { params: threat_category ? { threat_category } : {} }).then((r) => r.data),
+  getLesson: (id: string) =>
+    api.get(`/education/lessons/${id}`).then((r) => r.data),
+  completeLesson: (id: string, payload: { answers: number[] }) =>
+    api.post(`/education/lessons/${id}/complete`, payload).then((r) => r.data),
+
+  // Identity protection
+  breachCheck: (email: string) =>
+    api.post<BreachResult>("/identity/breach-check", { email }).then((r) => r.data),
+  passwordCheck: (password: string) =>
+    api.post<{ pwned_count: number; is_compromised: boolean; recommendation: string }>(
+      "/identity/password-check",
+      { password }
+    ).then((r) => r.data),
+  listIdentityAlerts: () =>
+    api.get<IdentityAlert[]>("/identity/alerts").then((r) => r.data),
+  markAlertRead: (id: string) =>
+    api.post(`/identity/alerts/${id}/read`),
+
+  // Community reporting
+  submitReport: (payload: { scan_id?: string; report_type: CommunityReportType; artifact_text?: string; category?: string; platform_hint?: string }) =>
+    api.post<CommunityReportOut>("/community/reports", payload).then((r) => r.data),
+  listMyReports: () =>
+    api.get<CommunityReportOut[]>("/community/reports").then((r) => r.data),
+  listPublicPatterns: () =>
+    api.get<ScamPatternOut[]>("/community/patterns").then((r) => r.data),
+
+  // Developer API key management
+  createApiKey: (name: string, scopes = ["scan:read", "scan:write"]) =>
+    api.post<ApiKeyCreated>("/developer/keys", { name, scopes }).then((r) => r.data),
+  listApiKeys: () =>
+    api.get<ApiKeyOut[]>("/developer/keys").then((r) => r.data),
+  revokeApiKey: (id: string) =>
+    api.delete(`/developer/keys/${id}`),
 };
