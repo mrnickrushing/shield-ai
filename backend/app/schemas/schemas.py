@@ -26,6 +26,11 @@ class RefreshRequest(BaseModel):
     refresh_token: str
 
 
+class ProfileUpdate(BaseModel):
+    display_name: str | None = None
+    simple_language_mode: bool | None = None
+
+
 class UserOut(BaseModel):
     id: str
     email: EmailStr

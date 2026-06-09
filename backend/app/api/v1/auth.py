@@ -13,6 +13,7 @@ from app.core.security import (
 from app.db.session import get_db
 from app.models.models import AuditLog, Profile, User
 from app.schemas.schemas import (
+    ProfileUpdate,
     RefreshRequest,
     TokenPair,
     UserLogin,
@@ -76,4 +77,26 @@ def me(user: User = Depends(get_current_user)):
     display = user.profile.display_name if user.profile else ""
     return UserOut(
         id=user.id, email=user.email, is_premium=user.is_premium, display_name=display
+    )
+
+
+@router.patch("/me", response_model=UserOut)
+def update_me(
+    payload: ProfileUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    profile = user.profile
+    if profile is None:
+        profile = Profile(user_id=user.id)
+        db.add(profile)
+    if payload.display_name is not None:
+        profile.display_name = payload.display_name
+    if payload.simple_language_mode is not None:
+        profile.simple_language_mode = payload.simple_language_mode
+    db.commit()
+    db.refresh(profile)
+    return UserOut(
+        id=user.id, email=user.email, is_premium=user.is_premium,
+        display_name=profile.display_name,
     )

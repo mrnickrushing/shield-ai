@@ -58,6 +58,18 @@ def test_register_login_flow():
     assert me.json()["email"] == "test@example.com"
 
 
+def test_update_profile():
+    reg = client.post(
+        "/api/v1/auth/register",
+        json={"email": "prof@example.com", "password": "supersecret1", "display_name": "Old"},
+    )
+    token = reg.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+    r = client.patch("/api/v1/auth/me", json={"display_name": "New Name"}, headers=headers)
+    assert r.status_code == 200
+    assert r.json()["display_name"] == "New Name"
+
+
 def test_link_scan_requires_auth():
     r = client.post("/api/v1/scans/link", json={"url": "http://example.com"})
     assert r.status_code in (401, 403)
