@@ -74,6 +74,12 @@ jobs:
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
 
+      - name: Deploy web admin to Railway
+        working-directory: web
+        run: railway up
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN_WEB }}
+
       - name: Verify deployment health
         run: |
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://backend-production-f835.up.railway.app/health)
