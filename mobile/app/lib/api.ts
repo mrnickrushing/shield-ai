@@ -8,10 +8,7 @@ const API_URL =
   process.env.EXPO_PUBLIC_API_URL ??
   "http://localhost:8000";
 
-export const api = axios.create({
-  baseURL: `${API_URL}/api/v1`,
-  timeout: 30000,
-});
+export const api = axios.create({ baseURL: `${API_URL}/api/v1`, timeout: 30000 });
 
 const ACCESS_KEY = "shield_access_token";
 const REFRESH_KEY = "shield_refresh_token";
@@ -20,15 +17,11 @@ export async function saveTokens(access: string, refresh: string) {
   await SecureStore.setItemAsync(ACCESS_KEY, access);
   await SecureStore.setItemAsync(REFRESH_KEY, refresh);
 }
-
 export async function clearTokens() {
   await SecureStore.deleteItemAsync(ACCESS_KEY);
   await SecureStore.deleteItemAsync(REFRESH_KEY);
 }
-
-export async function getAccessToken() {
-  return SecureStore.getItemAsync(ACCESS_KEY);
-}
+export async function getAccessToken() { return SecureStore.getItemAsync(ACCESS_KEY); }
 
 api.interceptors.request.use(async (config) => {
   const token = await getAccessToken();
@@ -36,7 +29,6 @@ api.interceptors.request.use(async (config) => {
   return config;
 });
 
-// On 401, try a one-time refresh.
 api.interceptors.response.use(
   (r) => r,
   async (error) => {
@@ -46,171 +38,44 @@ api.interceptors.response.use(
       const refresh = await SecureStore.getItemAsync(REFRESH_KEY);
       if (refresh) {
         try {
-          const { data } = await axios.post(`${API_URL}/api/v1/auth/refresh`, {
-            refresh_token: refresh,
-          });
+          const { data } = await axios.post(`${API_URL}/api/v1/auth/refresh`, { refresh_token: refresh });
           await saveTokens(data.access_token, data.refresh_token);
           original.headers.Authorization = `Bearer ${data.access_token}`;
           return api(original);
-        } catch {
-          await clearTokens();
-        }
+        } catch { await clearTokens(); }
       }
     }
     return Promise.reject(error);
   }
 );
 
-// ---------------------------------------------------------------------------
-// Shared types
-// ---------------------------------------------------------------------------
-
-export type RiskReport = {
-  risk_score: number;
-  risk_level: "safe" | "low" | "suspicious" | "high" | "critical";
-  threat_category: string;
-  confidence: number;
-  explanation: string;
-  red_flags: string[];
-  recommended_actions: string[];
-  evidence: Record<string, unknown>;
-};
-
-export type ScanType =
-  | "link"
-  | "image"
-  | "qr"
-  | "message"
-  | "email"
-  | "phone"
-  | "marketplace"
-  | "social";
-
-export type Scan = {
-  id: string;
-  scan_type: ScanType;
-  status: string;
-  raw_input: string;
-  created_at: string;
-  completed_at: string | null;
-  report: RiskReport | null;
-};
-
-export type UserProfile = {
-  id: string;
-  email: string;
-  is_premium: boolean;
-  display_name: string;
-};
-
-export type Notification = {
-  id: string;
-  title: string;
-  body: string;
-  scan_id: string | null;
-  is_read: boolean;
-  created_at: string;
-};
-
-export type BreachInfo = {
-  name: string;
-  title: string;
-  domain: string;
-  breach_date: string;
-  pwn_count: number;
-  data_classes: string[];
-  is_verified: boolean;
-};
-
-export type BreachResult = {
-  email: string;
-  breach_count: number;
-  severity: "none" | "low" | "medium" | "high";
-  breaches: BreachInfo[];
-  actions: string[];
-  disclaimer: string;
-  data_available: boolean;
-  checked_at: string;
-};
-
-export type IdentityAlert = {
-  id: string;
-  alert_type: string;
-  email: string;
-  detail: Record<string, unknown>;
-  is_read: boolean;
-  created_at: string;
-};
-
-// ---------------------------------------------------------------------------
-// API surface
-// ---------------------------------------------------------------------------
+export type RiskReport = { risk_score: number; risk_level: "safe" | "low" | "suspicious" | "high" | "critical"; threat_category: string; confidence: number; explanation: string; red_flags: string[]; recommended_actions: string[]; evidence: Record<string, unknown> };
+export type Scan = { id: string; scan_type: "link" | "image" | "qr" | "message" | "email" | "phone"; status: string; raw_input: string; created_at: string; completed_at: string | null; report: RiskReport | null };
+export type UserProfile = { id: string; email: string; is_premium: boolean; display_name: string; simple_language_mode: boolean; large_text_mode: boolean };
+export type Incident = { id: string; incident_type: string; status: string; title: string; amount_lost: number | null; currency: string; notes: string; linked_scan_id: string | null; steps_completed: string[]; created_at: string; updated_at: string };
+export type TrustedContact = { id: string; name: string; phone: string; email: string; relationship_label: string; created_at: string };
 
 export const ShieldAPI = {
-  // Auth
-  register: (email: string, password: string, display_name: string) =>
-    api.post("/auth/register", { email, password, display_name }).then((r) => r.data),
-  login: (email: string, password: string) =>
-    api.post("/auth/login", { email, password }).then((r) => r.data),
+  register: (email: string, password: string, display_name: string) => api.post("/auth/register", { email, password, display_name }).then((r) => r.data),
+  login: (email: string, password: string) => api.post("/auth/login", { email, password }).then((r) => r.data),
   me: () => api.get<UserProfile>("/auth/me").then((r) => r.data),
-  updateProfile: (display_name: string) =>
-    api.patch<UserProfile>("/auth/me", { display_name }).then((r) => r.data),
-
-  // Phase 1 scans
-  scanLink: (url: string) =>
-    api.post<Scan>("/scans/link", { url }).then((r) => r.data),
-  scanImage: (image_base64: string, filename = "screenshot.png") =>
-    api.post<Scan>("/scans/image", { image_base64, filename }).then((r) => r.data),
-
-  // Phase 2 scans
-  scanQR: (qr_content: string) =>
-    api.post<Scan>("/scans/qr", { qr_content }).then((r) => r.data),
-  scanMessage: (message_text: string, platform_hint = "") =>
-    api.post<Scan>("/scans/message", { message_text, platform_hint }).then((r) => r.data),
-  scanEmail: (payload: {
-    raw_email?: string;
-    sender_email?: string;
-    sender_display_name?: string;
-    reply_to_email?: string;
-    subject?: string;
-    body_text?: string;
-  }) => api.post<Scan>("/scans/email", payload).then((r) => r.data),
-  scanPhone: (phone_number: string) =>
-    api.post<Scan>("/scans/phone", { phone_number }).then((r) => r.data),
-
-  // Phase 3 scans
-  scanMarketplace: (content_text: string, platform_hint = "") =>
-    api.post<Scan>("/scans/marketplace", { content_text, platform_hint }).then((r) => r.data),
-  scanSocial: (content_text: string, platform = "") =>
-    api.post<Scan>("/scans/social", { content_text, platform }).then((r) => r.data),
-
-  // Scan history
+  updateProfile: (display_name: string) => api.patch<UserProfile>("/auth/me", { display_name }).then((r) => r.data),
+  scanLink: (url: string) => api.post<Scan>("/scans/link", { url }).then((r) => r.data),
+  scanImage: (image_base64: string, filename = "screenshot.png") => api.post<Scan>("/scans/image", { image_base64, filename }).then((r) => r.data),
   listScans: () => api.get<Scan[]>("/scans").then((r) => r.data),
   getScan: (id: string) => api.get<Scan>(`/scans/${id}`).then((r) => r.data),
-  feedback: (id: string, feedback: "helpful" | "false_positive") =>
-    api.post(`/scans/${id}/feedback`, { feedback }),
-
-  // Notifications
-  registerDevice: (push_token: string, platform: "ios" | "android") =>
-    api.post("/notifications/devices", { push_token, platform }),
-  listNotifications: (unread_only = false) =>
-    api.get<Notification[]>("/notifications", { params: { unread_only } }).then((r) => r.data),
-  markNotificationRead: (id: string) =>
-    api.post(`/notifications/${id}/read`),
-  markAllNotificationsRead: () =>
-    api.post("/notifications/read-all"),
-
-  // Identity protection
-  breachCheck: (email: string) =>
-    api.post<BreachResult>("/identity/breach-check", { email }).then((r) => r.data),
-  passwordCheck: (password: string) =>
-    api
-      .post<{ pwned_count: number; is_compromised: boolean; recommendation: string }>(
-        "/identity/password-check",
-        { password }
-      )
-      .then((r) => r.data),
-  listIdentityAlerts: () =>
-    api.get<IdentityAlert[]>("/identity/alerts").then((r) => r.data),
-  markAlertRead: (id: string) => api.post(`/identity/alerts/${id}/read`),
+  feedback: (id: string, feedback: "helpful" | "false_positive") => api.post(`/scans/${id}/feedback`, { feedback }),
+  getWizardSteps: (incident_type: string) => api.get(`/recovery/wizard/${incident_type}`).then((r) => r.data),
+  createIncident: (payload: { incident_type: string; linked_scan_id?: string; title?: string }) => api.post<Incident>("/recovery/incidents", payload).then((r) => r.data),
+  listIncidents: () => api.get<Incident[]>("/recovery/incidents").then((r) => r.data),
+  getIncident: (id: string) => api.get<Incident>(`/recovery/incidents/${id}`).then((r) => r.data),
+  updateIncident: (id: string, payload: Partial<Incident>) => api.patch<Incident>(`/recovery/incidents/${id}`, payload).then((r) => r.data),
+  addEvidence: (incident_id: string, payload: { evidence_type: string; content: string; label?: string }) => api.post(`/recovery/incidents/${incident_id}/evidence`, payload).then((r) => r.data),
+  getIncidentSummary: (id: string) => api.get(`/recovery/incidents/${id}/summary`).then((r) => r.data),
+  listContacts: () => api.get<TrustedContact[]>("/family/contacts").then((r) => r.data),
+  addContact: (payload: { name: string; phone?: string; email?: string; relationship_label?: string }) => api.post<TrustedContact>("/family/contacts", payload).then((r) => r.data),
+  removeContact: (id: string) => api.delete(`/family/contacts/${id}`),
+  listLessons: (threat_category?: string) => api.get("/education/lessons", { params: threat_category ? { threat_category } : {} }).then((r) => r.data),
+  getLesson: (id: string) => api.get(`/education/lessons/${id}`).then((r) => r.data),
+  completeLesson: (id: string, payload: { answers: number[] }) => api.post(`/education/lessons/${id}/complete`, payload).then((r) => r.data),
 };

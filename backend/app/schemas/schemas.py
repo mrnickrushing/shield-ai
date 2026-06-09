@@ -1,10 +1,9 @@
-"""Pydantic request/response schemas for Phase 1 + Phase 2."""
+"""Pydantic request/response schemas for Phase 1 + Phase 2 + Phase 4."""
 from datetime import datetime
 
 from pydantic import BaseModel, EmailStr, Field
 
 
-# --- Auth ---
 class UserRegister(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
@@ -29,6 +28,7 @@ class RefreshRequest(BaseModel):
 class ProfileUpdate(BaseModel):
     display_name: str | None = None
     simple_language_mode: bool | None = None
+    large_text_mode: bool | None = None
 
 
 class UserOut(BaseModel):
@@ -36,18 +36,18 @@ class UserOut(BaseModel):
     email: EmailStr
     is_premium: bool
     display_name: str = ""
+    simple_language_mode: bool = False
+    large_text_mode: bool = False
 
     class Config:
         from_attributes = True
 
 
-# --- Scans ---
 class LinkScanCreate(BaseModel):
     url: str
 
 
 class ImageScanCreate(BaseModel):
-    # base64-encoded image; in production this is a multipart upload / signed URL.
     image_base64: str
     filename: str = "screenshot.png"
 
@@ -83,22 +83,17 @@ class ScanFeedback(BaseModel):
     feedback: str = Field(pattern="^(helpful|false_positive)$")
 
 
-# ---------------------------------------------------------------------------
-# Phase 2 — new input types
-# ---------------------------------------------------------------------------
-
 class QRScanCreate(BaseModel):
-    # The mobile app decodes the QR and sends us the raw string content.
     qr_content: str
 
 
 class MessageScanCreate(BaseModel):
     message_text: str
-    platform_hint: str = ""  # "sms" | "whatsapp" | "imessage" | "telegram" | ""
+    platform_hint: str = ""
 
 
 class EmailScanCreate(BaseModel):
-    raw_email: str | None = None         # Full raw email including headers
+    raw_email: str | None = None
     sender_email: str | None = None
     sender_display_name: str | None = None
     reply_to_email: str | None = None
@@ -109,10 +104,6 @@ class EmailScanCreate(BaseModel):
 class PhoneScanCreate(BaseModel):
     phone_number: str
 
-
-# ---------------------------------------------------------------------------
-# Phase 2 — notifications
-# ---------------------------------------------------------------------------
 
 class DeviceRegister(BaseModel):
     push_token: str
@@ -131,55 +122,81 @@ class NotificationOut(BaseModel):
         from_attributes = True
 
 
-# ---------------------------------------------------------------------------
-# Phase 3 — protection workflows
-# ---------------------------------------------------------------------------
-
-class MarketplaceScanCreate(BaseModel):
-    content_text: str
-    platform_hint: str = ""   # facebook_marketplace | ebay | craigslist | offerup | ""
-
-
-class SocialScanCreate(BaseModel):
-    content_text: str
-    platform: str = ""        # instagram | facebook | twitter | tiktok | ""
+# Phase 4
+class IncidentCreate(BaseModel):
+    incident_type: str
+    title: str = ""
+    amount_lost: float | None = None
+    currency: str = "USD"
+    notes: str = ""
+    linked_scan_id: str | None = None
 
 
-class BreachCheckRequest(BaseModel):
-    email: EmailStr
+class IncidentUpdate(BaseModel):
+    status: str | None = None
+    title: str | None = None
+    amount_lost: float | None = None
+    notes: str | None = None
+    steps_completed: list[str] | None = None
 
 
-class BreachOut(BaseModel):
-    name: str
+class IncidentOut(BaseModel):
+    id: str
+    incident_type: str
+    status: str
     title: str
-    domain: str
-    breach_date: str
-    pwn_count: int
-    data_classes: list[str]
-    is_verified: bool
-
-
-class BreachCheckResult(BaseModel):
-    email: str
-    breach_count: int
-    severity: str               # none | low | medium | high
-    breaches: list[BreachOut]
-    actions: list[str]
-    disclaimer: str
-    data_available: bool
-    checked_at: datetime
+    amount_lost: float | None = None
+    currency: str
+    notes: str
+    linked_scan_id: str | None = None
+    steps_completed: list = []
+    created_at: datetime
+    updated_at: datetime
 
     class Config:
         from_attributes = True
 
 
-class IdentityAlertOut(BaseModel):
+class IncidentEvidenceCreate(BaseModel):
+    evidence_type: str
+    content: str
+    label: str = ""
+
+
+class TrustedContactCreate(BaseModel):
+    name: str
+    phone: str = ""
+    email: str = ""
+    relationship_label: str = ""
+
+
+class TrustedContactOut(BaseModel):
     id: str
-    alert_type: str
+    name: str
+    phone: str
     email: str
-    detail: dict
-    is_read: bool
+    relationship_label: str
     created_at: datetime
 
     class Config:
         from_attributes = True
+
+
+class LessonOut(BaseModel):
+    id: str
+    slug: str
+    title: str
+    summary: str
+    content: str
+    threat_category: str
+    difficulty: str
+    estimated_minutes: int
+    quiz_questions: list
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class QuizSubmit(BaseModel):
+    answers: list[int] = []
