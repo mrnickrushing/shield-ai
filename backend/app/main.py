@@ -6,17 +6,13 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1 import auth, scans
 from app.core.config import settings
-from app.db.session import Base, engine
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Phase 1: create any missing tables on startup. Future phases move this
-    # to Alembic migrations. create_all is a no-op for tables that exist.
-    try:
-        Base.metadata.create_all(bind=engine)
-    except Exception as exc:  # don't block startup/health if DB is briefly unready
-        print(f"[startup] table creation skipped: {exc}")
+    # Schema is managed exclusively by Alembic (run from start.py on boot).
+    # We intentionally do NOT call create_all here — doing both caused
+    # DuplicateTable errors when migrations and create_all raced.
     yield
 
 
