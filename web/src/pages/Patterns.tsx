@@ -9,20 +9,29 @@ export default function PatternsPage() {
   const [patterns, setPatterns] = useState<ScamPattern[]>([]);
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState<Partial<ScamPattern>>(EMPTY);
+  const [error, setError] = useState("");
 
-  const load = () => AdminAPI.patterns().then(r => setPatterns(r.data));
+  const load = () => AdminAPI.patterns().then(r => setPatterns(r.data)).catch(() => setError("Failed to load patterns."));
   useEffect(() => { load(); }, []);
 
   const toggle = async (p: ScamPattern) => {
-    await AdminAPI.updatePattern(p.id, { is_active: !p.is_active });
-    load();
+    try {
+      await AdminAPI.updatePattern(p.id, { is_active: !p.is_active });
+      load();
+    } catch {
+      setError("Failed to toggle pattern.");
+    }
   };
 
   const create = async () => {
-    await AdminAPI.createPattern(form);
-    setCreating(false);
-    setForm(EMPTY);
-    load();
+    try {
+      await AdminAPI.createPattern(form);
+      setCreating(false);
+      setForm(EMPTY);
+      load();
+    } catch {
+      setError("Failed to create pattern.");
+    }
   };
 
   const inp = (style?: object) => ({
@@ -32,6 +41,7 @@ export default function PatternsPage() {
 
   return (
     <div>
+      {error && <p style={{ color: "#ef4444", marginBottom: 12, fontSize: 13 }}>{error}</p>}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24 }}>
         <div>
           <h1 style={{ color: C.text, fontSize: 24, fontWeight: 800, marginBottom: 4 }}>Scam Patterns</h1>
@@ -86,8 +96,22 @@ export default function PatternsPage() {
               </select>
             </div>
             <div style={{ marginBottom: 12 }}>
-              <label style={{ color: C.muted, fontSize: 12, display: "block", marginBottom: 4 }}>regex (if regex type)</label>
-              <input value={(form.pattern_data as any)?.regex ?? ""} onChange={e => setForm(f => ({ ...f, pattern_data: { ...(f.pattern_data as any), regex: e.target.value } }))} style={inp()} />
+              <label style={{ color: C.muted, fontSize: 12, display: "block", marginBottom: 4 }}>
+                {form.pattern_type === "keyword" ? "keywords (comma-separated)" : "regex pattern"}
+              </label>
+              <input
+                placeholder={form.pattern_type === "keyword" ? "keyword1, keyword2, keyword3" : "e.g. irs.*arrest"}
+                value={form.pattern_type === "keyword"
+                  ? (Array.isArray((form.pattern_data as any)?.keywords) ? (form.pattern_data as any).keywords.join(", ") : "")
+                  : ((form.pattern_data as any)?.regex || "")}
+                onChange={e => setForm(f => ({
+                  ...f,
+                  pattern_data: form.pattern_type === "keyword"
+                    ? { keywords: e.target.value.split(",").map(s => s.trim()).filter(Boolean) }
+                    : { regex: e.target.value }
+                }))}
+                style={inp()}
+              />
             </div>
             <div style={{ marginBottom: 12 }}>
               <label style={{ color: C.muted, fontSize: 12, display: "block", marginBottom: 4 }}>artifact_types (comma-separated)</label>

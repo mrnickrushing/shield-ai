@@ -134,7 +134,8 @@ export default function DeveloperScreen() {
             </View>
             <Pressable
               onPress={() => revokeMutation.mutate(key.id)}
-              style={{ backgroundColor: colors.critical + "22", borderRadius: radius.sm, paddingHorizontal: spacing.sm, paddingVertical: 4 }}
+              disabled={revokeMutation.isPending}
+              style={{ backgroundColor: colors.critical + "22", borderRadius: radius.sm, paddingHorizontal: spacing.sm, paddingVertical: 4, opacity: revokeMutation.isPending ? 0.6 : 1 }}
             >
               <Text style={{ color: colors.critical, fontSize: 12, fontWeight: "700" }}>Revoke</Text>
             </Pressable>

@@ -65,7 +65,7 @@ def create_api_key(
 @router.get("/keys", response_model=list[ApiKeyOut])
 def list_api_keys(
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_developer),
 ):
     return (
         db.query(ApiKey)
@@ -79,7 +79,7 @@ def list_api_keys(
 def revoke_api_key(
     key_id: str,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_developer),
 ):
     api_key = db.get(ApiKey, key_id)
     if not api_key or api_key.user_id != user.id:

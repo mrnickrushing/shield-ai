@@ -15,21 +15,27 @@ export default function ReportsPage() {
   const [selected, setSelected] = useState<CommunityReport | null>(null);
   const [notes, setNotes] = useState("");
   const [newStatus, setNewStatus] = useState("reviewed");
+  const [error, setError] = useState("");
 
-  const load = () => AdminAPI.reports(filter || undefined).then(r => setReports(r.data));
+  const load = () => AdminAPI.reports(filter || undefined).then(r => setReports(r.data)).catch(() => setError("Failed to load reports."));
 
   useEffect(() => { load(); }, [filter]);
 
   const submit = async () => {
     if (!selected) return;
-    await AdminAPI.reviewReport(selected.id, newStatus, notes);
-    setSelected(null);
-    setNotes("");
-    load();
+    try {
+      await AdminAPI.reviewReport(selected.id, newStatus, notes);
+      setSelected(null);
+      setNotes("");
+      load();
+    } catch {
+      setError("Failed to submit review.");
+    }
   };
 
   return (
     <div>
+      {error && <p style={{ color: "#ef4444", marginBottom: 12, fontSize: 13 }}>{error}</p>}
       <h1 style={{ color: C.text, fontSize: 24, fontWeight: 800, marginBottom: 4 }}>Community Reports</h1>
       <p style={{ color: C.muted, marginBottom: 24, fontSize: 14 }}>Review user-submitted scam pattern reports</p>
 
@@ -61,7 +67,7 @@ export default function ReportsPage() {
             </div>
           )}
           {r.analyst_notes && <p style={{ color: C.muted, fontSize: 13, fontStyle: "italic", marginBottom: 8 }}>Notes: {r.analyst_notes}</p>}
-          <button onClick={() => { setSelected(r); setNotes(r.analyst_notes); setNewStatus("reviewed"); }}
+          <button onClick={() => { setSelected(r); setNotes(r.analyst_notes ?? ""); setNewStatus(r.status || "reviewed"); }}
             style={{ padding: "5px 14px", borderRadius: 8, backgroundColor: C.primary, color: "#fff", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 700 }}>
             Review
           </button>

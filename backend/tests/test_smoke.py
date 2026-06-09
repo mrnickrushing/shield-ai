@@ -4,6 +4,8 @@ import os
 os.environ["DATABASE_URL"] = "sqlite+pysqlite:///:memory:"
 os.environ["ENVIRONMENT"] = "development"
 
+import uuid
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -183,8 +185,7 @@ def test_phone_scan_endpoint_requires_auth():
 
 
 def _auth_headers() -> dict:
-    import time
-    email = f"p2test+{int(time.time()*1000)}@example.com"
+    email = f"p2test+{uuid.uuid4().hex}@example.com"
     r = client.post(
         "/api/v1/auth/register",
         json={"email": email, "password": "supersecret1", "display_name": "P2"},
@@ -505,17 +506,41 @@ def test_model_router_unknown_type_returns_default():
 
 
 def test_threat_intel_matches_regex_pattern():
+    from app.models.models import ScamPattern
     from app.services import threat_intel
 
+    # Test db=None guard
     boost, flags = threat_intel.check_patterns(
         db=None,  # type: ignore[arg-type]
-        text="Send BTC receive back double your bitcoin!",
-        artifact_type="social",
+        text="any text",
+        artifact_type="message",
     )
-    # No DB patterns seeded (None db), should return 0 gracefully
-    # The service handles empty results when db is None or empty
-    assert isinstance(boost, int)
-    assert isinstance(flags, list)
+    assert boost == 0
+    assert flags == []
+
+    # Test real regex match using in-memory test DB
+    db = TestingSession()
+    try:
+        pattern = ScamPattern(
+            name="test_regex",
+            description="test",
+            pattern_type="regex",
+            artifact_types=["message"],
+            pattern_data={"regex": "irs.*arrest", "flags": "i"},
+            risk_score_boost=55,
+            category="government_impersonation",
+            source="analyst",
+        )
+        db.add(pattern)
+        db.commit()
+        boost, flags = threat_intel.check_patterns(db, "irs arrest warrant call now", "message")
+        assert boost == 55
+        assert len(flags) == 1
+        assert "test_regex" in flags[0]
+    finally:
+        db.delete(pattern)
+        db.commit()
+        db.close()
 
 
 def test_community_report_endpoint_requires_auth():
@@ -572,18 +597,20 @@ def test_community_patterns_list():
 
 def _make_developer_headers() -> dict:
     """Register a user and promote them to developer via DB; return JWT headers."""
-    import time
     from app.models.models import User as UserModel
 
-    email = f"devuser+{int(time.time()*1000)}@example.com"
+    email = f"devuser+{uuid.uuid4().hex}@example.com"
     reg = client.post("/api/v1/auth/register", json={"email": email, "password": "supersecret1", "display_name": "Dev"})
     token = reg.json()["access_token"]
     user_id = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"}).json()["id"]
 
-    db = next(_override_db())
-    user = db.get(UserModel, user_id)
-    user.is_developer = True
-    db.commit()
+    db = TestingSession()
+    try:
+        user = db.get(UserModel, user_id)
+        user.is_developer = True
+        db.commit()
+    finally:
+        db.close()
 
     return {"Authorization": f"Bearer {token}"}
 
@@ -669,19 +696,21 @@ def test_admin_requires_is_admin_flag():
 
 
 def test_scam_pattern_crud_admin():
-    import time
     # Create an admin user by directly setting the flag via DB
-    email = f"admin+{int(time.time()*1000)}@example.com"
+    email = f"admin+{uuid.uuid4().hex}@example.com"
     reg = client.post("/api/v1/auth/register", json={"email": email, "password": "supersecret1", "display_name": "Admin"})
     token = reg.json()["access_token"]
     user_id = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"}).json()["id"]
 
     # Promote via DB override
     from app.models.models import User as UserModel
-    db = next(_override_db())
-    user = db.get(UserModel, user_id)
-    user.is_admin = True
-    db.commit()
+    db = TestingSession()
+    try:
+        user = db.get(UserModel, user_id)
+        user.is_admin = True
+        db.commit()
+    finally:
+        db.close()
 
     admin_headers = {"Authorization": f"Bearer {token}"}
 
@@ -696,7 +725,7 @@ def test_scam_pattern_crud_admin():
     pat_r = client.post(
         "/api/v1/admin/patterns",
         json={
-            "name": f"test_pattern_{int(time.time()*1000)}",
+            "name": f"test_pattern_{uuid.uuid4().hex}",
             "description": "Test pattern",
             "pattern_type": "regex",
             "artifact_types": ["message"],

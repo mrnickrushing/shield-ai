@@ -161,8 +161,8 @@ def process_image_scan(db: Session, scan: ScanHistory, image_bytes: bytes, stora
     if ocr_result["extracted_urls"]:
         url_evidence = url_enrichment.enrich(ocr_result["extracted_urls"][0])
         u_score, u_flags = risk_engine.score_url_evidence(url_evidence)
-        text_score += u_score
-        text_flags += u_flags
+        text_score = min(text_score + u_score, 100)
+        text_flags = list(dict.fromkeys(text_flags + u_flags))
 
     evidence = {
         "ocr": {k: v for k, v in ocr_result.items() if k != "ocr_text"},

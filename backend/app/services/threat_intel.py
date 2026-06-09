@@ -42,19 +42,23 @@ def check_patterns(
             continue
 
         matched = False
+        data = p.pattern_data if isinstance(p.pattern_data, dict) else {}
         if p.pattern_type == "regex":
-            regex = p.pattern_data.get("regex", "")
-            flags_str = p.pattern_data.get("flags", "i")
+            regex = data.get("regex", "")
+            flags_str = data.get("flags", "i")
+            if not isinstance(regex, str):
+                regex = ""
+            if not isinstance(flags_str, str):
+                flags_str = "i"
             re_flags = re.IGNORECASE if "i" in flags_str else 0
             try:
                 if regex and re.search(regex, text, re_flags):
                     matched = True
             except re.error:
                 pass
-
         elif p.pattern_type == "keyword":
-            keywords = p.pattern_data.get("keywords", [])
-            if any(kw.lower() in low for kw in keywords):
+            keywords = data.get("keywords", [])
+            if isinstance(keywords, list) and any(isinstance(kw, str) and kw.lower() in low for kw in keywords):
                 matched = True
 
         if matched:

@@ -83,8 +83,8 @@ def _jwt_user(creds: HTTPAuthorizationCredentials, db: Session) -> User:
         if payload.get("type") != "access":
             raise cred_exc
         user_id = payload.get("sub")
-    except Exception:
-        raise cred_exc
+    except Exception as err:
+        raise cred_exc from err
     user = db.get(User, user_id)
     if not user or not user.is_active:
         raise cred_exc

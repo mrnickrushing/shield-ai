@@ -14,18 +14,30 @@ function FlagToggle({ label, value, onChange }: { label: string; value: boolean;
 export default function UsersPage() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [search, setSearch] = useState("");
+  const [error, setError] = useState("");
+  const [pending, setPending] = useState<Record<string, boolean>>({});
 
-  useEffect(() => { AdminAPI.users().then(r => setUsers(r.data)); }, []);
+  useEffect(() => { AdminAPI.users().then(r => setUsers(r.data)).catch(() => setError("Failed to load users.")); }, []);
 
   const update = async (u: AdminUser, field: keyof AdminUser, val: boolean) => {
-    await AdminAPI.updateUser(u.id, { [field]: val });
-    setUsers(prev => prev.map(x => x.id === u.id ? { ...x, [field]: val } : x));
+    const key = `${u.id}:${field}`;
+    if (pending[key]) return;
+    setPending(prev => ({ ...prev, [key]: true }));
+    try {
+      await AdminAPI.updateUser(u.id, { [field]: val });
+      setUsers(prev => prev.map(x => x.id === u.id ? { ...x, [field]: val } : x));
+    } catch {
+      setError("Failed to update user.");
+    } finally {
+      setPending(prev => { const next = { ...prev }; delete next[key]; return next; });
+    }
   };
 
   const filtered = users.filter(u => u.email.toLowerCase().includes(search.toLowerCase()));
 
   return (
     <div>
+      {error && <p style={{ color: "#ef4444", marginBottom: 12, fontSize: 13 }}>{error}</p>}
       <h1 style={{ color: C.text, fontSize: 24, fontWeight: 800, marginBottom: 4 }}>Users</h1>
       <p style={{ color: C.muted, marginBottom: 20, fontSize: 14 }}>{users.length} accounts</p>
       <input placeholder="Search by email…" value={search} onChange={e => setSearch(e.target.value)}

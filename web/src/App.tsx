@@ -39,11 +39,15 @@ function LoginPage({ onLogin }: { onLogin: () => void }) {
         <h1 style={{ color: C.text, fontSize: 22, fontWeight: 800, marginBottom: 8 }}>Shield AI</h1>
         <p style={{ color: C.muted, marginBottom: 24, fontSize: 14 }}>Admin Console — sign in with your admin account</p>
         {error && <p style={{ color: "#ef4444", marginBottom: 16, fontSize: 13 }}>{error}</p>}
+        <label htmlFor="admin-email" style={{ display: "block", color: C.muted, fontSize: 12, marginBottom: 4 }}>Email</label>
         <input
+          id="admin-email"
           type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)}
           style={{ width: "100%", padding: "10px 12px", backgroundColor: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, marginBottom: 12, boxSizing: "border-box", fontSize: 14 }}
         />
+        <label htmlFor="admin-password" style={{ display: "block", color: C.muted, fontSize: 12, marginBottom: 4 }}>Password</label>
         <input
+          id="admin-password"
           type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)}
           style={{ width: "100%", padding: "10px 12px", backgroundColor: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, marginBottom: 20, boxSizing: "border-box", fontSize: 14 }}
         />

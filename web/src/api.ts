@@ -40,6 +40,7 @@ export type AdminUser = {
   is_premium: boolean;
   is_admin: boolean;
   is_developer: boolean;
+  is_active: boolean;
   created_at: string;
 };
 
@@ -70,13 +71,26 @@ export type ScamPattern = {
   created_at: string;
 };
 
+type UpdateUserPayload = Partial<Pick<AdminUser, "is_premium" | "is_admin" | "is_developer" | "is_active">>;
+type CreatePatternPayload = {
+  name: string;
+  description: string;
+  pattern_type: string;
+  artifact_types: string[];
+  pattern_data: Record<string, unknown>;
+  risk_score_boost: number;
+  category: string;
+  source?: string;
+};
+type UpdatePatternPayload = Partial<Pick<ScamPattern, "description" | "is_active" | "risk_score_boost" | "category" | "pattern_data" | "artifact_types">>;
+
 export const AdminAPI = {
   login: (email: string, password: string) =>
     api.post<{ access_token: string; refresh_token: string }>("/auth/login", { email, password }),
 
   stats: () => api.get<AdminStats>("/admin/stats"),
   users: () => api.get<AdminUser[]>("/admin/users"),
-  updateUser: (id: string, payload: Partial<AdminUser>) =>
+  updateUser: (id: string, payload: UpdateUserPayload) =>
     api.patch<AdminUser>(`/admin/users/${id}`, payload),
 
   reports: (statusFilter?: string) =>
@@ -85,9 +99,9 @@ export const AdminAPI = {
     api.patch<CommunityReport>(`/admin/reports/${id}`, { status, analyst_notes }),
 
   patterns: () => api.get<ScamPattern[]>("/admin/patterns"),
-  createPattern: (payload: Partial<ScamPattern>) =>
+  createPattern: (payload: CreatePatternPayload | Partial<ScamPattern>) =>
     api.post<ScamPattern>("/admin/patterns", payload),
-  updatePattern: (id: string, payload: Partial<ScamPattern>) =>
+  updatePattern: (id: string, payload: UpdatePatternPayload) =>
     api.patch<ScamPattern>(`/admin/patterns/${id}`, payload),
   deletePattern: (id: string) => api.delete(`/admin/patterns/${id}`),
 };
