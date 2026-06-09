@@ -49,9 +49,31 @@ def run_migrations() -> None:
         print(f"[startup] alembic step skipped due to error: {exc}")
 
 
+def promote_initial_admins() -> None:
+    """One-shot admin promotion: reads INITIAL_ADMIN_EMAILS (comma-separated),
+    sets is_admin=True for those users, then does nothing if the var is unset."""
+    emails_raw = os.environ.get("INITIAL_ADMIN_EMAILS", "").strip()
+    if not emails_raw:
+        return
+    emails = [e.strip() for e in emails_raw.split(",") if e.strip()]
+    try:
+        from sqlalchemy import create_engine, text
+        engine = create_engine(os.environ["DATABASE_URL"])
+        with engine.connect() as conn:
+            result = conn.execute(
+                text("UPDATE users SET is_admin = true WHERE email = ANY(:emails)"),
+                {"emails": emails},
+            )
+            conn.commit()
+            print(f"[startup] promoted {result.rowcount} user(s) to admin: {emails}")
+    except Exception as exc:
+        print(f"[startup] admin promotion skipped: {exc}")
+
+
 if __name__ == "__main__":
     import uvicorn
 
     run_migrations()
+    promote_initial_admins()
     port = int(os.environ.get("PORT", "8000"))
     uvicorn.run("app.main:app", host="0.0.0.0", port=port, workers=1)
