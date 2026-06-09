@@ -1,22 +1,22 @@
-// Lightweight auth store with Zustand.
+// Lightweight auth store with Zustand + SecureStore token persistence.
 import { create } from "zustand";
 
-import { ShieldAPI, clearTokens, getAccessToken, saveTokens } from "@/lib/api";
-
-type User = { id: string; email: string; is_premium: boolean; display_name: string };
+import { ShieldAPI, UserProfile, clearTokens, getAccessToken, saveTokens } from "@/lib/api";
 
 type AuthState = {
-  user: User | null;
+  user: UserProfile | null;
   hydrated: boolean;
   hydrate: () => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, name: string) => Promise<void>;
+  updateProfile: (displayName: string) => Promise<void>;
   logout: () => Promise<void>;
 };
 
 export const useAuth = create<AuthState>((set) => ({
   user: null,
   hydrated: false,
+
   hydrate: async () => {
     const token = await getAccessToken();
     if (token) {
@@ -29,16 +29,24 @@ export const useAuth = create<AuthState>((set) => ({
     }
     set({ hydrated: true });
   },
+
   login: async (email, password) => {
     const tokens = await ShieldAPI.login(email, password);
     await saveTokens(tokens.access_token, tokens.refresh_token);
     set({ user: await ShieldAPI.me() });
   },
+
   register: async (email, password, name) => {
     const tokens = await ShieldAPI.register(email, password, name);
     await saveTokens(tokens.access_token, tokens.refresh_token);
     set({ user: await ShieldAPI.me() });
   },
+
+  updateProfile: async (displayName) => {
+    const user = await ShieldAPI.updateProfile(displayName);
+    set({ user });
+  },
+
   logout: async () => {
     await clearTokens();
     set({ user: null });
