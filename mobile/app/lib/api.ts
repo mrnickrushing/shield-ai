@@ -83,12 +83,21 @@ export type Scan = {
   report: RiskReport | null;
 };
 
+export type UserProfile = {
+  id: string;
+  email: string;
+  is_premium: boolean;
+  display_name: string;
+};
+
 export const ShieldAPI = {
   register: (email: string, password: string, display_name: string) =>
     api.post("/auth/register", { email, password, display_name }).then((r) => r.data),
   login: (email: string, password: string) =>
     api.post("/auth/login", { email, password }).then((r) => r.data),
-  me: () => api.get("/auth/me").then((r) => r.data),
+  me: () => api.get<UserProfile>("/auth/me").then((r) => r.data),
+  updateProfile: (display_name: string) =>
+    api.patch<UserProfile>("/auth/me", { display_name }).then((r) => r.data),
   scanLink: (url: string) =>
     api.post<Scan>("/scans/link", { url }).then((r) => r.data),
   scanImage: (image_base64: string, filename = "screenshot.png") =>

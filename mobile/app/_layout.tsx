@@ -6,7 +6,11 @@ import React, { useEffect } from "react";
 import { useAuth } from "@/state/auth";
 import { colors } from "@/theme/theme";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: { retry: 1, staleTime: 30_000 },
+  },
+});
 
 export default function RootLayout() {
   const hydrate = useAuth((s) => s.hydrate);
@@ -23,12 +27,14 @@ export default function RootLayout() {
           headerStyle: { backgroundColor: colors.bg },
           headerTintColor: colors.text,
           contentStyle: { backgroundColor: colors.bg },
+          headerShadowVisible: false,
         }}
       >
         <Stack.Screen name="index" options={{ headerShown: false }} />
-        <Stack.Screen name="login" options={{ title: "Sign In" }} />
+        <Stack.Screen name="login" options={{ title: "Shield AI", headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="result" options={{ title: "Risk Report" }} />
+        <Stack.Screen name="profile" options={{ title: "Profile" }} />
       </Stack>
     </QueryClientProvider>
   );
