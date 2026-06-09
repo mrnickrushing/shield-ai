@@ -21,7 +21,16 @@ export default function LessonScreen() {
   });
 
   if (isLoading) return <View style={{ flex: 1, backgroundColor: colors.bg, justifyContent: "center", alignItems: "center" }}><ActivityIndicator color={colors.primaryBright} /></View>;
-  if (!lesson) return null;
+  if (!lesson) return (
+    <View style={{ flex: 1, backgroundColor: colors.bg, justifyContent: "center", alignItems: "center", padding: spacing.xl }}>
+      <Text style={{ fontSize: 40, marginBottom: spacing.md }}>📭</Text>
+      <Text style={{ color: colors.text, fontWeight: "700", fontSize: 18, marginBottom: 8 }}>Lesson not found</Text>
+      <Text style={{ color: colors.textMuted, fontSize: 14, textAlign: "center", marginBottom: spacing.xl }}>This lesson may have been removed or the link is invalid.</Text>
+      <Pressable onPress={() => router.back()} style={{ backgroundColor: colors.primary, borderRadius: radius.md, paddingHorizontal: spacing.xl, paddingVertical: spacing.md }}>
+        <Text style={{ color: "#fff", fontWeight: "700" }}>← Back to lessons</Text>
+      </Pressable>
+    </View>
+  );
 
   const lsn = lesson as any;
   const paragraphs = (lsn.content as string).split("\n").filter(Boolean);

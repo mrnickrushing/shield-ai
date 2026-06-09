@@ -3,13 +3,15 @@ import { create } from "zustand";
 
 import { ShieldAPI, UserProfile, clearTokens, getAccessToken, saveTokens } from "@/lib/api";
 
+type ProfilePatch = { display_name?: string; large_text_mode?: boolean; simple_language_mode?: boolean };
+
 type AuthState = {
   user: UserProfile | null;
   hydrated: boolean;
   hydrate: () => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, name: string) => Promise<void>;
-  updateProfile: (displayName: string) => Promise<void>;
+  updateProfile: (patch: ProfilePatch) => Promise<void>;
   logout: () => Promise<void>;
 };
 
@@ -42,8 +44,8 @@ export const useAuth = create<AuthState>((set) => ({
     set({ user: await ShieldAPI.me() });
   },
 
-  updateProfile: async (displayName) => {
-    const user = await ShieldAPI.updateProfile(displayName);
+  updateProfile: async (patch) => {
+    const user = await ShieldAPI.updateProfile(patch);
     set({ user });
   },
 
