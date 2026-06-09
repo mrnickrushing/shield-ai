@@ -1,24 +1,21 @@
-"""Shield AI — FastAPI application entrypoint (Phase 1)."""
+"""Shield AI — FastAPI application entrypoint."""
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1 import auth, scans
+from app.api.v1 import auth, education, family, notifications, recovery, scans
 from app.core.config import settings
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Schema is managed exclusively by Alembic (run from start.py on boot).
-    # We intentionally do NOT call create_all here — doing both caused
-    # DuplicateTable errors when migrations and create_all raced.
     yield
 
 
 app = FastAPI(
     title=settings.APP_NAME,
-    version="0.1.0",
+    version="0.4.0",
     description="AI-powered scam, phishing, and fraud detection assistant.",
     lifespan=lifespan,
 )
@@ -33,11 +30,15 @@ app.add_middleware(
 
 app.include_router(auth.router, prefix=settings.API_V1_PREFIX)
 app.include_router(scans.router, prefix=settings.API_V1_PREFIX)
+app.include_router(notifications.router, prefix=settings.API_V1_PREFIX)
+app.include_router(recovery.router, prefix=settings.API_V1_PREFIX)
+app.include_router(family.router, prefix=settings.API_V1_PREFIX)
+app.include_router(education.router, prefix=settings.API_V1_PREFIX)
 
 
 @app.get("/health", tags=["system"])
 def health():
-    return {"status": "ok", "app": settings.APP_NAME, "version": "0.1.0"}
+    return {"status": "ok", "app": settings.APP_NAME, "version": "0.4.0"}
 
 
 @app.get("/", tags=["system"])

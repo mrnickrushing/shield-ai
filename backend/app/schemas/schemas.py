@@ -1,4 +1,4 @@
-"""Pydantic request/response schemas for Phase 1."""
+"""Pydantic request/response schemas for Phase 1 + Phase 2 + Phase 4."""
 from datetime import datetime
 
 from pydantic import BaseModel, EmailStr, Field
@@ -29,6 +29,7 @@ class RefreshRequest(BaseModel):
 class ProfileUpdate(BaseModel):
     display_name: str | None = None
     simple_language_mode: bool | None = None
+    large_text_mode: bool | None = None
 
 
 class UserOut(BaseModel):
@@ -36,6 +37,8 @@ class UserOut(BaseModel):
     email: EmailStr
     is_premium: bool
     display_name: str = ""
+    simple_language_mode: bool = False
+    large_text_mode: bool = False
 
     class Config:
         from_attributes = True
@@ -47,7 +50,6 @@ class LinkScanCreate(BaseModel):
 
 
 class ImageScanCreate(BaseModel):
-    # base64-encoded image; in production this is a multipart upload / signed URL.
     image_base64: str
     filename: str = "screenshot.png"
 
@@ -81,3 +83,126 @@ class ScanOut(BaseModel):
 
 class ScanFeedback(BaseModel):
     feedback: str = Field(pattern="^(helpful|false_positive)$")
+
+
+# Phase 2
+class QRScanCreate(BaseModel):
+    qr_content: str
+
+
+class MessageScanCreate(BaseModel):
+    message_text: str
+    platform_hint: str = ""
+
+
+class EmailScanCreate(BaseModel):
+    raw_email: str | None = None
+    sender_email: str | None = None
+    sender_display_name: str | None = None
+    reply_to_email: str | None = None
+    subject: str | None = None
+    body_text: str | None = None
+
+
+class PhoneScanCreate(BaseModel):
+    phone_number: str
+
+
+class DeviceRegister(BaseModel):
+    push_token: str
+    platform: str = Field(pattern="^(ios|android)$")
+
+
+class NotificationOut(BaseModel):
+    id: str
+    title: str
+    body: str
+    scan_id: str | None = None
+    is_read: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# ---------------------------------------------------------------------------
+# Phase 4 — recovery, family, education
+# ---------------------------------------------------------------------------
+
+class IncidentCreate(BaseModel):
+    incident_type: str
+    title: str = ""
+    amount_lost: float | None = None
+    currency: str = "USD"
+    notes: str = ""
+    linked_scan_id: str | None = None
+
+
+class IncidentUpdate(BaseModel):
+    status: str | None = None
+    title: str | None = None
+    amount_lost: float | None = None
+    notes: str | None = None
+    steps_completed: list[str] | None = None
+
+
+class IncidentOut(BaseModel):
+    id: str
+    incident_type: str
+    status: str
+    title: str
+    amount_lost: float | None = None
+    currency: str
+    notes: str
+    linked_scan_id: str | None = None
+    steps_completed: list = []
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class IncidentEvidenceCreate(BaseModel):
+    evidence_type: str
+    content: str
+    label: str = ""
+
+
+class TrustedContactCreate(BaseModel):
+    name: str
+    phone: str = ""
+    email: str = ""
+    relationship_label: str = ""
+
+
+class TrustedContactOut(BaseModel):
+    id: str
+    name: str
+    phone: str
+    email: str
+    relationship_label: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class LessonOut(BaseModel):
+    id: str
+    slug: str
+    title: str
+    summary: str
+    content: str
+    threat_category: str
+    difficulty: str
+    estimated_minutes: int
+    quiz_questions: list
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class QuizSubmit(BaseModel):
+    answers: list[int] = []

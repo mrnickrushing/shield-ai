@@ -1,12 +1,4 @@
-"""Phase 1 SQLAlchemy models.
-
-Deliberately scoped to the Phase 1 tables only:
-users, profiles, devices, scan_history, risk_reports, image_scans,
-link_scans, api_usage, audit_logs.
-
-Specialized tables (identity_alerts, trusted_contacts, education_progress,
-phone_lookups, qr_scans, email_scans, message_scans) are added in later phases.
-"""
+"""Phase 1 + Phase 2 + Phase 4 SQLAlchemy models."""
 import enum
 import uuid
 from datetime import datetime, timezone
@@ -38,6 +30,10 @@ def _now() -> datetime:
 class ScanType(str, enum.Enum):
     link = "link"
     image = "image"
+    qr = "qr"
+    message = "message"
+    email = "email"
+    phone = "phone"
 
 
 class ScanStatus(str, enum.Enum):
@@ -53,6 +49,23 @@ class RiskLevel(str, enum.Enum):
     suspicious = "suspicious"
     high = "high"
     critical = "critical"
+
+
+class IncidentType(str, enum.Enum):
+    bank_transfer = "bank_transfer"
+    gift_card = "gift_card"
+    crypto = "crypto"
+    marketplace = "marketplace"
+    account_takeover = "account_takeover"
+    romance = "romance"
+    investment = "investment"
+    other = "other"
+
+
+class IncidentStatus(str, enum.Enum):
+    open = "open"
+    in_progress = "in_progress"
+    resolved = "resolved"
 
 
 class User(Base):
@@ -77,6 +90,7 @@ class Profile(Base):
     display_name: Mapped[str] = mapped_column(String, default="")
     locale: Mapped[str] = mapped_column(String, default="en")
     simple_language_mode: Mapped[bool] = mapped_column(Boolean, default=False)
+    large_text_mode: Mapped[bool] = mapped_column(Boolean, default=False)
 
     user: Mapped[User] = relationship(back_populates="profile")
 
@@ -86,7 +100,7 @@ class Device(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
-    platform: Mapped[str] = mapped_column(String, default="")  # ios | android
+    platform: Mapped[str] = mapped_column(String, default="")
     push_token: Mapped[str] = mapped_column(String, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
@@ -98,7 +112,7 @@ class ScanHistory(Base):
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
     scan_type: Mapped[ScanType] = mapped_column(Enum(ScanType))
     status: Mapped[ScanStatus] = mapped_column(Enum(ScanStatus), default=ScanStatus.pending)
-    raw_input: Mapped[str] = mapped_column(Text, default="")  # url or extracted text
+    raw_input: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
@@ -111,15 +125,15 @@ class RiskReport(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
     scan_id: Mapped[str] = mapped_column(ForeignKey("scan_history.id"), unique=True, index=True)
-    risk_score: Mapped[int] = mapped_column(Integer, default=0)  # 0-100
+    risk_score: Mapped[int] = mapped_column(Integer, default=0)
     risk_level: Mapped[RiskLevel] = mapped_column(Enum(RiskLevel), default=RiskLevel.safe)
     threat_category: Mapped[str] = mapped_column(String, default="unknown")
-    confidence: Mapped[float] = mapped_column(Float, default=0.0)  # 0-1
+    confidence: Mapped[float] = mapped_column(Float, default=0.0)
     explanation: Mapped[str] = mapped_column(Text, default="")
     red_flags: Mapped[list] = mapped_column(JSON, default=list)
     recommended_actions: Mapped[list] = mapped_column(JSON, default=list)
-    evidence: Mapped[dict] = mapped_column(JSON, default=dict)  # deterministic signals
-    user_feedback: Mapped[str | None] = mapped_column(String, nullable=True)  # helpful | false_positive
+    evidence: Mapped[dict] = mapped_column(JSON, default=dict)
+    user_feedback: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     scan: Mapped[ScanHistory] = relationship(back_populates="report")
@@ -155,7 +169,7 @@ class ApiUsage(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
-    provider: Mapped[str] = mapped_column(String)  # openai | safe_browsing | virustotal
+    provider: Mapped[str] = mapped_column(String)
     units: Mapped[int] = mapped_column(Integer, default=1)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
@@ -168,3 +182,144 @@ class AuditLog(Base):
     action: Mapped[str] = mapped_column(String)
     detail: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+# ---------------------------------------------------------------------------
+# Phase 2
+# ---------------------------------------------------------------------------
+
+class QRScan(Base):
+    __tablename__ = "qr_scans"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    scan_id: Mapped[str] = mapped_column(ForeignKey("scan_history.id"), index=True)
+    qr_content: Mapped[str] = mapped_column(Text)
+    qr_type: Mapped[str] = mapped_column(String, default="url")
+    decoded_url: Mapped[str] = mapped_column(Text, default="")
+
+
+class MessageScan(Base):
+    __tablename__ = "message_scans"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    scan_id: Mapped[str] = mapped_column(ForeignKey("scan_history.id"), index=True)
+    message_text: Mapped[str] = mapped_column(Text)
+    platform_hint: Mapped[str] = mapped_column(String, default="")
+    detected_entities: Mapped[dict] = mapped_column(JSON, default=dict)
+    extracted_urls: Mapped[list] = mapped_column(JSON, default=list)
+
+
+class EmailScan(Base):
+    __tablename__ = "email_scans"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    scan_id: Mapped[str] = mapped_column(ForeignKey("scan_history.id"), index=True)
+    sender_email: Mapped[str] = mapped_column(String, default="")
+    sender_display_name: Mapped[str] = mapped_column(String, default="")
+    reply_to_email: Mapped[str] = mapped_column(String, default="")
+    subject: Mapped[str] = mapped_column(String, default="")
+    body_text: Mapped[str] = mapped_column(Text, default="")
+    extracted_urls: Mapped[list] = mapped_column(JSON, default=list)
+    header_flags: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
+class PhoneScan(Base):
+    __tablename__ = "phone_scans"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    scan_id: Mapped[str] = mapped_column(ForeignKey("scan_history.id"), index=True)
+    phone_number: Mapped[str] = mapped_column(String)
+    normalized_number: Mapped[str] = mapped_column(String, default="")
+    country_code: Mapped[str] = mapped_column(String, default="")
+    carrier: Mapped[str] = mapped_column(String, default="")
+    line_type: Mapped[str] = mapped_column(String, default="")
+
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    title: Mapped[str] = mapped_column(String)
+    body: Mapped[str] = mapped_column(Text, default="")
+    scan_id: Mapped[str | None] = mapped_column(ForeignKey("scan_history.id"), nullable=True)
+    is_read: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+# ---------------------------------------------------------------------------
+# Phase 4 — recovery, family, education
+# ---------------------------------------------------------------------------
+
+class Incident(Base):
+    __tablename__ = "incidents"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    incident_type: Mapped[IncidentType] = mapped_column(Enum(IncidentType))
+    status: Mapped[IncidentStatus] = mapped_column(Enum(IncidentStatus), default=IncidentStatus.open)
+    title: Mapped[str] = mapped_column(String, default="")
+    amount_lost: Mapped[float | None] = mapped_column(Float, nullable=True)
+    currency: Mapped[str] = mapped_column(String, default="USD")
+    notes: Mapped[str] = mapped_column(Text, default="")
+    linked_scan_id: Mapped[str | None] = mapped_column(ForeignKey("scan_history.id"), nullable=True)
+    steps_completed: Mapped[list] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+    evidence: Mapped[list["IncidentEvidence"]] = relationship(back_populates="incident")
+
+
+class IncidentEvidence(Base):
+    __tablename__ = "incident_evidence"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    incident_id: Mapped[str] = mapped_column(ForeignKey("incidents.id"), index=True)
+    evidence_type: Mapped[str] = mapped_column(String)  # screenshot | url | message | transaction | other
+    content: Mapped[str] = mapped_column(Text, default="")
+    label: Mapped[str] = mapped_column(String, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+    incident: Mapped[Incident] = relationship(back_populates="evidence")
+
+
+class TrustedContact(Base):
+    __tablename__ = "trusted_contacts"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    name: Mapped[str] = mapped_column(String)
+    phone: Mapped[str] = mapped_column(String, default="")
+    email: Mapped[str] = mapped_column(String, default="")
+    relationship_label: Mapped[str] = mapped_column(String, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class EducationLesson(Base):
+    __tablename__ = "education_lessons"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    slug: Mapped[str] = mapped_column(String, unique=True, index=True)
+    title: Mapped[str] = mapped_column(String)
+    summary: Mapped[str] = mapped_column(String, default="")
+    content: Mapped[str] = mapped_column(Text, default="")
+    threat_category: Mapped[str] = mapped_column(String, default="")
+    difficulty: Mapped[str] = mapped_column(String, default="beginner")
+    estimated_minutes: Mapped[int] = mapped_column(Integer, default=3)
+    quiz_questions: Mapped[list] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+    progress: Mapped[list["EducationProgress"]] = relationship(back_populates="lesson")
+
+
+class EducationProgress(Base):
+    __tablename__ = "education_progress"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    lesson_id: Mapped[str] = mapped_column(ForeignKey("education_lessons.id"), index=True)
+    completed: Mapped[bool] = mapped_column(Boolean, default=False)
+    quiz_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    lesson: Mapped[EducationLesson] = relationship(back_populates="progress")
