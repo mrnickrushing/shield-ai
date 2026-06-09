@@ -50,7 +50,7 @@ def update_incident(incident_id: str, payload: IncidentUpdate, db: Session = Dep
     incident = db.get(Incident, incident_id)
     if not incident or incident.user_id != user.id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Incident not found")
-    for field, val in payload.model_dump(exclude_none=True).items():
+    for field, val in payload.model_dump(exclude_unset=True).items():
         setattr(incident, field, val)
     incident.updated_at = datetime.now(timezone.utc)
     db.commit()

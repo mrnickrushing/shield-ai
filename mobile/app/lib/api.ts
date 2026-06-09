@@ -200,7 +200,7 @@ export const ShieldAPI = {
   register: (email: string, password: string, display_name: string) => api.post("/auth/register", { email, password, display_name }).then((r) => r.data),
   login: (email: string, password: string) => api.post("/auth/login", { email, password }).then((r) => r.data),
   me: () => api.get<UserProfile>("/auth/me").then((r) => r.data),
-  updateProfile: (display_name: string) => api.patch<UserProfile>("/auth/me", { display_name }).then((r) => r.data),
+  updateProfile: (patch: { display_name?: string; large_text_mode?: boolean; simple_language_mode?: boolean }) => api.patch<UserProfile>("/auth/me", patch).then((r) => r.data),
   scanLink: (url: string) => api.post<Scan>("/scans/link", { url }).then((r) => r.data),
   scanImage: (image_base64: string, filename = "screenshot.png") => api.post<Scan>("/scans/image", { image_base64, filename }).then((r) => r.data),
   listScans: () => api.get<Scan[]>("/scans").then((r) => r.data),
