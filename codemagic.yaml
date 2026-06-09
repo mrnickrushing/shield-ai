@@ -1,0 +1,86 @@
+workflows:
+  ios-testflight:
+    name: iOS → TestFlight
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+
+    integrations:
+      app_store_connect: App Store Connect API Key
+
+    environment:
+      groups:
+        - ios_credentials   # CM_CERTIFICATE, CM_CERTIFICATE_PASSWORD,
+                            # CM_PROVISIONING_PROFILE (base64 encoded)
+      vars:
+        BUNDLE_ID: com.rushingtech.shieldai
+        EXPO_PUBLIC_API_URL: https://api.shieldai.rushingtechnologies.com
+      node: "20"
+      xcode: latest
+      cocoapods: default
+
+    triggering:
+      events:
+        - push
+        - tag
+      branch_patterns:
+        - pattern: main
+          include: true
+      tag_patterns:
+        - pattern: "v*"
+          include: true
+      cancel_previous_builds: true
+
+    scripts:
+      - name: Install JS dependencies
+        working_directory: mobile
+        script: npm ci
+
+      - name: Expo prebuild (generate native iOS project)
+        working_directory: mobile
+        script: npx expo prebuild --clean --platform ios --non-interactive
+
+      - name: Install CocoaPods
+        working_directory: mobile/ios
+        script: pod install
+
+      - name: Set up code signing
+        script: |
+          keychain initialize
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --create
+          # Also fetch the Share Extension signing files if needed
+          keychain add-certificates
+          xcode-project use-profiles
+
+      - name: Increment build number
+        working_directory: mobile/ios
+        script: |
+          LATEST=$(app-store-connect get-latest-testflight-build-number "$BUNDLE_ID" 2>/dev/null || echo 0)
+          agvtool new-version -all $((LATEST + 1))
+
+      - name: Build IPA
+        working_directory: mobile/ios
+        script: |
+          xcode-project build-ipa \
+            --workspace ShieldAI.xcworkspace \
+            --scheme ShieldAI \
+            --archive-xcargs "SWIFT_TREAT_WARNINGS_AS_ERRORS=NO"
+
+    artifacts:
+      - mobile/build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM
+
+    publishing:
+      email:
+        recipients:
+          - nick@rushingtechnologies.com
+        notify:
+          success: true
+          failure: true
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        beta_groups:
+          - Internal Testers
