@@ -1,0 +1,36 @@
+{
+  "expo": {
+    "name": "Shield AI",
+    "slug": "shield-ai",
+    "version": "0.1.0",
+    "scheme": "shieldai",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#020617"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.rushingtech.shieldai"
+    },
+    "android": {
+      "package": "com.rushingtech.shieldai",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#020617"
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": ["expo-router", "expo-secure-store", "expo-image-picker"],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

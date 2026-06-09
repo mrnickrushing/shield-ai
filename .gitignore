@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.env
+backend/.env
+
+# Node / Expo
+node_modules/
+.expo/
+dist/
+web-build/
+*.log
+npm-debug.*
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
