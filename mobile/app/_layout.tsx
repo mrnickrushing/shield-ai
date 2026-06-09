@@ -44,17 +44,20 @@ async function registerForPushNotifications() {
 
 export default function RootLayout() {
   const hydrate = useAuth((s) => s.hydrate);
-  const hydrated = useAuth((s) => s.hydrated);
+  const user = useAuth((s) => s.user);
 
   useEffect(() => {
     hydrate();
   }, [hydrate]);
 
+  // Guard on user identity so registration runs after login/register, not
+  // just after hydration. On a fresh unauthenticated launch user is null and
+  // we skip; after login user.id becomes non-null and this effect re-fires.
   useEffect(() => {
-    if (hydrated) {
+    if (user) {
       registerForPushNotifications();
     }
-  }, [hydrated]);
+  }, [user?.id]);
 
   return (
     <QueryClientProvider client={queryClient}>
