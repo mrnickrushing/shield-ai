@@ -34,6 +34,8 @@ class ScanType(str, enum.Enum):
     message = "message"
     email = "email"
     phone = "phone"
+    marketplace = "marketplace"
+    social = "social"
 
 
 class ScanStatus(str, enum.Enum):
@@ -237,6 +239,28 @@ class PhoneScan(Base):
     line_type: Mapped[str] = mapped_column(String, default="")
 
 
+class MarketplaceScan(Base):
+    __tablename__ = "marketplace_scans"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    scan_id: Mapped[str] = mapped_column(ForeignKey("scan_history.id"), index=True)
+    content_text: Mapped[str] = mapped_column(Text, default="")
+    platform: Mapped[str] = mapped_column(String, default="")
+    detected_signals: Mapped[dict] = mapped_column(JSON, default=dict)
+    extracted_urls: Mapped[list] = mapped_column(JSON, default=list)
+
+
+class SocialScan(Base):
+    __tablename__ = "social_scans"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    scan_id: Mapped[str] = mapped_column(ForeignKey("scan_history.id"), index=True)
+    content_text: Mapped[str] = mapped_column(Text, default="")
+    platform: Mapped[str] = mapped_column(String, default="")
+    detected_signals: Mapped[dict] = mapped_column(JSON, default=dict)
+    extracted_urls: Mapped[list] = mapped_column(JSON, default=list)
+
+
 class Notification(Base):
     __tablename__ = "notifications"
 
@@ -245,6 +269,36 @@ class Notification(Base):
     title: Mapped[str] = mapped_column(String)
     body: Mapped[str] = mapped_column(Text, default="")
     scan_id: Mapped[str | None] = mapped_column(ForeignKey("scan_history.id"), nullable=True)
+    is_read: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 — identity protection
+# ---------------------------------------------------------------------------
+
+class BreachRecord(Base):
+    """Cached HaveIBeenPwned result per email (24-hour TTL)."""
+    __tablename__ = "breach_records"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    email: Mapped[str] = mapped_column(String, index=True)
+    breach_count: Mapped[int] = mapped_column(Integer, default=0)
+    severity: Mapped[str] = mapped_column(String, default="none")
+    breaches: Mapped[list] = mapped_column(JSON, default=list)
+    checked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class IdentityAlert(Base):
+    """Ongoing identity-monitoring alert for a user."""
+    __tablename__ = "identity_alerts"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    alert_type: Mapped[str] = mapped_column(String)
+    email: Mapped[str] = mapped_column(String, default="")
+    detail: Mapped[dict] = mapped_column(JSON, default=dict)
     is_read: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 

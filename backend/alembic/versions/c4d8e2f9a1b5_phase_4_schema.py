@@ -1,14 +1,14 @@
 """Phase 4 schema — incidents, trusted_contacts, education
 
 Revision ID: c4d8e2f9a1b5
-Revises: b7e9d1a2f3c4
+Revises: c8f3a5b2e1d0
 Create Date: 2026-06-09
 """
 from alembic import op
 import sqlalchemy as sa
 
 revision = "c4d8e2f9a1b5"
-down_revision = "b7e9d1a2f3c4"
+down_revision = "c8f3a5b2e1d0"
 branch_labels = None
 depends_on = None
 

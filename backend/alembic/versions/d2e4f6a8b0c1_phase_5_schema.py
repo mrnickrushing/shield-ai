@@ -1,7 +1,7 @@
 """phase 5 schema: api_keys, community_reports, scam_patterns + user flags
 
 Revision ID: d2e4f6a8b0c1
-Revises: c8f3a5b2e1d0
+Revises: c4d8e2f9a1b5
 Create Date: 2026-06-09 16:00:00.000000
 """
 from typing import Sequence, Union
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "d2e4f6a8b0c1"
-down_revision: Union[str, None] = "c8f3a5b2e1d0"
+down_revision: Union[str, None] = "c4d8e2f9a1b5"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

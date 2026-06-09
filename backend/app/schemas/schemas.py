@@ -105,6 +105,16 @@ class PhoneScanCreate(BaseModel):
     phone_number: str
 
 
+class MarketplaceScanCreate(BaseModel):
+    content_text: str
+    platform_hint: str = ""
+
+
+class SocialScanCreate(BaseModel):
+    content_text: str
+    platform: str = ""
+
+
 class DeviceRegister(BaseModel):
     push_token: str
     platform: str = Field(pattern="^(ios|android)$")
@@ -200,6 +210,47 @@ class LessonOut(BaseModel):
 
 class QuizSubmit(BaseModel):
     answers: list[int] = []
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 — identity protection
+# ---------------------------------------------------------------------------
+
+class BreachCheckRequest(BaseModel):
+    email: str
+
+
+class BreachInfo(BaseModel):
+    name: str
+    title: str
+    domain: str
+    breach_date: str
+    pwn_count: int
+    data_classes: list[str]
+    is_verified: bool
+
+
+class BreachCheckResult(BaseModel):
+    email: str
+    breach_count: int
+    severity: str
+    breaches: list[dict]
+    actions: list[str]
+    disclaimer: str
+    data_available: bool
+    checked_at: datetime
+
+
+class IdentityAlertOut(BaseModel):
+    id: str
+    alert_type: str
+    email: str
+    detail: dict
+    is_read: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
 
 
 # ---------------------------------------------------------------------------
