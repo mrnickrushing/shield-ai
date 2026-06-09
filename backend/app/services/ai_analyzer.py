@@ -9,11 +9,9 @@ from __future__ import annotations
 import json
 
 from app.core.config import settings
+from app.services.model_router import get_config
 
-SYSTEM_PROMPT = """You are Shield AI, a scam, phishing, and fraud detection assistant.
-You analyze suspicious content (a URL, OCR text from a screenshot, or a pasted message)
-and the deterministic security signals already gathered about it.
-
+_JSON_FORMAT = """
 Return ONLY valid JSON with this exact shape:
 {
   "risk_score": <int 0-100>,
@@ -31,6 +29,10 @@ Rules:
 """
 
 
+def _build_system_prompt(system_hint: str) -> str:
+    return f"{system_hint}\n{_JSON_FORMAT}"
+
+
 def _build_user_prompt(content: str, evidence: dict) -> str:
     return (
         "CONTENT TO ANALYZE:\n"
@@ -41,20 +43,22 @@ def _build_user_prompt(content: str, evidence: dict) -> str:
     )
 
 
-def analyze(content: str, evidence: dict) -> dict | None:
+def analyze(content: str, evidence: dict, artifact_type: str = "unknown") -> dict | None:
     """Call the LLM. Returns parsed dict or None on failure (graceful fallback)."""
     if not settings.OPENAI_API_KEY:
         return None
     try:
         from openai import OpenAI
 
+        cfg = get_config(artifact_type)
         client = OpenAI(api_key=settings.OPENAI_API_KEY)
         resp = client.chat.completions.create(
-            model=settings.OPENAI_MODEL,
+            model=cfg.model,
             response_format={"type": "json_object"},
-            temperature=0.2,
+            temperature=cfg.temperature,
+            max_tokens=cfg.max_tokens,
             messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "system", "content": _build_system_prompt(cfg.system_hint)},
                 {"role": "user", "content": _build_user_prompt(content, evidence)},
             ],
         )

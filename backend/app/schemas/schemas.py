@@ -200,3 +200,105 @@ class LessonOut(BaseModel):
 
 class QuizSubmit(BaseModel):
     answers: list[int] = []
+
+
+# ---------------------------------------------------------------------------
+# Phase 5 — moat + B2B
+# ---------------------------------------------------------------------------
+
+class ApiKeyCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=64)
+    scopes: list[str] = ["scan:read", "scan:write"]
+
+
+class ApiKeyOut(BaseModel):
+    id: str
+    name: str
+    key_prefix: str
+    scopes: list[str]
+    is_active: bool
+    created_at: datetime
+    last_used_at: datetime | None = None
+
+    class Config:
+        from_attributes = True
+
+
+class ApiKeyCreated(ApiKeyOut):
+    raw_key: str
+
+
+class CommunityReportCreate(BaseModel):
+    scan_id: str | None = None
+    report_type: str = Field(pattern="^(false_positive|missed_scam|new_pattern)$")
+    artifact_text: str = ""
+    category: str = ""
+    platform_hint: str = ""
+
+
+class CommunityReportOut(BaseModel):
+    id: str
+    report_type: str
+    artifact_text: str
+    category: str
+    platform_hint: str
+    status: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class CommunityReportAdminOut(CommunityReportOut):
+    user_id: str | None = None
+    scan_id: str | None = None
+    analyst_notes: str
+
+
+class ScamPatternCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=128)
+    description: str = ""
+    pattern_type: str = Field(pattern="^(regex|keyword|semantic)$", default="regex")
+    artifact_types: list[str] = []
+    pattern_data: dict = {}
+    risk_score_boost: int = Field(ge=0, le=100, default=0)
+    category: str = "unknown"
+    source: str = "analyst"
+
+
+class ScamPatternOut(BaseModel):
+    id: str
+    name: str
+    description: str
+    pattern_type: str
+    artifact_types: list[str]
+    pattern_data: dict
+    risk_score_boost: int
+    category: str
+    is_active: bool
+    source: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class AdminStatsOut(BaseModel):
+    total_users: int
+    total_scans: int
+    scans_today: int
+    open_community_reports: int
+    active_scam_patterns: int
+    active_api_keys: int
+
+
+class AdminUserOut(BaseModel):
+    id: str
+    email: str
+    is_premium: bool
+    is_admin: bool
+    is_developer: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

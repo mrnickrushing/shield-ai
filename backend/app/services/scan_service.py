@@ -34,6 +34,7 @@ from app.services import (
     phone_lookup,
     risk_engine,
     social_analyzer,
+    threat_intel,
     url_enrichment,
 )
 
@@ -122,7 +123,11 @@ def process_link_scan(db: Session, scan: ScanHistory, url: str) -> RiskReport:
     evidence = url_enrichment.enrich(url)
     det_score, det_flags = risk_engine.score_url_evidence(evidence)
 
-    llm = ai_analyzer.analyze(f"URL: {evidence['final_url']}", evidence)
+    ti_boost, ti_flags = threat_intel.check_patterns(db, url, "link")
+    det_score = min(det_score + ti_boost, 100)
+    det_flags = list(dict.fromkeys(det_flags + ti_flags))
+
+    llm = ai_analyzer.analyze(f"URL: {evidence['final_url']}", evidence, artifact_type="link")
     report_data = risk_engine.combine(det_score, det_flags, "unknown", llm)
 
     db.add(LinkScan(
@@ -148,19 +153,23 @@ def process_image_scan(db: Session, scan: ScanHistory, image_bytes: bytes, stora
 
     text_score, text_flags, category = risk_engine.score_text_evidence(text)
 
+    ti_boost, ti_flags = threat_intel.check_patterns(db, text, "image")
+    text_score = min(text_score + ti_boost, 100)
+    text_flags = list(dict.fromkeys(text_flags + ti_flags))
+
     url_evidence: dict = {}
     if ocr_result["extracted_urls"]:
         url_evidence = url_enrichment.enrich(ocr_result["extracted_urls"][0])
         u_score, u_flags = risk_engine.score_url_evidence(url_evidence)
-        text_score += u_score
-        text_flags += u_flags
+        text_score = min(text_score + u_score, 100)
+        text_flags = list(dict.fromkeys(text_flags + u_flags))
 
     evidence = {
         "ocr": {k: v for k, v in ocr_result.items() if k != "ocr_text"},
         "url": url_evidence,
         "detected_brands": ocr_result["detected_brands"],
     }
-    llm = ai_analyzer.analyze(text, {**evidence, "extracted_text": text[:2000]})
+    llm = ai_analyzer.analyze(text, {**evidence, "extracted_text": text[:2000]}, artifact_type="image")
     report_data = risk_engine.combine(text_score, text_flags, category, llm)
 
     db.add(ImageScan(
@@ -202,7 +211,11 @@ def process_qr_scan(db: Session, scan: ScanHistory, qr_content: str) -> RiskRepo
         det_score, det_flags = text_score, text_flags
         evidence = {"qr_content": qr_content, "is_url": False}
 
-    llm = ai_analyzer.analyze(f"QR code content: {qr_content}", evidence)
+    ti_boost, ti_flags = threat_intel.check_patterns(db, qr_content, "qr")
+    det_score = min(det_score + ti_boost, 100)
+    det_flags = list(dict.fromkeys(det_flags + ti_flags))
+
+    llm = ai_analyzer.analyze(f"QR code content: {qr_content}", evidence, artifact_type="qr")
     report_data = risk_engine.combine(det_score, det_flags, category, llm)
 
     db.add(QRScan(
@@ -237,8 +250,12 @@ def process_message_scan(db: Session, scan: ScanHistory, message_text: str, plat
         det_score = min(det_score + u_score, 100)
         det_flags = list(dict.fromkeys(det_flags + u_flags))
 
+    ti_boost, ti_flags = threat_intel.check_patterns(db, message_text, "message")
+    det_score = min(det_score + ti_boost, 100)
+    det_flags = list(dict.fromkeys(det_flags + ti_flags))
+
     full_evidence = {**msg_ev, "url": url_evidence}
-    llm = ai_analyzer.analyze(message_text[:4000], full_evidence)
+    llm = ai_analyzer.analyze(message_text[:4000], full_evidence, artifact_type="message")
     report_data = risk_engine.combine(det_score, det_flags, category, llm)
 
     db.add(MessageScan(
@@ -302,12 +319,17 @@ def process_email_scan(
         det_score = min(det_score + u_score, 100)
         det_flags = list(dict.fromkeys(det_flags + u_flags))
 
+    email_text = f"{subject or ''} {sender_email or ''} {body}"
+    ti_boost, ti_flags = threat_intel.check_patterns(db, email_text, "email")
+    det_score = min(det_score + ti_boost, 100)
+    det_flags = list(dict.fromkeys(det_flags + ti_flags))
+
     full_evidence = {**email_ev, "url": url_evidence}
     content_for_llm = (
         f"Subject: {subject or ''}\nFrom: {sender_email or ''}\n"
         f"Reply-To: {reply_to_email or ''}\nBody:\n{body[:3000]}"
     )
-    llm = ai_analyzer.analyze(content_for_llm, full_evidence)
+    llm = ai_analyzer.analyze(content_for_llm, full_evidence, artifact_type="email")
     report_data = risk_engine.combine(det_score, det_flags, category, llm)
 
     # Re-read parsed fields from email_ev signals in case raw_email was parsed
@@ -349,7 +371,11 @@ def process_phone_scan(db: Session, scan: ScanHistory, phone_number: str) -> Ris
     if int(sig.get("spam_score", 0)) > 70:
         det_score += 45
 
-    llm = ai_analyzer.analyze(f"Phone number: {phone_number}", phone_ev)
+    ti_boost, ti_flags = threat_intel.check_patterns(db, phone_number, "phone")
+    det_score = min(det_score + ti_boost, 100)
+    det_flags = list(dict.fromkeys(det_flags + ti_flags))
+
+    llm = ai_analyzer.analyze(f"Phone number: {phone_number}", phone_ev, artifact_type="phone")
     report_data = risk_engine.combine(det_score, det_flags, category, llm)
 
     db.add(PhoneScan(
@@ -402,10 +428,15 @@ def process_marketplace_scan(db: Session, scan: ScanHistory, content_text: str, 
         det_score = min(det_score + u_score, 100)
         det_flags = list(dict.fromkeys(det_flags + u_flags))
 
+    ti_boost, ti_flags = threat_intel.check_patterns(db, content_text, "marketplace")
+    det_score = min(det_score + ti_boost, 100)
+    det_flags = list(dict.fromkeys(det_flags + ti_flags))
+
     full_evidence = {**mkt_ev, "url": url_evidence}
     llm = ai_analyzer.analyze(
         f"Marketplace listing/message ({mkt_ev['platform']}):\n{content_text[:4000]}",
         full_evidence,
+        artifact_type="marketplace",
     )
     report_data = risk_engine.combine(det_score, det_flags, category, llm)
 
@@ -453,10 +484,15 @@ def process_social_scan(db: Session, scan: ScanHistory, content_text: str, platf
         det_score = min(det_score + u_score, 100)
         det_flags = list(dict.fromkeys(det_flags + u_flags))
 
+    ti_boost, ti_flags = threat_intel.check_patterns(db, content_text, "social")
+    det_score = min(det_score + ti_boost, 100)
+    det_flags = list(dict.fromkeys(det_flags + ti_flags))
+
     full_evidence = {**soc_ev, "url": url_evidence}
     llm = ai_analyzer.analyze(
         f"Social media content ({soc_ev['platform']}):\n{content_text[:4000]}",
         full_evidence,
+        artifact_type="social",
     )
     report_data = risk_engine.combine(det_score, det_flags, category, llm)
 
