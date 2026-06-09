@@ -12,7 +12,7 @@ workflows:
         - ios_credentials   # CM_CERTIFICATE, CM_CERTIFICATE_PASSWORD,
                             # CM_PROVISIONING_PROFILE (base64 encoded)
       vars:
-        BUNDLE_ID: com.rushingtech.shieldai
+        BUNDLE_ID: com.shieldai.app
         EXPO_PUBLIC_API_URL: https://api.shieldai.rushingtechnologies.com
       node: "20"
       xcode: latest
