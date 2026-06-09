@@ -59,7 +59,6 @@
           "sounds": []
         }
       ],
-      "react-native-webview",
       [
         "expo-share-intent",
         {
