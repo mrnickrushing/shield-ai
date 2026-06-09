@@ -7,22 +7,12 @@ export const api = axios.create({
   timeout: 15000,
 });
 
-let _token = localStorage.getItem("admin_token") ?? "";
-
 export function setToken(t: string) {
-  _token = t;
-  localStorage.setItem("admin_token", t);
   api.defaults.headers.common["Authorization"] = `Bearer ${t}`;
 }
 
 export function clearToken() {
-  _token = "";
-  localStorage.removeItem("admin_token");
   delete api.defaults.headers.common["Authorization"];
-}
-
-if (_token) {
-  api.defaults.headers.common["Authorization"] = `Bearer ${_token}`;
 }
 
 export type AdminStats = {

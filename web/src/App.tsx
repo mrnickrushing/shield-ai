@@ -5,6 +5,10 @@ import DashboardPage from "./pages/Dashboard";
 import PatternsPage from "./pages/Patterns";
 import ReportsPage from "./pages/Reports";
 import UsersPage from "./pages/Users";
+import MarketingPage from "./pages/Marketing";
+import SupportPage from "./pages/Support";
+import TermsPage from "./pages/Terms";
+import PrivacyPage from "./pages/Privacy";
 
 const C = {
   bg: "#020617",
@@ -34,8 +38,11 @@ function LoginPage({ onLogin }: { onLogin: () => void }) {
   };
 
   return (
-    <div style={{ minHeight: "100vh", backgroundColor: C.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
+    <div style={{ minHeight: "100vh", backgroundColor: C.bg, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
       <form onSubmit={submit} style={{ backgroundColor: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: 40, width: 360 }}>
+        <div style={{ marginBottom: 24 }}>
+          <Link to="/" style={{ color: C.muted, textDecoration: "none", fontSize: 13 }}>← Back to Shield AI</Link>
+        </div>
         <h1 style={{ color: C.text, fontSize: 22, fontWeight: 800, marginBottom: 8 }}>Shield AI</h1>
         <p style={{ color: C.muted, marginBottom: 24, fontSize: 14 }}>Admin Console — sign in with your admin account</p>
         {error && <p style={{ color: "#ef4444", marginBottom: 16, fontSize: 13 }}>{error}</p>}
@@ -61,7 +68,7 @@ function LoginPage({ onLogin }: { onLogin: () => void }) {
 
 function NavItem({ to, label }: { to: string; label: string }) {
   const loc = useLocation();
-  const active = loc.pathname === to;
+  const active = loc.pathname === to || (to !== "/admin" && loc.pathname.startsWith(to));
   return (
     <Link to={to} style={{
       display: "block", padding: "8px 16px", borderRadius: 8, textDecoration: "none",
@@ -73,50 +80,67 @@ function NavItem({ to, label }: { to: string; label: string }) {
   );
 }
 
-function Layout({ onLogout, children }: { onLogout: () => void; children: React.ReactNode }) {
+function AdminLayout({ onLogout, children }: { onLogout: () => void; children: React.ReactNode }) {
   return (
-    <div style={{ display: "flex", minHeight: "100vh", backgroundColor: C.bg }}>
+    <div style={{ display: "flex", minHeight: "100vh", backgroundColor: C.bg, fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
       <aside style={{ width: 220, backgroundColor: C.surface, borderRight: `1px solid ${C.border}`, padding: 20, flexShrink: 0 }}>
         <div style={{ marginBottom: 32 }}>
           <span style={{ color: C.text, fontWeight: 800, fontSize: 18 }}>Shield AI</span>
           <span style={{ color: C.bright, fontSize: 11, fontWeight: 700, marginLeft: 8, letterSpacing: 1 }}>ADMIN</span>
         </div>
-        <NavItem to="/" label="Dashboard" />
-        <NavItem to="/reports" label="Community Reports" />
-        <NavItem to="/patterns" label="Scam Patterns" />
-        <NavItem to="/users" label="Users" />
-        <button onClick={onLogout} style={{ marginTop: 32, background: "none", border: "none", color: C.muted, cursor: "pointer", fontSize: 13, padding: "8px 16px" }}>
-          Sign out
-        </button>
+        <NavItem to="/admin" label="Dashboard" />
+        <NavItem to="/admin/reports" label="Community Reports" />
+        <NavItem to="/admin/patterns" label="Scam Patterns" />
+        <NavItem to="/admin/users" label="Users" />
+        <div style={{ marginTop: 32, borderTop: `1px solid ${C.border}`, paddingTop: 16 }}>
+          <Link to="/" style={{ display: "block", color: C.muted, textDecoration: "none", fontSize: 13, padding: "4px 16px", marginBottom: 4 }}>
+            ← Marketing Site
+          </Link>
+          <button onClick={onLogout} style={{ background: "none", border: "none", color: C.muted, cursor: "pointer", fontSize: 13, padding: "4px 16px", display: "block" }}>
+            Sign out
+          </button>
+        </div>
       </aside>
       <main style={{ flex: 1, padding: 32, overflowY: "auto" }}>{children}</main>
     </div>
   );
 }
 
-export default function App() {
-  const [authed, setAuthed] = useState(!!localStorage.getItem("admin_token"));
-
-  useEffect(() => {
-    document.body.style.margin = "0";
-    document.body.style.fontFamily = "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
-  }, []);
-
+function AdminApp() {
+  const [authed, setAuthed] = useState(false);
   const logout = () => { clearToken(); setAuthed(false); };
 
   if (!authed) return <LoginPage onLogin={() => setAuthed(true)} />;
 
   return (
+    <AdminLayout onLogout={logout}>
+      <Routes>
+        <Route index element={<DashboardPage />} />
+        <Route path="reports" element={<ReportsPage />} />
+        <Route path="patterns" element={<PatternsPage />} />
+        <Route path="users" element={<UsersPage />} />
+        <Route path="*" element={<Navigate to="/admin" replace />} />
+      </Routes>
+    </AdminLayout>
+  );
+}
+
+export default function App() {
+  useEffect(() => {
+    document.body.style.margin = "0";
+    document.body.style.fontFamily = "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+  }, []);
+
+  return (
     <BrowserRouter>
-      <Layout onLogout={logout}>
-        <Routes>
-          <Route path="/" element={<DashboardPage />} />
-          <Route path="/reports" element={<ReportsPage />} />
-          <Route path="/patterns" element={<PatternsPage />} />
-          <Route path="/users" element={<UsersPage />} />
-          <Route path="*" element={<Navigate to="/" />} />
-        </Routes>
-      </Layout>
+      <Routes>
+        <Route path="/" element={<MarketingPage />} />
+        <Route path="/support" element={<SupportPage />} />
+        <Route path="/terms" element={<TermsPage />} />
+        <Route path="/privacy" element={<PrivacyPage />} />
+        <Route path="/admin/*" element={<AdminApp />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     </BrowserRouter>
   );
 }
