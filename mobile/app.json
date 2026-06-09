@@ -2,7 +2,7 @@
   "expo": {
     "name": "Shield AI",
     "slug": "shield-ai",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "scheme": "shieldai",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -15,20 +15,60 @@
     "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.rushingtech.shieldai"
+      "bundleIdentifier": "com.rushingtech.shieldai",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Shield AI uses the camera to scan QR codes for threat analysis.",
+        "NSPhotoLibraryUsageDescription": "Shield AI accesses your photo library to scan screenshots for scam detection."
+      }
     },
     "android": {
       "package": "com.rushingtech.shieldai",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#020617"
-      }
+      },
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.VIBRATE"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png",
       "bundler": "metro"
     },
-    "plugins": ["expo-router", "expo-secure-store", "expo-image-picker"],
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-image-picker",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Shield AI uses your camera to scan QR codes.",
+          "microphonePermission": false
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#3B82F6",
+          "sounds": []
+        }
+      ],
+      [
+        "expo-share-intent",
+        {
+          "iosActivationRules": {
+            "NSExtensionActivationSupportsWebURLWithMaxCount": 1,
+            "NSExtensionActivationSupportsWebPageWithMaxCount": 1,
+            "NSExtensionActivationSupportsText": true
+          },
+          "androidIntentFilters": ["text/*"]
+        }
+      ]
+    ],
     "experiments": {
       "typedRoutes": true
     }

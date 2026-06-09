@@ -1,11 +1,10 @@
-"""Phase 1 SQLAlchemy models.
+"""Phase 1 + Phase 2 SQLAlchemy models.
 
-Deliberately scoped to the Phase 1 tables only:
-users, profiles, devices, scan_history, risk_reports, image_scans,
-link_scans, api_usage, audit_logs.
+Phase 1 tables: users, profiles, devices, scan_history, risk_reports,
+image_scans, link_scans, api_usage, audit_logs.
 
-Specialized tables (identity_alerts, trusted_contacts, education_progress,
-phone_lookups, qr_scans, email_scans, message_scans) are added in later phases.
+Phase 2 tables: qr_scans, message_scans, email_scans, phone_scans,
+notifications.
 """
 import enum
 import uuid
@@ -38,6 +37,10 @@ def _now() -> datetime:
 class ScanType(str, enum.Enum):
     link = "link"
     image = "image"
+    qr = "qr"
+    message = "message"
+    email = "email"
+    phone = "phone"
 
 
 class ScanStatus(str, enum.Enum):
@@ -167,4 +170,67 @@ class AuditLog(Base):
     user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
     action: Mapped[str] = mapped_column(String)
     detail: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+# ---------------------------------------------------------------------------
+# Phase 2 — artifact detail tables
+# ---------------------------------------------------------------------------
+
+class QRScan(Base):
+    __tablename__ = "qr_scans"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    scan_id: Mapped[str] = mapped_column(ForeignKey("scan_history.id"), index=True)
+    qr_content: Mapped[str] = mapped_column(Text)
+    qr_type: Mapped[str] = mapped_column(String, default="url")  # url | text | phone | wifi | other
+    decoded_url: Mapped[str] = mapped_column(Text, default="")
+
+
+class MessageScan(Base):
+    __tablename__ = "message_scans"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    scan_id: Mapped[str] = mapped_column(ForeignKey("scan_history.id"), index=True)
+    message_text: Mapped[str] = mapped_column(Text)
+    platform_hint: Mapped[str] = mapped_column(String, default="")  # sms | whatsapp | imessage | ""
+    detected_entities: Mapped[dict] = mapped_column(JSON, default=dict)
+    extracted_urls: Mapped[list] = mapped_column(JSON, default=list)
+
+
+class EmailScan(Base):
+    __tablename__ = "email_scans"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    scan_id: Mapped[str] = mapped_column(ForeignKey("scan_history.id"), index=True)
+    sender_email: Mapped[str] = mapped_column(String, default="")
+    sender_display_name: Mapped[str] = mapped_column(String, default="")
+    reply_to_email: Mapped[str] = mapped_column(String, default="")
+    subject: Mapped[str] = mapped_column(String, default="")
+    body_text: Mapped[str] = mapped_column(Text, default="")
+    extracted_urls: Mapped[list] = mapped_column(JSON, default=list)
+    header_flags: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
+class PhoneScan(Base):
+    __tablename__ = "phone_scans"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    scan_id: Mapped[str] = mapped_column(ForeignKey("scan_history.id"), index=True)
+    phone_number: Mapped[str] = mapped_column(String)
+    normalized_number: Mapped[str] = mapped_column(String, default="")
+    country_code: Mapped[str] = mapped_column(String, default="")
+    carrier: Mapped[str] = mapped_column(String, default="")
+    line_type: Mapped[str] = mapped_column(String, default="")  # mobile | landline | voip
+
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    title: Mapped[str] = mapped_column(String)
+    body: Mapped[str] = mapped_column(Text, default="")
+    scan_id: Mapped[str | None] = mapped_column(ForeignKey("scan_history.id"), nullable=True)
+    is_read: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)

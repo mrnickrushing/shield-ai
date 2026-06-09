@@ -32,11 +32,15 @@ class Settings(BaseSettings):
     # --- CORS ---
     CORS_ORIGINS: List[str] = ["*"]
 
-    # --- Third-party detection APIs (Phase 1 uses Safe Browsing + optional VirusTotal) ---
+    # --- Third-party detection APIs ---
     OPENAI_API_KEY: str = ""
     OPENAI_MODEL: str = "gpt-4o-mini"
     GOOGLE_SAFE_BROWSING_KEY: str = ""
     VIRUSTOTAL_API_KEY: str = ""
+
+    # --- Phase 2 optional APIs ---
+    NUMVERIFY_API_KEY: str = ""    # apilayer.net phone lookup
+    EXPO_ACCESS_TOKEN: str = ""    # Expo push notification service
 
     # --- Limits ---
     FREE_TIER_DAILY_SCANS: int = 15
