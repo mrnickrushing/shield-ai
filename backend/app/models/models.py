@@ -1,4 +1,4 @@
-"""Phase 1 + Phase 2 SQLAlchemy models.
+"""Phase 1 + Phase 2 + Phase 3 SQLAlchemy models.
 
 Phase 1 tables: users, profiles, devices, scan_history, risk_reports,
 image_scans, link_scans, api_usage, audit_logs.
@@ -41,6 +41,8 @@ class ScanType(str, enum.Enum):
     message = "message"
     email = "email"
     phone = "phone"
+    marketplace = "marketplace"   # Phase 3
+    social = "social"             # Phase 3
 
 
 class ScanStatus(str, enum.Enum):
@@ -232,5 +234,57 @@ class Notification(Base):
     title: Mapped[str] = mapped_column(String)
     body: Mapped[str] = mapped_column(Text, default="")
     scan_id: Mapped[str | None] = mapped_column(ForeignKey("scan_history.id"), nullable=True)
+    is_read: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 — protection workflow tables
+# ---------------------------------------------------------------------------
+
+class MarketplaceScan(Base):
+    __tablename__ = "marketplace_scans"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    scan_id: Mapped[str] = mapped_column(ForeignKey("scan_history.id"), index=True)
+    content_text: Mapped[str] = mapped_column(Text)
+    platform: Mapped[str] = mapped_column(String, default="")  # facebook_marketplace | ebay | craigslist | …
+    detected_signals: Mapped[dict] = mapped_column(JSON, default=dict)
+    extracted_urls: Mapped[list] = mapped_column(JSON, default=list)
+
+
+class SocialScan(Base):
+    __tablename__ = "social_scans"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    scan_id: Mapped[str] = mapped_column(ForeignKey("scan_history.id"), index=True)
+    content_text: Mapped[str] = mapped_column(Text)
+    platform: Mapped[str] = mapped_column(String, default="")  # instagram | facebook | twitter | tiktok | …
+    detected_signals: Mapped[dict] = mapped_column(JSON, default=dict)
+    extracted_urls: Mapped[list] = mapped_column(JSON, default=list)
+
+
+class BreachRecord(Base):
+    """Cached HaveIBeenPwned result per email (24-hour TTL)."""
+    __tablename__ = "breach_records"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    email: Mapped[str] = mapped_column(String, index=True)
+    breach_count: Mapped[int] = mapped_column(Integer, default=0)
+    severity: Mapped[str] = mapped_column(String, default="none")   # none | low | medium | high
+    breaches: Mapped[list] = mapped_column(JSON, default=list)
+    checked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class IdentityAlert(Base):
+    """Ongoing identity-monitoring alert for a user."""
+    __tablename__ = "identity_alerts"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    alert_type: Mapped[str] = mapped_column(String)   # breach | monitoring
+    email: Mapped[str] = mapped_column(String, default="")
+    detail: Mapped[dict] = mapped_column(JSON, default=dict)
     is_read: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)

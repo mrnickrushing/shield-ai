@@ -129,3 +129,57 @@ class NotificationOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 — protection workflows
+# ---------------------------------------------------------------------------
+
+class MarketplaceScanCreate(BaseModel):
+    content_text: str
+    platform_hint: str = ""   # facebook_marketplace | ebay | craigslist | offerup | ""
+
+
+class SocialScanCreate(BaseModel):
+    content_text: str
+    platform: str = ""        # instagram | facebook | twitter | tiktok | ""
+
+
+class BreachCheckRequest(BaseModel):
+    email: EmailStr
+
+
+class BreachOut(BaseModel):
+    name: str
+    title: str
+    domain: str
+    breach_date: str
+    pwn_count: int
+    data_classes: list[str]
+    is_verified: bool
+
+
+class BreachCheckResult(BaseModel):
+    email: str
+    breach_count: int
+    severity: str               # none | low | medium | high
+    breaches: list[BreachOut]
+    actions: list[str]
+    disclaimer: str
+    data_available: bool
+    checked_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class IdentityAlertOut(BaseModel):
+    id: str
+    alert_type: str
+    email: str
+    detail: dict
+    is_read: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

@@ -1,4 +1,4 @@
-"""Scan routes: link, image, QR, message, email, phone scans + history + feedback."""
+"""Scan routes — Phase 1-3: link, image, QR, message, email, phone, marketplace, social."""
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -18,11 +18,13 @@ from app.schemas.schemas import (
     EmailScanCreate,
     ImageScanCreate,
     LinkScanCreate,
+    MarketplaceScanCreate,
     MessageScanCreate,
     PhoneScanCreate,
     QRScanCreate,
     ScanFeedback,
     ScanOut,
+    SocialScanCreate,
 )
 from app.services import ocr, scan_service
 
@@ -241,6 +243,54 @@ def create_phone_scan(
     db.refresh(scan)
 
     scan_service.process_phone_scan(db, scan, payload.phone_number)
+    db.commit()
+    db.refresh(scan)
+    return scan
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 — protection workflow scan types
+# ---------------------------------------------------------------------------
+
+@router.post("/marketplace", response_model=ScanOut, status_code=status.HTTP_201_CREATED)
+def create_marketplace_scan(
+    payload: MarketplaceScanCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    _check_quota(db, user)
+    scan = ScanHistory(
+        user_id=user.id, scan_type=ScanType.marketplace,
+        raw_input=payload.content_text[:500], status=ScanStatus.pending,
+    )
+    db.add(scan)
+    db.commit()
+    db.refresh(scan)
+
+    scan_service.process_marketplace_scan(db, scan, payload.content_text, payload.platform_hint)
+    db.add(ApiUsage(user_id=user.id, provider="openai"))
+    db.commit()
+    db.refresh(scan)
+    return scan
+
+
+@router.post("/social", response_model=ScanOut, status_code=status.HTTP_201_CREATED)
+def create_social_scan(
+    payload: SocialScanCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    _check_quota(db, user)
+    scan = ScanHistory(
+        user_id=user.id, scan_type=ScanType.social,
+        raw_input=payload.content_text[:500], status=ScanStatus.pending,
+    )
+    db.add(scan)
+    db.commit()
+    db.refresh(scan)
+
+    scan_service.process_social_scan(db, scan, payload.content_text, payload.platform)
+    db.add(ApiUsage(user_id=user.id, provider="openai"))
     db.commit()
     db.refresh(scan)
     return scan

@@ -40,6 +40,13 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="protect"
+        options={{
+          title: "Protect",
+          tabBarIcon: ({ color, size }) => <Ionicons name="lock-closed-outline" size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="history"
         options={{
           title: "History",
