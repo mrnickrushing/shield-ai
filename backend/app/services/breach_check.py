@@ -54,25 +54,25 @@ def check_password_pwned(password: str) -> int:
     k-Anonymity password check via HIBP Pwned Passwords.
     Returns how many times this password appeared in known breach databases.
     Never sends the full password — only a 5-character SHA-1 prefix.
+    Raises on network or HTTP errors so callers can surface an unavailable state
+    rather than silently reporting a compromised password as safe.
     """
     import hashlib
 
+    import httpx
+
     sha1 = hashlib.sha1(password.encode("utf-8")).hexdigest().upper()
     prefix, suffix = sha1[:5], sha1[5:]
-    try:
-        import httpx
-
-        resp = httpx.get(
-            f"https://api.pwnedpasswords.com/range/{prefix}",
-            headers={"user-agent": "Shield-AI/3.0"},
-            timeout=5.0,
-        )
-        for line in resp.text.splitlines():
-            parts = line.split(":")
-            if len(parts) == 2 and parts[0] == suffix:
-                return int(parts[1])
-    except Exception:
-        pass
+    resp = httpx.get(
+        f"https://api.pwnedpasswords.com/range/{prefix}",
+        headers={"user-agent": "Shield-AI/3.0"},
+        timeout=5.0,
+    )
+    resp.raise_for_status()
+    for line in resp.text.splitlines():
+        parts = line.split(":")
+        if len(parts) == 2 and parts[0] == suffix:
+            return int(parts[1])
     return 0
 
 

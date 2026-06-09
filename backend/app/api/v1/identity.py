@@ -62,40 +62,43 @@ def check_breach(
     result = breach_check.check_breaches(email)
     now = datetime.now(timezone.utc)
 
-    # Persist result
-    record = BreachRecord(
-        user_id=user.id,
-        email=email,
-        breach_count=result["breach_count"],
-        severity=result["severity"],
-        breaches=result["breaches"],
-        checked_at=now,
-    )
-    db.add(record)
-
-    # Create an identity alert if new breaches were found
-    if result["breach_count"] > 0:
-        existing = (
-            db.query(IdentityAlert)
-            .filter(
-                IdentityAlert.user_id == user.id,
-                IdentityAlert.email == email,
-                IdentityAlert.alert_type == "breach",
-            )
-            .first()
+    # Only persist when HIBP actually returned data. Caching a "no API key /
+    # transient failure" result would suppress real lookups for 24 hours and
+    # silently report zero breaches while the service is unavailable.
+    if result["data_available"]:
+        record = BreachRecord(
+            user_id=user.id,
+            email=email,
+            breach_count=result["breach_count"],
+            severity=result["severity"],
+            breaches=result["breaches"],
+            checked_at=now,
         )
-        if not existing:
-            db.add(IdentityAlert(
-                user_id=user.id,
-                alert_type="breach",
-                email=email,
-                detail={
-                    "breach_count": result["breach_count"],
-                    "severity": result["severity"],
-                    "top_breaches": [b["name"] for b in result["breaches"][:5]],
-                },
-            ))
-    db.commit()
+        db.add(record)
+
+        # Create an identity alert if new breaches were found
+        if result["breach_count"] > 0:
+            existing = (
+                db.query(IdentityAlert)
+                .filter(
+                    IdentityAlert.user_id == user.id,
+                    IdentityAlert.email == email,
+                    IdentityAlert.alert_type == "breach",
+                )
+                .first()
+            )
+            if not existing:
+                db.add(IdentityAlert(
+                    user_id=user.id,
+                    alert_type="breach",
+                    email=email,
+                    detail={
+                        "breach_count": result["breach_count"],
+                        "severity": result["severity"],
+                        "top_breaches": [b["name"] for b in result["breaches"][:5]],
+                    },
+                ))
+        db.commit()
 
     return BreachCheckResult(
         email=email,
@@ -121,7 +124,13 @@ def check_password(
     password = payload.get("password", "")
     if not password:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "password is required")
-    count = breach_check.check_password_pwned(password)
+    try:
+        count = breach_check.check_password_pwned(password)
+    except Exception:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "Password check service temporarily unavailable. Please try again.",
+        )
     if count > 0:
         recommendation = (
             f"This password appeared {count:,} time(s) in known data breaches. "

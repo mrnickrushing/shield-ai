@@ -467,12 +467,13 @@ def test_password_check_clean():
         json={"password": "some-password-to-check"},
         headers=headers,
     )
-    # May fail if no network; service catches exceptions and returns 0
-    assert r.status_code == 200
-    data = r.json()
-    assert "pwned_count" in data
-    assert "is_compromised" in data
-    assert "recommendation" in data
+    # Returns 200 with result if HIBP is reachable, or 503 when network is unavailable.
+    assert r.status_code in (200, 503)
+    if r.status_code == 200:
+        data = r.json()
+        assert "pwned_count" in data
+        assert "is_compromised" in data
+        assert "recommendation" in data
 
 
 def test_password_check_requires_password_field():
