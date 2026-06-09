@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { AdminAPI, AdminStats } from "../api";
 
 const C = { text: "#F8FAFC", muted: "#94A3B8", surface: "#0B1220", border: "#1E2A45", bright: "#22D3EE", primary: "#3B82F6" };
