@@ -12,14 +12,21 @@ from app.models.models import RiskLevel
 
 # Phrases that frequently appear in phishing / social-engineering content.
 URGENCY_PATTERNS = [
-    r"act now", r"within \d+ hours", r"immediately", r"final notice",
-    r"account (will be )?(suspended|locked|closed)", r"verify your account",
-    r"unusual activity", r"confirm your identity", r"last warning",
+    r"act now", r"within \d+ ?hour", r"in \d+ ?hour", r"immediately",
+    r"final notice", r"last chance", r"expire", r"urgent", r"asap",
+    r"account (is |has been |will be )?(suspended|locked|closed|disabled|restricted|frozen)",
+    r"(suspended|locked|closed|disabled|restricted|frozen) (your )?account",
+    r"verify (your )?(account|identity|details|information)?", r"verify now",
+    r"unusual activity", r"suspicious activity", r"confirm your identity",
+    r"last warning", r"lose access", r"avoid (suspension|deactivation)",
 ]
 CREDENTIAL_PATTERNS = [
-    r"enter your password", r"login to (confirm|verify)", r"update your payment",
-    r"social security", r"\bssn\b", r"banking details", r"one[- ]time code",
+    r"enter your password", r"log ?in to (confirm|verify)", r"sign ?in to (confirm|verify)",
+    r"update your payment", r"confirm your (password|pin|card|payment)",
+    r"social security", r"\bssn\b", r"bank(ing)? (details|account)",
+    r"card (number|details)", r"one[- ]time (code|password)",
     r"\botp\b", r"seed phrase", r"private key", r"wallet recovery",
+    r"verification code", r"security code",
 ]
 PAYMENT_SCAM_PATTERNS = [
     r"gift card", r"google play card", r"wire transfer", r"bitcoin", r"crypto",
@@ -72,13 +79,35 @@ def score_url_evidence(ev: dict) -> tuple[int, list[str]]:
     return score, flags
 
 
+# A legitimately-delivered one-time code ("your code is 123456") is NOT a
+# phishing request. Detect that shape so we don't flag real 2FA messages.
+_DELIVERED_CODE_RE = re.compile(
+    r"(your )?(verification|security|one[- ]time|login|access|otp) ?(code|password|pin)"
+    r"\s*(is|:)\s*\d{4,8}|\bis\s+\d{4,8}\b.*(code|verification)",
+    re.IGNORECASE,
+)
+
+
 def score_text_evidence(text: str) -> tuple[int, list[str], str]:
     score, flags = 0, []
     category = "unknown"
+    low = (text or "").lower()
+
+    # Benign 2FA / OTP delivery: code is given to the user, no link, no ask.
+    delivered_code = bool(_DELIVERED_CODE_RE.search(text or ""))
+    has_link = bool(re.search(r"https?://|www\.", low))
+    has_actionable_ask = bool(
+        re.search(r"click|tap|log ?in|sign ?in|confirm|verify your|update your|reply|call", low)
+    )
+    benign_code_delivery = delivered_code and not has_link and not has_actionable_ask
 
     urgency = _match_any(text, URGENCY_PATTERNS)
     creds = _match_any(text, CREDENTIAL_PATTERNS)
     payment = _match_any(text, PAYMENT_SCAM_PATTERNS)
+
+    if benign_code_delivery:
+        # Looks like a real delivered code with no phishing ask — don't score.
+        return 0, [], "unknown"
 
     if urgency:
         score += 15
@@ -93,6 +122,30 @@ def score_text_evidence(text: str) -> tuple[int, list[str], str]:
         flags.append("Asks for payment via untraceable methods (gift cards, crypto, wire).")
         category = "payment_fraud"
     return score, flags, category
+
+
+# Message-level signal weights (from message_analyzer.analyze_message signals).
+# These give the deterministic engine real teeth on pasted SMS/chat content,
+# independent of whether an embedded URL is in a threat database yet.
+MESSAGE_SIGNAL_WEIGHTS = [
+    ("authority_impersonation", 40, "Impersonates a government agency, bank, or official authority."),
+    ("delivery_scam_signals", 30, "Matches delivery / package-fee scam patterns."),
+    ("prize_scam_signals", 30, "Claims you won a prize or reward (advance-fee pattern)."),
+    ("romance_scam_signals", 30, "Matches romance / investment scam patterns."),
+    ("job_scam_signals", 25, "Contains job / quick-money scam indicators."),
+    ("sms_with_link", 25, "Unsolicited SMS containing a clickable link (common smishing tactic)."),
+    ("has_urgency", 15, "Uses urgency or time pressure to force a quick decision."),
+]
+
+
+def score_message_signals(signals: dict) -> tuple[int, list[str]]:
+    """Convert message_analyzer deterministic signals into weighted score + flags."""
+    score, flags = 0, []
+    for key, pts, msg in MESSAGE_SIGNAL_WEIGHTS:
+        if signals.get(key):
+            score += pts
+            flags.append(msg)
+    return score, flags
 
 
 def level_for_score(score: int) -> RiskLevel:

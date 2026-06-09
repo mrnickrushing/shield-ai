@@ -222,9 +222,12 @@ def process_message_scan(db: Session, scan: ScanHistory, message_text: str, plat
 
     msg_ev = message_analyzer.analyze_message(message_text, platform_hint)
     text_score, text_flags, text_category = risk_engine.score_text_evidence(message_text)
+    # Weight the message-level scam signals (urgency, smishing, impersonation,
+    # delivery/prize/job/romance patterns) so they actually move the score.
+    sig_score, sig_flags = risk_engine.score_message_signals(msg_ev["signals"])
 
-    det_flags = list(dict.fromkeys(text_flags + msg_ev["flags"]))
-    det_score = text_score
+    det_flags = list(dict.fromkeys(text_flags + sig_flags + msg_ev["flags"]))
+    det_score = min(text_score + sig_score, 100)
     category = msg_ev["category"] if msg_ev["category"] != "unknown" else text_category
 
     url_evidence: dict = {}
