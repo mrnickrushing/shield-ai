@@ -67,21 +67,41 @@ def expand_url(url: str, timeout: float = 5.0) -> tuple[str, int]:
         return url, 0
 
 
-def check_safe_browsing(url: str) -> bool:
-    """Query Google Safe Browsing. Returns True if a threat match is found."""
-    if not settings.GOOGLE_SAFE_BROWSING_KEY:
-        return False
-    endpoint = (
-        "https://safebrowsing.googleapis.com/v4/threatMatches:find"
-        f"?key={settings.GOOGLE_SAFE_BROWSING_KEY}"
-    )
+# Threat types shared across both Google URL-reputation APIs.
+_WEBRISK_THREAT_TYPES = ["MALWARE", "SOCIAL_ENGINEERING", "UNWANTED_SOFTWARE"]
+_SB_THREAT_TYPES = [
+    "MALWARE", "SOCIAL_ENGINEERING",
+    "UNWANTED_SOFTWARE", "POTENTIALLY_HARMFUL_APPLICATION",
+]
+
+
+def _check_web_risk(url: str, key: str) -> bool | None:
+    """Google Web Risk uris:search (the supported, non-deprecated API).
+    Returns True/False on a definitive answer, or None if the API is
+    unavailable/disabled so the caller can fall back."""
+    params = [("key", key), ("uri", url)]
+    params += [("threatTypes", t) for t in _WEBRISK_THREAT_TYPES]
+    try:
+        with httpx.Client(timeout=6.0) as client:
+            resp = client.get(
+                "https://webrisk.googleapis.com/v1/uris:search", params=params
+            )
+            if resp.status_code == 200:
+                return bool(resp.json().get("threat"))
+            # 403/SERVICE_DISABLED, etc. -> let caller try the legacy API
+            return None
+    except Exception:
+        return None
+
+
+def _check_safe_browsing_v4(url: str, key: str) -> bool | None:
+    """Legacy Safe Browsing v4 threatMatches:find. Deprecated by Google but
+    kept as a fallback for projects where it is still enabled."""
+    endpoint = f"https://safebrowsing.googleapis.com/v4/threatMatches:find?key={key}"
     body = {
         "client": {"clientId": "shield-ai", "clientVersion": "1.0"},
         "threatInfo": {
-            "threatTypes": [
-                "MALWARE", "SOCIAL_ENGINEERING",
-                "UNWANTED_SOFTWARE", "POTENTIALLY_HARMFUL_APPLICATION",
-            ],
+            "threatTypes": _SB_THREAT_TYPES,
             "platformTypes": ["ANY_PLATFORM"],
             "threatEntryTypes": ["URL"],
             "threatEntries": [{"url": url}],
@@ -90,9 +110,27 @@ def check_safe_browsing(url: str) -> bool:
     try:
         with httpx.Client(timeout=6.0) as client:
             resp = client.post(endpoint, json=body)
-            return bool(resp.json().get("matches"))
+            if resp.status_code == 200:
+                return bool(resp.json().get("matches"))
+            return None
     except Exception:
+        return None
+
+
+def check_safe_browsing(url: str) -> bool:
+    """Check a URL against Google's threat lists. Prefers Web Risk (current
+    API); falls back to legacy Safe Browsing v4. Returns True on a match.
+
+    Both APIs use the same GOOGLE_SAFE_BROWSING_KEY. A None result from one
+    API (unavailable/disabled) triggers the other; if both are unavailable
+    we fail open (False) so detection degrades gracefully."""
+    key = settings.GOOGLE_SAFE_BROWSING_KEY
+    if not key:
         return False
+    result = _check_web_risk(url, key)
+    if result is None:
+        result = _check_safe_browsing_v4(url, key)
+    return bool(result)
 
 
 def estimate_domain_age_days(domain: str) -> int | None:
