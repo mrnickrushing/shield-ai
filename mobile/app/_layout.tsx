@@ -35,6 +35,11 @@ export default function RootLayout() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="result" options={{ title: "Risk Report" }} />
         <Stack.Screen name="profile" options={{ title: "Profile" }} />
+        <Stack.Screen name="recovery" options={{ title: "Scam Recovery" }} />
+        <Stack.Screen name="incident" options={{ title: "Recovery Case" }} />
+        <Stack.Screen name="education" options={{ title: "Education Center" }} />
+        <Stack.Screen name="lesson" options={{ title: "Lesson" }} />
+        <Stack.Screen name="family" options={{ title: "Family Protection" }} />
       </Stack>
     </QueryClientProvider>
   );

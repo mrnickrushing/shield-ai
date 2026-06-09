@@ -26,35 +26,21 @@ export default function Dashboard() {
     }).length ?? 0;
 
   const ActionCard = ({
-    icon,
-    title,
-    body,
-    onPress,
-  }: {
-    icon: string;
-    title: string;
-    body: string;
-    onPress: () => void;
-  }) => (
+    icon, title, body, onPress,
+  }: { icon: string; title: string; body: string; onPress: () => void }) => (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => ({
         backgroundColor: pressed ? colors.surfaceActive : colors.surface,
-        borderColor: colors.border,
-        borderWidth: 1,
-        borderRadius: radius.lg,
-        padding: spacing.lg,
-        marginBottom: spacing.md,
-        flexDirection: "row",
-        alignItems: "center",
-        gap: spacing.md,
+        borderColor: colors.border, borderWidth: 1,
+        borderRadius: radius.lg, padding: spacing.lg,
+        marginBottom: spacing.md, flexDirection: "row",
+        alignItems: "center", gap: spacing.md,
       })}
     >
       <Text style={{ fontSize: 28 }}>{icon}</Text>
       <View style={{ flex: 1 }}>
-        <Text style={{ color: colors.text, fontSize: 17, fontWeight: "700", marginBottom: 3 }}>
-          {title}
-        </Text>
+        <Text style={{ color: colors.text, fontSize: 17, fontWeight: "700", marginBottom: 3 }}>{title}</Text>
         <Text style={{ color: colors.textMuted, fontSize: 13 }}>{body}</Text>
       </View>
       <Text style={{ color: colors.textMuted, fontSize: 18 }}>›</Text>
@@ -62,19 +48,8 @@ export default function Dashboard() {
   );
 
   return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: colors.bg }}
-      contentContainerStyle={{ padding: spacing.lg }}
-    >
-      {/* Header */}
-      <View
-        style={{
-          flexDirection: "row",
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-          marginBottom: spacing.lg,
-        }}
-      >
+    <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ padding: spacing.lg }}>
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: spacing.lg }}>
         <View>
           <Text style={{ color: colors.textMuted, marginBottom: 2 }}>
             Welcome back{user?.display_name ? `, ${user.display_name}` : ""}
@@ -82,64 +57,34 @@ export default function Dashboard() {
           <Text style={{ color: colors.text, fontSize: 26, fontWeight: "800" }}>Is it real?</Text>
         </View>
         {todayCount > 0 && (
-          <View
-            style={{
-              backgroundColor: colors.surface,
-              borderRadius: radius.md,
-              padding: spacing.sm,
-              alignItems: "center",
-              minWidth: 52,
-            }}
-          >
-            <Text style={{ color: colors.primaryBright, fontWeight: "800", fontSize: 20 }}>
-              {todayCount}
-            </Text>
+          <View style={{ backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.sm, alignItems: "center", minWidth: 52 }}>
+            <Text style={{ color: colors.primaryBright, fontWeight: "800", fontSize: 20 }}>{todayCount}</Text>
             <Text style={{ color: colors.textMuted, fontSize: 11 }}>today</Text>
           </View>
         )}
       </View>
 
-      {/* Action cards */}
-      <ActionCard
-        icon="🔗"
-        title="Check a Link"
-        body="Paste any suspicious URL — get a risk report in seconds."
-        onPress={() => router.push("/(tabs)/scan?type=link")}
-      />
-      <ActionCard
-        icon="📷"
-        title="Scan a Screenshot"
-        body="Upload a screenshot of a message, email, or website."
-        onPress={() => router.push("/(tabs)/scan?type=image")}
-      />
+      <Text style={{ color: colors.textMuted, fontSize: 12, fontWeight: "700", letterSpacing: 1, textTransform: "uppercase", marginBottom: spacing.sm }}>Analyze</Text>
+      <ActionCard icon="🔗" title="Check a Link" body="Paste any suspicious URL — get a risk report in seconds." onPress={() => router.push("/(tabs)/scan?type=link")} />
+      <ActionCard icon="📷" title="Scan a Screenshot" body="Upload a screenshot of a message, email, or website." onPress={() => router.push("/(tabs)/scan?type=image")} />
 
-      {/* Recent scans */}
+      <Text style={{ color: colors.textMuted, fontSize: 12, fontWeight: "700", letterSpacing: 1, textTransform: "uppercase", marginBottom: spacing.sm, marginTop: spacing.lg }}>Protect</Text>
+      <ActionCard icon="🆘" title="Scam Recovery" body="Already been scammed? Get a guided step-by-step recovery plan." onPress={() => router.push("/recovery")} />
+      <ActionCard icon="📚" title="Education Center" body="Short lessons to help you spot scams before they happen." onPress={() => router.push("/education")} />
+      <ActionCard icon="👨‍👩‍👧" title="Family Protection" body="Add trusted contacts to share scam alerts with." onPress={() => router.push("/family")} />
+
       {isLoading ? (
         <ActivityIndicator color={colors.primaryBright} style={{ marginTop: spacing.xl }} />
       ) : recentScans.length > 0 ? (
         <>
-          <View
-            style={{
-              flexDirection: "row",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginTop: spacing.lg,
-              marginBottom: spacing.sm,
-            }}
-          >
-            <Text style={{ color: colors.text, fontWeight: "700", fontSize: 15 }}>
-              Recent Scans
-            </Text>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: spacing.lg, marginBottom: spacing.sm }}>
+            <Text style={{ color: colors.text, fontWeight: "700", fontSize: 15 }}>Recent Scans</Text>
             <Pressable onPress={() => router.push("/(tabs)/history")}>
               <Text style={{ color: colors.primaryBright, fontSize: 13 }}>View all →</Text>
             </Pressable>
           </View>
           {recentScans.map((scan) => (
-            <ScanCard
-              key={scan.id}
-              scan={scan}
-              onPress={() => router.push(`/result?id=${scan.id}`)}
-            />
+            <ScanCard key={scan.id} scan={scan} onPress={() => router.push(`/result?id=${scan.id}`)} />
           ))}
         </>
       ) : null}
