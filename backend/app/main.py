@@ -11,9 +11,12 @@ from app.db.session import Base, engine
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Phase 1: create tables on startup. Production should use Alembic migrations.
-    if settings.ENVIRONMENT == "development":
+    # Phase 1: create any missing tables on startup. Future phases move this
+    # to Alembic migrations. create_all is a no-op for tables that exist.
+    try:
         Base.metadata.create_all(bind=engine)
+    except Exception as exc:  # don't block startup/health if DB is briefly unready
+        print(f"[startup] table creation skipped: {exc}")
     yield
 
 
