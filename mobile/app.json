@@ -15,14 +15,14 @@
     "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.rushingtech.shieldai",
+      "bundleIdentifier": "com.shieldai.app",
       "infoPlist": {
         "NSCameraUsageDescription": "Shield AI uses the camera to scan QR codes for threat analysis.",
         "NSPhotoLibraryUsageDescription": "Shield AI accesses your photo library to scan screenshots for scam detection."
       }
     },
     "android": {
-      "package": "com.rushingtech.shieldai",
+      "package": "com.shieldai.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#020617"
