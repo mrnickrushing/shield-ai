@@ -1,14 +1,6 @@
 import { Link } from "react-router-dom";
-
-const C = {
-  bg: "#020617",
-  surface: "#0B1220",
-  border: "#1E2A45",
-  text: "#F8FAFC",
-  muted: "#94A3B8",
-  primary: "#3B82F6",
-  bright: "#22D3EE",
-};
+import { C } from "../theme";
+import Footer from "../components/Footer";
 
 const FEATURES = [
   {
@@ -142,18 +134,7 @@ export default function MarketingPage() {
         </Link>
       </section>
 
-      {/* Footer */}
-      <footer style={{ borderTop: `1px solid ${C.border}`, padding: "36px 40px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontWeight: 800, fontSize: 16, color: C.text }}>Shield AI</span>
-          <span style={{ color: C.muted, fontSize: 13 }}>© {new Date().getFullYear()} Rushing Technologies. All rights reserved.</span>
-        </div>
-        <div style={{ display: "flex", gap: 28 }}>
-          <Link to="/support" style={{ color: C.muted, textDecoration: "none", fontSize: 14 }}>Support</Link>
-          <Link to="/terms" style={{ color: C.muted, textDecoration: "none", fontSize: 14 }}>Terms of Service</Link>
-          <Link to="/privacy" style={{ color: C.muted, textDecoration: "none", fontSize: 14 }}>Privacy Policy</Link>
-        </div>
-      </footer>
+      <Footer />
 
     </div>
   );

@@ -1,7 +1,6 @@
 import React from "react";
 import PublicPageShell from "../components/PublicPageShell";
-
-const C = { text: "#F8FAFC", muted: "#94A3B8", border: "#1E2A45", bright: "#22D3EE" };
+import { C } from "../theme";
 
 const h2Style: React.CSSProperties = { fontSize: 20, fontWeight: 700, color: C.text, marginTop: 44, marginBottom: 12 };
 const pStyle: React.CSSProperties = { color: C.muted, fontSize: 15, lineHeight: 1.8, marginBottom: 16 };

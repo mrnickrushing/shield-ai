@@ -1,14 +1,6 @@
 import { useState } from "react";
 import PublicPageShell from "../components/PublicPageShell";
-
-const C = {
-  surface: "#0B1220",
-  border: "#1E2A45",
-  text: "#F8FAFC",
-  muted: "#94A3B8",
-  primary: "#3B82F6",
-  bright: "#22D3EE",
-};
+import { C } from "../theme";
 
 const FAQS = [
   {
@@ -47,6 +39,7 @@ function FAQ({ q, a }: { q: string; a: string }) {
     <div style={{ borderBottom: `1px solid ${C.border}` }}>
       <button
         onClick={() => setOpen(o => !o)}
+        aria-expanded={open}
         style={{ width: "100%", background: "none", border: "none", color: C.text, padding: "20px 0", textAlign: "left", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 16, fontWeight: 600 }}
       >
         {q}

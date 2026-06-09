@@ -107,7 +107,7 @@ function AdminLayout({ onLogout, children }: { onLogout: () => void; children: R
 }
 
 function AdminApp() {
-  const [authed, setAuthed] = useState(!!localStorage.getItem("admin_token"));
+  const [authed, setAuthed] = useState(false);
   const logout = () => { clearToken(); setAuthed(false); };
 
   if (!authed) return <LoginPage onLogin={() => setAuthed(true)} />;

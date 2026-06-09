@@ -1,14 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
-
-const C = {
-  bg: "#020617",
-  surface: "#0B1220",
-  border: "#1E2A45",
-  text: "#F8FAFC",
-  muted: "#94A3B8",
-  primary: "#3B82F6",
-};
+import { C } from "../theme";
+import Footer from "./Footer";
 
 export default function PublicPageShell({ children }: { children: React.ReactNode }) {
   return (
@@ -25,14 +18,7 @@ export default function PublicPageShell({ children }: { children: React.ReactNod
         {children}
       </div>
 
-      <footer style={{ borderTop: `1px solid ${C.border}`, padding: "32px 40px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, flexShrink: 0 }}>
-        <span style={{ color: C.muted, fontSize: 13 }}>© {new Date().getFullYear()} Rushing Technologies. All rights reserved.</span>
-        <div style={{ display: "flex", gap: 24 }}>
-          <Link to="/support" style={{ color: C.muted, textDecoration: "none", fontSize: 14 }}>Support</Link>
-          <Link to="/terms" style={{ color: C.muted, textDecoration: "none", fontSize: 14 }}>Terms of Service</Link>
-          <Link to="/privacy" style={{ color: C.muted, textDecoration: "none", fontSize: 14 }}>Privacy Policy</Link>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }
