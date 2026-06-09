@@ -14,7 +14,8 @@ workflows:
       vars:
         BUNDLE_ID: com.shieldai.app
         EXPO_PUBLIC_API_URL: https://api.shieldai.rushingtechnologies.com
-      node: "20"
+        CI: "1"
+      node: "18"
       xcode: latest
       cocoapods: default
 
@@ -37,7 +38,7 @@ workflows:
 
       - name: Expo prebuild (generate native iOS project)
         working_directory: mobile
-        script: npx expo prebuild --clean --platform ios --non-interactive
+        script: npx expo prebuild --clean --platform ios
 
       - name: Install CocoaPods
         working_directory: mobile/ios
