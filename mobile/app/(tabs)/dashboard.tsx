@@ -31,7 +31,7 @@ export default function Dashboard() {
     <Pressable
       onPress={onPress}
       style={({ pressed }) => ({
-        backgroundColor: pressed ? colors.surfaceActive : colors.surface,
+        backgroundColor: pressed ? colors.surfaceAlt : colors.surface,
         borderColor: colors.border,
         borderWidth: 1,
         borderRadius: radius.lg,
@@ -86,6 +86,35 @@ export default function Dashboard() {
           ))}
         </>
       ) : null}
+
+      <Text style={{ color: colors.textMuted, fontSize: 12, fontWeight: "700", letterSpacing: 1, marginTop: spacing.lg, marginBottom: spacing.sm }}>
+        PROTECT
+      </Text>
+
+      <ActionCard
+        icon="🛡️"
+        title="Identity Protection"
+        body="Check your email against breach databases and get credit freeze guidance."
+        onPress={() => router.push("/identity")}
+      />
+      <ActionCard
+        icon="🌐"
+        title="Safe Browser"
+        body="Pre-scan any URL before opening it — see risk score and threat details."
+        onPress={() => router.push("/browser")}
+      />
+      <ActionCard
+        icon="🏪"
+        title="Marketplace Scan"
+        body="Detect overpayment scams, fake escrow, and off-platform payment tricks."
+        onPress={() => router.push("/(tabs)/scan?type=marketplace")}
+      />
+      <ActionCard
+        icon="📱"
+        title="Social Media Scan"
+        body="Spot fake giveaways, crypto lures, and platform impersonation in posts."
+        onPress={() => router.push("/(tabs)/scan?type=social")}
+      />
     </ScrollView>
   );
 }

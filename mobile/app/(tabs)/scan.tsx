@@ -16,7 +16,7 @@ import {
 import { ShieldAPI } from "@/lib/api";
 import { colors, radius, spacing } from "@/theme/theme";
 
-type ScanMode = "link" | "image" | "qr" | "message" | "email" | "phone";
+type ScanMode = "link" | "image" | "qr" | "message" | "email" | "phone" | "marketplace" | "social";
 
 const MODES: { value: ScanMode; label: string }[] = [
   { value: "link", label: "Link" },
@@ -25,6 +25,8 @@ const MODES: { value: ScanMode; label: string }[] = [
   { value: "message", label: "Message" },
   { value: "email", label: "Email" },
   { value: "phone", label: "Phone" },
+  { value: "marketplace", label: "Marketplace" },
+  { value: "social", label: "Social" },
 ];
 
 export default function ScanScreen() {
@@ -51,6 +53,14 @@ export default function ScanScreen() {
 
   // Phone
   const [phoneNumber, setPhoneNumber] = useState("");
+
+  // Marketplace
+  const [marketplaceText, setMarketplaceText] = useState("");
+  const [marketplacePlatform, setMarketplacePlatform] = useState("");
+
+  // Social
+  const [socialText, setSocialText] = useState("");
+  const [socialPlatform, setSocialPlatform] = useState("");
 
   // Camera permissions
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
@@ -108,6 +118,12 @@ export default function ScanScreen() {
     );
 
   const runPhone = () => wrap(() => ShieldAPI.scanPhone(phoneNumber.trim()));
+
+  const runMarketplace = () =>
+    wrap(() => ShieldAPI.scanMarketplace(marketplaceText.trim(), marketplacePlatform));
+
+  const runSocial = () =>
+    wrap(() => ShieldAPI.scanSocial(socialText.trim(), socialPlatform));
 
   const inputStyle = {
     backgroundColor: colors.surface,
@@ -356,6 +372,88 @@ export default function ScanScreen() {
               style={inputStyle}
             />
             <Btn label="Look Up Number" onPress={runPhone} disabled={!phoneNumber.trim()} />
+          </>
+        )}
+
+        {/* Marketplace */}
+        {mode === "marketplace" && (
+          <>
+            <Text style={{ color: colors.textMuted, marginBottom: spacing.sm }}>
+              Paste a marketplace listing or buyer/seller message to check for scams.
+            </Text>
+            <TextInput
+              placeholder="Paste the listing or message here…"
+              placeholderTextColor={colors.textMuted}
+              multiline
+              value={marketplaceText}
+              onChangeText={setMarketplaceText}
+              style={multilineStyle}
+            />
+            <Text style={{ color: colors.textMuted, fontSize: 12, marginBottom: spacing.xs }}>
+              Platform (optional)
+            </Text>
+            <View style={{ flexDirection: "row", gap: spacing.xs, marginBottom: spacing.sm, flexWrap: "wrap" }}>
+              {(["", "facebook", "ebay", "craigslist", "offerup"] as const).map((p) => (
+                <Pressable
+                  key={p || "other"}
+                  onPress={() => setMarketplacePlatform(p)}
+                  style={{
+                    paddingHorizontal: spacing.sm,
+                    paddingVertical: 4,
+                    borderRadius: radius.pill,
+                    backgroundColor: marketplacePlatform === p ? colors.primary : colors.surface,
+                    borderColor: colors.border,
+                    borderWidth: 1,
+                  }}
+                >
+                  <Text style={{ color: marketplacePlatform === p ? "#fff" : colors.textMuted, fontSize: 12 }}>
+                    {p || "Other"}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+            <Btn label="Analyze Listing" onPress={runMarketplace} disabled={!marketplaceText.trim()} />
+          </>
+        )}
+
+        {/* Social */}
+        {mode === "social" && (
+          <>
+            <Text style={{ color: colors.textMuted, marginBottom: spacing.sm }}>
+              Paste a social media post or DM to check for giveaway scams, impersonation, or crypto lures.
+            </Text>
+            <TextInput
+              placeholder="Paste the post or message here…"
+              placeholderTextColor={colors.textMuted}
+              multiline
+              value={socialText}
+              onChangeText={setSocialText}
+              style={multilineStyle}
+            />
+            <Text style={{ color: colors.textMuted, fontSize: 12, marginBottom: spacing.xs }}>
+              Platform (optional)
+            </Text>
+            <View style={{ flexDirection: "row", gap: spacing.xs, marginBottom: spacing.sm, flexWrap: "wrap" }}>
+              {(["", "instagram", "facebook", "twitter", "tiktok", "youtube"] as const).map((p) => (
+                <Pressable
+                  key={p || "other"}
+                  onPress={() => setSocialPlatform(p)}
+                  style={{
+                    paddingHorizontal: spacing.sm,
+                    paddingVertical: 4,
+                    borderRadius: radius.pill,
+                    backgroundColor: socialPlatform === p ? colors.primary : colors.surface,
+                    borderColor: colors.border,
+                    borderWidth: 1,
+                  }}
+                >
+                  <Text style={{ color: socialPlatform === p ? "#fff" : colors.textMuted, fontSize: 12 }}>
+                    {p || "Other"}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+            <Btn label="Analyze Post" onPress={runSocial} disabled={!socialText.trim()} />
           </>
         )}
 

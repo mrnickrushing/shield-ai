@@ -293,3 +293,189 @@ def test_email_scan_requires_at_least_one_field():
     headers = _auth_headers()
     r = client.post("/api/v1/scans/email", json={}, headers=headers)
     assert r.status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 — service unit tests
+# ---------------------------------------------------------------------------
+
+def test_marketplace_analyzer_detects_overpayment():
+    from app.services import marketplace_analyzer
+
+    text = "I'll send you a check for $500 over the price. Just wire me back the difference."
+    result = marketplace_analyzer.analyze_marketplace(text)
+    assert result["signals"].get("overpayment_scam") is True
+    assert result["category"] == "payment_fraud"
+    assert len(result["flags"]) > 0
+
+
+def test_marketplace_analyzer_detects_payment_bypass():
+    from app.services import marketplace_analyzer
+
+    text = "Don't use the app payment. Send via Zelle or Venmo directly to avoid fees."
+    result = marketplace_analyzer.analyze_marketplace(text)
+    assert result["signals"].get("payment_bypass") is True
+
+
+def test_marketplace_analyzer_detects_fake_escrow():
+    from app.services import marketplace_analyzer
+
+    text = "Use our secure escrow service to hold funds. Click here to set it up."
+    result = marketplace_analyzer.analyze_marketplace(text)
+    assert result["signals"].get("fake_escrow") is True
+
+
+def test_social_analyzer_detects_fake_giveaway():
+    from app.services import social_analyzer
+
+    text = "Like, share and win! DM to claim your prize today. 100 winner selected randomly!"
+    result = social_analyzer.analyze_social(text)
+    assert result["signals"].get("fake_giveaway") is True
+    assert result["category"] == "social_engineering"
+
+
+def test_social_analyzer_detects_crypto_lure():
+    from app.services import social_analyzer
+
+    text = "Double your bitcoin now! Guaranteed returns. Send BTC receive back double!"
+    result = social_analyzer.analyze_social(text)
+    assert result["signals"].get("crypto_investment_lure") is True
+    assert result["category"] == "payment_fraud"
+
+
+def test_social_analyzer_detects_account_takeover():
+    from app.services import social_analyzer
+
+    text = "Your account will be suspended in 24 hours. Violating community standards. Appeal click here."
+    result = social_analyzer.analyze_social(text)
+    assert result["signals"].get("account_takeover_attempt") is True
+    assert result["category"] == "credential_theft"
+
+
+def test_breach_check_no_api_key():
+    from app.services import breach_check
+
+    # With no HIBP key configured, should return empty breach list gracefully
+    result = breach_check.check_breaches("nobody@example.com")
+    assert result["breach_count"] == 0
+    assert result["severity"] == "none"
+    assert result["data_available"] is False
+    assert "disclaimer" in result
+
+
+def test_breach_severity_logic():
+    from app.services import breach_check
+
+    assert breach_check._severity([]) == "none"
+    assert breach_check._severity([{"data_classes": ["Usernames"]}]) == "low"
+    assert (
+        breach_check._severity([
+            {"data_classes": ["Usernames"]},
+            {"data_classes": ["Email addresses"]},
+        ]) == "medium"
+    )
+    assert (
+        breach_check._severity([
+            {"data_classes": ["Passwords"]},
+        ]) == "high"
+    )
+
+
+def test_marketplace_scan_endpoint_requires_auth():
+    r = client.post("/api/v1/scans/marketplace", json={"content_text": "Test listing"})
+    assert r.status_code in (401, 403)
+
+
+def test_social_scan_endpoint_requires_auth():
+    r = client.post("/api/v1/scans/social", json={"content_text": "Test post"})
+    assert r.status_code in (401, 403)
+
+
+def test_identity_breach_check_requires_auth():
+    r = client.post("/api/v1/identity/breach-check", json={"email": "test@example.com"})
+    assert r.status_code in (401, 403)
+
+
+def test_identity_alerts_requires_auth():
+    r = client.get("/api/v1/identity/alerts")
+    assert r.status_code in (401, 403)
+
+
+def test_marketplace_scan_full_flow():
+    headers = _auth_headers()
+    r = client.post(
+        "/api/v1/scans/marketplace",
+        json={
+            "content_text": (
+                "I'll overpay with a check. Send me back the difference via Zelle. "
+                "Use our secure escrow: http://fake-escrow.xyz/hold"
+            ),
+            "platform_hint": "facebook",
+        },
+        headers=headers,
+    )
+    assert r.status_code == 201, r.text
+    data = r.json()
+    assert data["scan_type"] == "marketplace"
+    assert data["status"] == "completed"
+    assert data["report"]["risk_score"] > 40
+
+
+def test_social_scan_full_flow():
+    headers = _auth_headers()
+    r = client.post(
+        "/api/v1/scans/social",
+        json={
+            "content_text": "Like and share to win! DM to claim your iPhone prize now!",
+            "platform": "instagram",
+        },
+        headers=headers,
+    )
+    assert r.status_code == 201, r.text
+    data = r.json()
+    assert data["scan_type"] == "social"
+    assert data["status"] == "completed"
+    assert data["report"] is not None
+
+
+def test_identity_breach_check_no_hibp_key():
+    headers = _auth_headers()
+    r = client.post(
+        "/api/v1/identity/breach-check",
+        json={"email": "nobody@example.com"},
+        headers=headers,
+    )
+    assert r.status_code == 200, r.text
+    data = r.json()
+    assert data["email"] == "nobody@example.com"
+    assert data["breach_count"] == 0
+    assert data["data_available"] is False
+    assert "disclaimer" in data
+
+
+def test_identity_alerts_list():
+    headers = _auth_headers()
+    r = client.get("/api/v1/identity/alerts", headers=headers)
+    assert r.status_code == 200
+    assert isinstance(r.json(), list)
+
+
+def test_password_check_clean():
+    headers = _auth_headers()
+    r = client.post(
+        "/api/v1/identity/password-check",
+        json={"password": "some-password-to-check"},
+        headers=headers,
+    )
+    # May fail if no network; service catches exceptions and returns 0
+    assert r.status_code == 200
+    data = r.json()
+    assert "pwned_count" in data
+    assert "is_compromised" in data
+    assert "recommendation" in data
+
+
+def test_password_check_requires_password_field():
+    headers = _auth_headers()
+    r = client.post("/api/v1/identity/password-check", json={}, headers=headers)
+    assert r.status_code == 422

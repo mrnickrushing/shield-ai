@@ -42,6 +42,9 @@ class Settings(BaseSettings):
     NUMVERIFY_API_KEY: str = ""    # apilayer.net phone lookup
     EXPO_ACCESS_TOKEN: str = ""    # Expo push notification service
 
+    # --- Phase 3 optional APIs ---
+    HIBP_API_KEY: str = ""         # HaveIBeenPwned v3 breach lookup
+
     # --- Limits ---
     FREE_TIER_DAILY_SCANS: int = 15
     MAX_UPLOAD_MB: int = 10

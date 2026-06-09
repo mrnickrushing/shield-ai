@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1 import auth, notifications, scans
+from app.api.v1 import auth, identity, notifications, scans
 from app.core.config import settings
 
 
@@ -34,6 +34,7 @@ app.add_middleware(
 app.include_router(auth.router, prefix=settings.API_V1_PREFIX)
 app.include_router(scans.router, prefix=settings.API_V1_PREFIX)
 app.include_router(notifications.router, prefix=settings.API_V1_PREFIX)
+app.include_router(identity.router, prefix=settings.API_V1_PREFIX)
 
 
 @app.get("/health", tags=["system"])

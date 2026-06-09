@@ -15,6 +15,7 @@ from app.models.models import (
     EmailScan,
     ImageScan,
     LinkScan,
+    MarketplaceScan,
     MessageScan,
     Notification,
     PhoneScan,
@@ -22,14 +23,17 @@ from app.models.models import (
     RiskReport,
     ScanHistory,
     ScanStatus,
+    SocialScan,
 )
 from app.services import (
     ai_analyzer,
     email_analyzer,
+    marketplace_analyzer,
     message_analyzer,
     ocr,
     phone_lookup,
     risk_engine,
+    social_analyzer,
     url_enrichment,
 )
 
@@ -354,3 +358,110 @@ def process_phone_scan(db: Session, scan: ScanHistory, phone_number: str) -> Ris
         line_type=sig.get("line_type", ""),
     ))
     return _finalize(db, scan, report_data, phone_ev)
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 scan processors
+# ---------------------------------------------------------------------------
+
+def process_marketplace_scan(db: Session, scan: ScanHistory, content_text: str, platform_hint: str = "") -> RiskReport:
+    """Analyze marketplace listing/conversation for buyer-seller scam patterns."""
+    scan.status = ScanStatus.processing
+    scan.raw_input = content_text[:500]
+    db.commit()
+
+    mkt_ev = marketplace_analyzer.analyze_marketplace(content_text, platform_hint)
+    text_score, text_flags, text_category = risk_engine.score_text_evidence(content_text)
+
+    det_flags = list(dict.fromkeys(mkt_ev["flags"] + text_flags))
+    det_score = text_score
+    category = mkt_ev["category"] if mkt_ev["category"] != "unknown" else text_category
+
+    # Marketplace-specific score boosts
+    sig = mkt_ev["signals"]
+    if sig.get("overpayment_scam"):
+        det_score = min(det_score + 45, 100)
+    if sig.get("payment_bypass"):
+        det_score = min(det_score + 35, 100)
+    if sig.get("fake_escrow"):
+        det_score = min(det_score + 50, 100)
+    if sig.get("rental_scam"):
+        det_score = min(det_score + 40, 100)
+    if sig.get("shipping_scam"):
+        det_score = min(det_score + 30, 100)
+    if sig.get("ticket_scam"):
+        det_score = min(det_score + 35, 100)
+
+    url_evidence: dict = {}
+    if mkt_ev["extracted_urls"]:
+        url_evidence = url_enrichment.enrich(mkt_ev["extracted_urls"][0])
+        u_score, u_flags = risk_engine.score_url_evidence(url_evidence)
+        det_score = min(det_score + u_score, 100)
+        det_flags = list(dict.fromkeys(det_flags + u_flags))
+
+    full_evidence = {**mkt_ev, "url": url_evidence}
+    llm = ai_analyzer.analyze(
+        f"Marketplace listing/message ({mkt_ev['platform']}):\n{content_text[:4000]}",
+        full_evidence,
+    )
+    report_data = risk_engine.combine(det_score, det_flags, category, llm)
+
+    db.add(MarketplaceScan(
+        scan_id=scan.id,
+        content_text=content_text[:10000],
+        platform=mkt_ev["platform"],
+        detected_signals=sig,
+        extracted_urls=mkt_ev.get("extracted_urls", []),
+    ))
+    return _finalize(db, scan, report_data, full_evidence)
+
+
+def process_social_scan(db: Session, scan: ScanHistory, content_text: str, platform: str = "") -> RiskReport:
+    """Analyze social media post/DM for giveaway scams, impersonation, and phishing."""
+    scan.status = ScanStatus.processing
+    scan.raw_input = content_text[:500]
+    db.commit()
+
+    soc_ev = social_analyzer.analyze_social(content_text, platform)
+    text_score, text_flags, text_category = risk_engine.score_text_evidence(content_text)
+
+    det_flags = list(dict.fromkeys(soc_ev["flags"] + text_flags))
+    det_score = text_score
+    category = soc_ev["category"] if soc_ev["category"] != "unknown" else text_category
+
+    sig = soc_ev["signals"]
+    if sig.get("fake_giveaway"):
+        det_score = min(det_score + 35, 100)
+    if sig.get("crypto_investment_lure"):
+        det_score = min(det_score + 45, 100)
+    if sig.get("impersonation"):
+        det_score = min(det_score + 40, 100)
+    if sig.get("account_takeover_attempt"):
+        det_score = min(det_score + 50, 100)
+    if sig.get("phishing_dm"):
+        det_score = min(det_score + 45, 100)
+    if sig.get("pig_butchering"):
+        det_score = min(det_score + 50, 100)
+
+    url_evidence: dict = {}
+    if soc_ev["extracted_urls"]:
+        url_evidence = url_enrichment.enrich(soc_ev["extracted_urls"][0])
+        u_score, u_flags = risk_engine.score_url_evidence(url_evidence)
+        det_score = min(det_score + u_score, 100)
+        det_flags = list(dict.fromkeys(det_flags + u_flags))
+
+    full_evidence = {**soc_ev, "url": url_evidence}
+    llm = ai_analyzer.analyze(
+        f"Social media content ({soc_ev['platform']}):\n{content_text[:4000]}",
+        full_evidence,
+    )
+    report_data = risk_engine.combine(det_score, det_flags, category, llm)
+
+    db.add(SocialScan(
+        scan_id=scan.id,
+        content_text=content_text[:10000],
+        platform=soc_ev["platform"],
+        detected_signals=sig,
+        extracted_urls=soc_ev.get("extracted_urls", []),
+    ))
+    return _finalize(db, scan, report_data, full_evidence)
