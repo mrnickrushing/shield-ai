@@ -6,6 +6,31 @@
 
 ---
 
+## Status — Phase 1 in progress
+
+Phase 1 (the core scam-checker MVP) is scaffolded and building:
+
+- ✅ **Backend** (FastAPI): JWT auth, link + screenshot scan endpoints, OCR pipeline, URL enrichment (Safe Browsing, WHOIS/domain age, redirect/typosquat/homograph checks), blended deterministic + LLM risk engine, scan history & feedback, Celery worker, Alembic migrations. Tests passing.
+- ✅ **Mobile** (Expo / React Native): login, dashboard, scan (link + screenshot), history, and risk-report screens; typed API client with token refresh; Zustand auth store.
+- ✅ **App icon**: `design/icon/shield-ai-logo.svg` + generated Expo icon/splash/adaptive/favicon.
+- ✅ **Infra**: Dockerfile, `docker-compose` (Postgres + Redis + API + worker), `railway.json`.
+- 🚧 **Deploy**: Railway project provisioned (backend + Postgres + Redis); Cloudflare DNS set for `shieldai.rushingtechnologies.com` and `admin.shieldai.rushingtechnologies.com`. See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
+
+### Quickstart
+
+```bash
+# Backend (full stack)
+cd infra && docker compose up --build      # API at http://localhost:8000/docs
+
+# Backend (bare)
+cd backend && pip install -r requirements.txt && python start.py
+
+# Mobile
+cd mobile && npm install && npm start
+```
+
+---
+
 ## What is Shield AI?
 
 Shield AI is a decision assistant — not a generic antivirus app. You send it anything suspicious (a screenshot, a link, a forwarded text), and it comes back with a risk score, threat class, plain-English explanation, and exact next steps. The core promise: one narrow, fast answer to "is this safe?" before you act.
