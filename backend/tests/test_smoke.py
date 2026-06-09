@@ -564,14 +564,42 @@ def test_community_reports_list():
 
 
 def test_community_patterns_list():
-    headers = _auth_headers()
-    r = client.get("/api/v1/community/patterns", headers=headers)
+    # Public endpoint — no auth required
+    r = client.get("/api/v1/community/patterns")
     assert r.status_code == 200
     assert isinstance(r.json(), list)
 
 
-def test_developer_key_create_and_list():
+def _make_developer_headers() -> dict:
+    """Register a user and promote them to developer via DB; return JWT headers."""
+    import time
+    from app.models.models import User as UserModel
+
+    email = f"devuser+{int(time.time()*1000)}@example.com"
+    reg = client.post("/api/v1/auth/register", json={"email": email, "password": "supersecret1", "display_name": "Dev"})
+    token = reg.json()["access_token"]
+    user_id = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"}).json()["id"]
+
+    db = next(_override_db())
+    user = db.get(UserModel, user_id)
+    user.is_developer = True
+    db.commit()
+
+    return {"Authorization": f"Bearer {token}"}
+
+
+def test_developer_key_requires_developer_flag():
     headers = _auth_headers()
+    r = client.post(
+        "/api/v1/developer/keys",
+        json={"name": "Should Fail"},
+        headers=headers,
+    )
+    assert r.status_code == 403
+
+
+def test_developer_key_create_and_list():
+    headers = _make_developer_headers()
     r = client.post(
         "/api/v1/developer/keys",
         json={"name": "Test Key", "scopes": ["scan:read"]},
@@ -591,7 +619,7 @@ def test_developer_key_create_and_list():
 
 
 def test_developer_key_revoke():
-    headers = _auth_headers()
+    headers = _make_developer_headers()
     created = client.post(
         "/api/v1/developer/keys",
         json={"name": "Revoke Me"},
@@ -604,20 +632,31 @@ def test_developer_key_revoke():
     assert not any(k["id"] == created["id"] for k in keys)
 
 
-def test_api_key_auth_on_scan_endpoint():
-    import time
-    # Create a user and get an API key
-    email = f"apitest+{int(time.time()*1000)}@example.com"
-    reg = client.post("/api/v1/auth/register", json={"email": email, "password": "supersecret1", "display_name": "Dev"})
-    token = reg.json()["access_token"]
-    jwt_headers = {"Authorization": f"Bearer {token}"}
+def test_api_key_scope_enforcement():
+    """A read-only API key must be rejected for write (scan creation) operations."""
+    headers = _make_developer_headers()
+    read_only_key = client.post(
+        "/api/v1/developer/keys",
+        json={"name": "Read Only", "scopes": ["scan:read"]},
+        headers=headers,
+    ).json()["raw_key"]
 
-    key_data = client.post("/api/v1/developer/keys", json={"name": "Scan Key"}, headers=jwt_headers).json()
+    r = client.post("/api/v1/scans/link", json={"url": "http://example.com"}, headers={"X-API-Key": read_only_key})
+    assert r.status_code == 403
+
+
+def test_api_key_auth_on_scan_endpoint():
+    """A key with scan:write scope can create scans via X-API-Key header."""
+    headers = _make_developer_headers()
+    key_data = client.post(
+        "/api/v1/developer/keys",
+        json={"name": "Scan Key"},
+        headers=headers,
+    ).json()
     raw_key = key_data["raw_key"]
 
-    # Use API key instead of JWT for a scan
-    api_key_headers = {"X-API-Key": raw_key}
-    r = client.post("/api/v1/scans/link", json={"url": "http://example.com"}, headers=api_key_headers)
+    # Use API key (with default scan:read + scan:write scopes) for a scan
+    r = client.post("/api/v1/scans/link", json={"url": "http://example.com"}, headers={"X-API-Key": raw_key})
     assert r.status_code == 201, r.text
     assert r.json()["scan_type"] == "link"
 

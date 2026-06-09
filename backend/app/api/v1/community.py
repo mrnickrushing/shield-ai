@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.db.session import get_db
-from app.models.models import CommunityReport, ScamPattern, User
+from app.models.models import CommunityReport, ScamPattern, User  # User used in POST routes
 from app.schemas.schemas import CommunityReportCreate, CommunityReportOut, ScamPatternOut
 
 router = APIRouter(prefix="/community", tags=["community"])
@@ -56,9 +56,8 @@ def list_my_reports(
 def list_patterns(
     limit: int = 100,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
 ):
-    """Browse analyst-approved scam patterns (read-only, for transparency)."""
+    """Browse analyst-approved scam patterns (public, read-only, for transparency)."""
     return (
         db.query(ScamPattern)
         .filter(ScamPattern.is_active.is_(True), ScamPattern.source == "analyst")

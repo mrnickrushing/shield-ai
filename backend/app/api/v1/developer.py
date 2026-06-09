@@ -10,7 +10,7 @@ import secrets
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, require_developer
 from app.db.session import get_db
 from app.models.models import ApiKey, User
 from app.schemas.schemas import ApiKeyCreate, ApiKeyCreated, ApiKeyOut
@@ -29,7 +29,7 @@ def _generate_raw_key() -> str:
 def create_api_key(
     payload: ApiKeyCreate,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_developer),
 ):
     """
     Generate a new API key. The full raw key is returned only here — store it

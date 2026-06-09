@@ -4,7 +4,10 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_user_from_api_key_or_jwt as get_current_user
+from app.api.deps import (
+    get_user_from_api_key_or_jwt as get_user,
+    get_user_from_api_key_or_jwt_write as get_user_write,
+)
 from app.db.session import get_db
 from app.models.models import (
     ApiUsage,
@@ -53,7 +56,7 @@ def _check_quota(db: Session, user: User) -> None:
 def create_link_scan(
     payload: LinkScanCreate,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(get_user_write),
 ):
     _check_quota(db, user)
     scan = ScanHistory(
@@ -75,7 +78,7 @@ def create_link_scan(
 def create_image_scan(
     payload: ImageScanCreate,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(get_user_write),
 ):
     _check_quota(db, user)
     try:
@@ -101,7 +104,7 @@ def create_image_scan(
 def list_scans(
     limit: int = 50,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(get_user),
 ):
     return (
         db.query(ScanHistory)
@@ -116,7 +119,7 @@ def list_scans(
 def get_scan(
     scan_id: str,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(get_user),
 ):
     scan = db.get(ScanHistory, scan_id)
     if not scan or scan.user_id != user.id:
@@ -129,7 +132,7 @@ def submit_feedback(
     scan_id: str,
     payload: ScanFeedback,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(get_user_write),
 ):
     scan = db.get(ScanHistory, scan_id)
     if not scan or scan.user_id != user.id:
@@ -149,7 +152,7 @@ def submit_feedback(
 def create_qr_scan(
     payload: QRScanCreate,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(get_user_write),
 ):
     _check_quota(db, user)
     scan = ScanHistory(
@@ -171,7 +174,7 @@ def create_qr_scan(
 def create_message_scan(
     payload: MessageScanCreate,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(get_user_write),
 ):
     _check_quota(db, user)
     scan = ScanHistory(
@@ -193,7 +196,7 @@ def create_message_scan(
 def create_email_scan(
     payload: EmailScanCreate,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(get_user_write),
 ):
     if not any([
         payload.raw_email, payload.sender_email, payload.subject, payload.body_text
@@ -231,7 +234,7 @@ def create_email_scan(
 def create_phone_scan(
     payload: PhoneScanCreate,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(get_user_write),
 ):
     _check_quota(db, user)
     scan = ScanHistory(
@@ -256,7 +259,7 @@ def create_phone_scan(
 def create_marketplace_scan(
     payload: MarketplaceScanCreate,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(get_user_write),
 ):
     _check_quota(db, user)
     scan = ScanHistory(
@@ -278,7 +281,7 @@ def create_marketplace_scan(
 def create_social_scan(
     payload: SocialScanCreate,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(get_user_write),
 ):
     _check_quota(db, user)
     scan = ScanHistory(
