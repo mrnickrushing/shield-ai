@@ -25,6 +25,13 @@ class RefreshRequest(BaseModel):
     refresh_token: str
 
 
+class SocialAuthRequest(BaseModel):
+    provider: str = Field(pattern="^(apple|google)$")
+    token: str
+    email: str | None = None
+    display_name: str | None = None
+
+
 class ProfileUpdate(BaseModel):
     display_name: str | None = None
     simple_language_mode: bool | None = None

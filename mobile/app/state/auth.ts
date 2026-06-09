@@ -1,4 +1,3 @@
-// Lightweight auth store with Zustand + SecureStore token persistence.
 import { create } from "zustand";
 
 import { ShieldAPI, UserProfile, clearTokens, getAccessToken, saveTokens } from "@/lib/api";
@@ -11,6 +10,7 @@ type AuthState = {
   hydrate: () => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, name: string) => Promise<void>;
+  loginWithSocial: (provider: "apple" | "google", token: string, email?: string, displayName?: string) => Promise<void>;
   updateProfile: (patch: ProfilePatch) => Promise<void>;
   logout: () => Promise<void>;
 };
@@ -40,6 +40,12 @@ export const useAuth = create<AuthState>((set) => ({
 
   register: async (email, password, name) => {
     const tokens = await ShieldAPI.register(email, password, name);
+    await saveTokens(tokens.access_token, tokens.refresh_token);
+    set({ user: await ShieldAPI.me() });
+  },
+
+  loginWithSocial: async (provider, token, email, displayName) => {
+    const tokens = await ShieldAPI.socialAuth(provider, token, email, displayName);
     await saveTokens(tokens.access_token, tokens.refresh_token);
     set({ user: await ShieldAPI.me() });
   },

@@ -1,7 +1,8 @@
+import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams } from "expo-router";
 import React from "react";
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, Share, Text, View } from "react-native";
 
 import { ShieldAPI } from "@/lib/api";
 import { RiskBadge } from "@/components/RiskBadge";
@@ -99,6 +100,27 @@ export default function Result() {
                 <Text style={{ color: colors.textMuted, fontWeight: "600" }}>Not accurate</Text>
               </Pressable>
             </View>
+
+            <Pressable
+              onPress={() => {
+                const text = [
+                  "Shield AI Risk Report",
+                  `Risk: ${report.risk_level.toUpperCase()} (${report.risk_score}/100)`,
+                  `Category: ${report.threat_category}`,
+                  "",
+                  report.explanation,
+                  "",
+                  report.red_flags.length ? `Red flags:\n${report.red_flags.map((f) => `• ${f}`).join("\n")}` : "",
+                  "",
+                  `Recommended actions:\n${report.recommended_actions.map((a) => `→ ${a}`).join("\n")}`,
+                ].filter(Boolean).join("\n");
+                Share.share({ message: text, title: "Shield AI Risk Report" });
+              }}
+              style={{ backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, alignItems: "center", borderWidth: 1, borderColor: colors.border, marginTop: spacing.sm, flexDirection: "row", justifyContent: "center", gap: spacing.sm }}
+            >
+              <Ionicons name="share-outline" size={18} color={colors.primaryBright} />
+              <Text style={{ color: colors.primaryBright, fontWeight: "700" }}>Share Report</Text>
+            </Pressable>
           </View>
         </>
       ) : (

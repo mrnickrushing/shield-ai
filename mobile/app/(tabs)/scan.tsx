@@ -1,3 +1,4 @@
+import * as Clipboard from "expo-clipboard";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -197,15 +198,23 @@ export default function ScanScreen() {
             <Text style={{ color: colors.textMuted, marginBottom: spacing.sm }}>
               Paste a suspicious URL to check.
             </Text>
-            <TextInput
-              placeholder="https://…"
-              placeholderTextColor={colors.textMuted}
-              autoCapitalize="none"
-              keyboardType="url"
-              value={url}
-              onChangeText={setUrl}
-              style={inputStyle}
-            />
+            <View style={{ flexDirection: "row", gap: spacing.sm, marginBottom: spacing.sm }}>
+              <TextInput
+                placeholder="https://…"
+                placeholderTextColor={colors.textMuted}
+                autoCapitalize="none"
+                keyboardType="url"
+                value={url}
+                onChangeText={setUrl}
+                style={{ ...inputStyle, flex: 1, marginBottom: 0 }}
+              />
+              <Pressable
+                onPress={async () => { const text = await Clipboard.getStringAsync(); if (text) setUrl(text.trim()); }}
+                style={{ backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: radius.md, paddingHorizontal: spacing.md, justifyContent: "center" }}
+              >
+                <Text style={{ color: colors.primaryBright, fontWeight: "700", fontSize: 13 }}>Paste</Text>
+              </Pressable>
+            </View>
             <Btn label="Analyze Link" onPress={runLink} disabled={!url.trim()} />
           </>
         )}
