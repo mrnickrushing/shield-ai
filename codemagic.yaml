@@ -103,9 +103,12 @@ workflows:
       - name: Publish OTA update to production channel
         working_directory: mobile
         script: |
+          APP_VERSION=$(node -e "console.log(require('./app.json').expo.version)")
+          BUILD_NUM=$(cd ios && agvtool what-version -terse)
           npx eas-cli update \
             --branch production \
-            --message "Build $(agvtool what-version -terse) — $(date +%Y-%m-%d)" \
+            --platform ios \
+            --message "v${APP_VERSION} (${BUILD_NUM}) — $(date +%Y-%m-%d)" \
             --non-interactive
 
     artifacts:
