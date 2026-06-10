@@ -9,7 +9,7 @@
     "web": "expo start --web",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "postinstall": "patch-package"
+    "postinstall": "patch-package && node scripts/patch-metro-exports.js"
   },
   "dependencies": {
     "expo": "~52.0.0",
