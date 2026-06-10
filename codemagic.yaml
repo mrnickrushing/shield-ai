@@ -53,22 +53,102 @@ workflows:
       - name: Set up code signing
         script: |
           PROFILES_DIR=~/Library/MobileDevice/Provisioning\ Profiles
+          SHARE_BUNDLE="${BUNDLE_ID}.share-extension"
 
-          # Remove any stale profile for the wrong extension bundle ID that
-          # Codemagic may have cached from a previous mis-registered identifier.
+          # Remove all locally-cached profiles for the share extension.
           for f in "$PROFILES_DIR"/*.mobileprovision; do
             bid=$(security cms -D -i "$f" 2>/dev/null \
               | awk '/<key>application-identifier<\/key>/{getline; gsub(/.*<string>|<\/string>.*/,""); print}')
-            if [[ "$bid" == *"SharedExtension"* ]]; then
+            if [[ "$bid" == *".share-extension"* || "$bid" == *"SharedExtension"* ]]; then
               echo "Removing stale cached profile: $f (bundle: $bid)"
               rm -f "$f"
             fi
           done
 
-          # Fetch the correct share-extension profile from Apple.
-          # ios_signing has already installed the distribution cert, so this
-          # call will find it and only needs to write the missing profile.
-          app-store-connect fetch-signing-files "${BUNDLE_ID}.share-extension" \
+          # Ensure the share-extension App ID has App Groups capability, then
+          # delete any remote profiles that pre-date the capability so that
+          # fetch-signing-files creates a fresh one that includes App Groups.
+          python3 - << 'PYEOF'
+import os, sys, time, json
+from urllib.request import Request, urlopen
+from urllib.error import HTTPError
+
+BASE = "https://api.appstoreconnect.apple.com"
+
+def jwt_token():
+    try:
+        import jwt
+    except ImportError:
+        import subprocess
+        subprocess.run([sys.executable, "-m", "pip", "install", "-q", "PyJWT", "cryptography"], check=True)
+        import jwt
+    kid = os.environ["APP_STORE_CONNECT_KEY_IDENTIFIER"]
+    iss = os.environ["APP_STORE_CONNECT_ISSUER_ID"]
+    key = os.environ["APP_STORE_CONNECT_PRIVATE_KEY"]
+    now = int(time.time())
+    tok = jwt.encode(
+        {"iss": iss, "iat": now, "exp": now + 1200, "aud": "appstoreconnect-v1"},
+        key, algorithm="ES256", headers={"kid": kid},
+    )
+    return tok if isinstance(tok, str) else tok.decode()
+
+def api(method, path, body=None):
+    req = Request(
+        BASE + path,
+        data=json.dumps(body).encode() if body else None,
+        headers={"Authorization": f"Bearer {jwt_token()}", "Content-Type": "application/json"},
+        method=method,
+    )
+    try:
+        with urlopen(req) as r:
+            raw = r.read()
+            return json.loads(raw) if raw else {}
+    except HTTPError as e:
+        print(f"HTTP {e.code} {method} {path}: {e.read().decode()[:400]}", file=sys.stderr)
+        return None
+
+bundle_str = f"{os.environ['BUNDLE_ID']}.share-extension"
+print(f"Configuring App ID: {bundle_str}")
+
+# Find or create the App ID
+res = api("GET", f"/v1/bundleIds?filter[identifier]={bundle_str}")
+if res and res.get("data"):
+    bid_id = res["data"][0]["id"]
+    print(f"  found: {bid_id}")
+else:
+    res = api("POST", "/v1/bundleIds", {"data": {
+        "type": "bundleIds",
+        "attributes": {"identifier": bundle_str, "name": "Shield AI Share Extension", "platform": "IOS"},
+    }})
+    if not res:
+        print("ERROR: could not find or create bundle ID", file=sys.stderr)
+        sys.exit(1)
+    bid_id = res["data"]["id"]
+    print(f"  created: {bid_id}")
+
+# Enable App Groups capability if missing
+caps = api("GET", f"/v1/bundleIds/{bid_id}/bundleIdCapabilities") or {}
+if any(c["attributes"]["capabilityType"] == "APP_GROUPS" for c in caps.get("data", [])):
+    print("  App Groups already enabled")
+else:
+    print("  Enabling App Groups capability...")
+    r = api("POST", "/v1/bundleIdCapabilities", {"data": {
+        "type": "bundleIdCapabilities",
+        "attributes": {"capabilityType": "APP_GROUPS", "settings": []},
+        "relationships": {"bundleId": {"data": {"type": "bundleIds", "id": bid_id}}},
+    }})
+    print(f"  {'enabled' if r else 'WARNING: enable failed'}")
+
+# Delete stale distribution profiles (created before App Groups was enabled)
+profs = api("GET", f"/v1/profiles?filter[bundleId]={bid_id}&filter[profileType]=IOS_APP_STORE") or {}
+for p in profs.get("data", []):
+    pid, name = p["id"], p["attributes"]["name"]
+    api("DELETE", f"/v1/profiles/{pid}")
+    print(f"  deleted stale profile: {name} ({pid})")
+PYEOF
+
+          # Fetch (re-create) a fresh profile that now includes App Groups.
+          app-store-connect fetch-signing-files "$SHARE_BUNDLE" \
             --type IOS_APP_STORE \
             --create
 
