@@ -52,13 +52,14 @@ workflows:
 
       - name: Set up code signing
         script: |
-          set -euo pipefail
           PROFILES_DIR=~/Library/MobileDevice/Provisioning\ Profiles
           SHARE_BUNDLE="${BUNDLE_ID}.share-extension"
 
           # Remove locally-cached profiles for the share extension so
-          # use-profiles only sees a fresh one.
+          # use-profiles only sees a fresh one. [ -e ] guard handles the
+          # case where the glob doesn't match any files yet.
           for f in "$PROFILES_DIR"/*.mobileprovision; do
+            [ -e "$f" ] || continue
             bid=$(security cms -D -i "$f" 2>/dev/null \
               | awk '/<key>application-identifier<\/key>/{getline; gsub(/.*<string>|<\/string>.*/,""); print}')
             if [[ "$bid" == *".share-extension"* || "$bid" == *"SharedExtension"* ]]; then
@@ -76,6 +77,7 @@ workflows:
 
           echo "=== Installed profiles ==="
           for f in "$PROFILES_DIR"/*.mobileprovision; do
+            [ -e "$f" ] || continue
             bid=$(security cms -D -i "$f" 2>/dev/null \
               | awk '/<key>application-identifier<\/key>/{getline; gsub(/.*<string>|<\/string>.*/,""); print}')
             grp=$(security cms -D -i "$f" 2>/dev/null \
