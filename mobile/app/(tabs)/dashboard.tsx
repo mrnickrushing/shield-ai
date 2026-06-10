@@ -120,6 +120,8 @@ function ProtectCard({
       onPress={onPress}
       style={({ pressed }) => ({
         flex: 1,
+        flexBasis: 0,
+        minWidth: 0,
         backgroundColor: pressed ? colors.surfaceActive : colors.surface,
         borderRadius: radius.lg,
         borderWidth: 1,
