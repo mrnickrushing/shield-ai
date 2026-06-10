@@ -1,53 +1,49 @@
 // nativewind@4.2.5 includes @react-native/community-cli-plugin@0.86.0 which
-// causes npm to hoist metro@0.84.x to node_modules. The 0.84.x packages have
-// strict exports maps that break @expo/cli@0.22.x and @expo/metro-config, both
-// of which were built against metro@0.81.x.
+// causes npm to hoist metro@0.84.x to node_modules. metro@0.84.x added a strict
+// exports map that prevents @expo/cli@0.22.x and @expo/metro-config from importing
+// internal paths (e.g. metro/src/lib/TerminalReporter, metro-cache/src/stores/FileStore).
 //
-// Fix: replace all top-level metro-* packages with the 0.81.5 copies that
-// @react-native/community-cli-plugin nested for itself.
+// Fix: remove the "exports" field from all top-level metro-* package.json files so
+// that Node resolves internal paths the old way (direct file lookup). This avoids
+// the cascade dependency issues that come from replacing the entire metro-* packages
+// with their 0.81.5 equivalents.
 const fs = require('fs');
 const path = require('path');
-const src = path.join(__dirname, '..', 'node_modules', '@react-native', 'community-cli-plugin', 'node_modules');
-const dst = path.join(__dirname, '..', 'node_modules');
+const nm = path.join(__dirname, '..', 'node_modules');
 
-if (!fs.existsSync(src)) {
-  console.log('[patch-metro] no nested community-cli-plugin found, skipping');
-  process.exit(0);
+const metroPkgs = [
+  'metro', 'metro-babel-transformer', 'metro-cache', 'metro-cache-key',
+  'metro-config', 'metro-core', 'metro-file-map', 'metro-minify-terser',
+  'metro-resolver', 'metro-runtime', 'metro-source-map', 'metro-symbolicate',
+  'metro-transform-plugins', 'metro-transform-worker',
+];
+for (const pkg of metroPkgs) {
+  const jsonPath = path.join(nm, pkg, 'package.json');
+  if (!fs.existsSync(jsonPath)) continue;
+  const data = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+  if (data.exports) {
+    delete data.exports;
+    fs.writeFileSync(jsonPath, JSON.stringify(data, null, 2) + '\n');
+    console.log(`[patch-metro] removed exports restriction from ${pkg}@${data.version}`);
+  }
 }
-
-const pkgs = fs.readdirSync(src).filter(n => n.startsWith('metro'));
-let patched = 0;
-for (const pkg of pkgs) {
-  const srcPkg = path.join(src, pkg);
-  const dstPkg = path.join(dst, pkg);
-  const srcVer = JSON.parse(fs.readFileSync(path.join(srcPkg, 'package.json'), 'utf8')).version;
-  const dstVer = fs.existsSync(path.join(dstPkg, 'package.json'))
-    ? JSON.parse(fs.readFileSync(path.join(dstPkg, 'package.json'), 'utf8')).version
-    : '(none)';
-  if (srcVer === dstVer) continue;
-  fs.rmSync(dstPkg, { recursive: true, force: true });
-  fs.cpSync(srcPkg, dstPkg, { recursive: true });
-  console.log(`[patch-metro] replaced ${pkg}: ${dstVer} → ${srcVer}`);
-  patched++;
-}
-if (patched === 0) console.log('[patch-metro] metro: nothing to patch');
 
 // Packages that are nested under their parent but must be at the top level
 // so Babel / metro can resolve them from the project root.
 const promotions = [
   // expo-asset: @expo/metro-config requires it from the project root
-  [path.join(dst, 'expo', 'node_modules', 'expo-asset'), path.join(dst, 'expo-asset')],
+  [path.join(nm, 'expo', 'node_modules', 'expo-asset'), path.join(nm, 'expo-asset')],
   // nativewind nests its runtime deps; they must be at top level for Metro resolution
-  [path.join(dst, 'nativewind', 'node_modules', 'react-native-worklets'), path.join(dst, 'react-native-worklets')],
-  [path.join(dst, 'nativewind', 'node_modules', 'react-native-reanimated'), path.join(dst, 'react-native-reanimated')],
-  [path.join(dst, 'nativewind', 'node_modules', 'react-native-css-interop'), path.join(dst, 'react-native-css-interop')],
+  [path.join(nm, 'nativewind', 'node_modules', 'react-native-worklets'), path.join(nm, 'react-native-worklets')],
+  [path.join(nm, 'nativewind', 'node_modules', 'react-native-reanimated'), path.join(nm, 'react-native-reanimated')],
+  [path.join(nm, 'nativewind', 'node_modules', 'react-native-css-interop'), path.join(nm, 'react-native-css-interop')],
 ];
 
 for (const [srcPkg, dstPkg] of promotions) {
   const srcJson = path.join(srcPkg, 'package.json');
   const dstJson = path.join(dstPkg, 'package.json');
   if (!fs.existsSync(srcJson)) continue;
-  if (fs.existsSync(dstJson)) continue;  // already at top level
+  if (fs.existsSync(dstJson)) continue;
   fs.rmSync(dstPkg, { recursive: true, force: true });
   fs.cpSync(srcPkg, dstPkg, { recursive: true });
   const ver = JSON.parse(fs.readFileSync(dstJson, 'utf8')).version;
