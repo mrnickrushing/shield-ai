@@ -54,8 +54,8 @@ workflows:
           app-store-connect fetch-signing-files "$BUNDLE_ID" \
             --type IOS_APP_STORE \
             --create
-          echo "=== Fetching profiles for ${BUNDLE_ID}.ShareExtension ==="
-          app-store-connect fetch-signing-files "${BUNDLE_ID}.ShareExtension" \
+          echo "=== Fetching profiles for ${BUNDLE_ID}.share-extension ==="
+          app-store-connect fetch-signing-files "${BUNDLE_ID}.share-extension" \
             --type IOS_APP_STORE \
             --create
           echo "=== Downloaded profiles ==="
