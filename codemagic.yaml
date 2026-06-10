@@ -8,9 +8,6 @@ workflows:
       app_store_connect: CyberLab ASC Key
 
     environment:
-      groups:
-        - ios_credentials   # CM_CERTIFICATE, CM_CERTIFICATE_PASSWORD,
-                            # CM_PROVISIONING_PROFILE (base64 encoded)
       vars:
         BUNDLE_ID: com.shieldai.app
         EXPO_PUBLIC_API_URL: https://api.shieldai.rushingtechnologies.com
@@ -68,7 +65,7 @@ workflows:
             --archive-xcargs "SWIFT_TREAT_WARNINGS_AS_ERRORS=NO"
 
     artifacts:
-      - mobile/build/ios/ipa/*.ipa
+      - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
       - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM
 
