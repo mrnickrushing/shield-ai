@@ -89,8 +89,7 @@ workflows:
       - name: Increment build number
         working_directory: mobile/ios
         script: |
-          LATEST=$(app-store-connect get-latest-testflight-build-number "$BUNDLE_ID" 2>/dev/null || echo 0)
-          agvtool new-version -all $((LATEST + 1))
+          agvtool new-version -all "$(date +%Y%m%d%H%M)"
 
       - name: Build IPA
         working_directory: mobile/ios
