@@ -25,6 +25,8 @@ function FeatureCard({ icon, color, title, body, badge, tag, onPress, wide }: Fe
       onPress={onPress}
       style={({ pressed }) => ({
         flex: wide ? undefined : 1,
+        flexBasis: wide ? undefined : 0,
+        minWidth: 0,
         backgroundColor: pressed ? colors.surfaceActive : colors.surface,
         borderRadius: radius.xl,
         borderWidth: 1,
