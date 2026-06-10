@@ -1,8 +1,12 @@
+import Constants from "expo-constants";
+import * as Notifications from "expo-notifications";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React, { useEffect } from "react";
+import { Platform } from "react-native";
 
+import { ShieldAPI } from "@/lib/api";
 import { useAuth } from "@/state/auth";
 import { colors } from "@/theme/theme";
 
@@ -10,9 +14,52 @@ const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
 });
 
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+    shouldShowBanner: true,
+    shouldShowList: true,
+  }),
+});
+
+async function registerDeviceForPush() {
+  if (Platform.OS === "web") return;
+  if (!Constants.isDevice) return;
+
+  const permission = await Notifications.getPermissionsAsync();
+  let finalStatus = permission.status;
+  if (finalStatus !== "granted") {
+    const requested = await Notifications.requestPermissionsAsync();
+    finalStatus = requested.status;
+  }
+  if (finalStatus !== "granted") return;
+
+  const projectId =
+    Constants.easConfig?.projectId ??
+    Constants.expoConfig?.extra?.eas?.projectId;
+  const tokenResponse = projectId
+    ? await Notifications.getExpoPushTokenAsync({ projectId })
+    : await Notifications.getExpoPushTokenAsync();
+
+  await ShieldAPI.registerDevice(
+    tokenResponse.data,
+    Platform.OS === "ios" ? "ios" : "android"
+  );
+}
+
 export default function RootLayout() {
   const hydrate = useAuth((s) => s.hydrate);
+  const user = useAuth((s) => s.user);
   useEffect(() => { hydrate(); }, [hydrate]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    registerDeviceForPush().catch(() => {
+      // Push registration is best-effort so auth and navigation are never blocked.
+    });
+  }, [user?.id]);
 
   return (
     <QueryClientProvider client={queryClient}>

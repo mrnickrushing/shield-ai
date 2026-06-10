@@ -1,6 +1,7 @@
 export const colors = {
   bg: "#0a0a0f",
   surface: "#13131a",
+  surfaceAlt: "#171923",
   surfaceActive: "#1c1c26",
   border: "#1e1e2a",
   text: "#f0f0f5",
@@ -29,6 +30,7 @@ export const radius = {
   sm: 6,
   md: 10,
   lg: 16,
+  xl: 24,
   pill: 999,
 };
 
