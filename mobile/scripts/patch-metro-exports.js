@@ -28,6 +28,20 @@ if (!fs.existsSync(src)) {
   }
 }
 
+// nativewind nests react-native-css-interop; Metro needs it at top level for
+// jsx-runtime resolution (expo-router imports it directly).
+const nwNested = path.join(nm, 'nativewind', 'node_modules');
+for (const name of ['react-native-css-interop', 'react-native-reanimated']) {
+  const srcPkg = path.join(nwNested, name);
+  const dstPkg = path.join(nm, name);
+  if (!fs.existsSync(path.join(srcPkg, 'package.json'))) continue;
+  if (fs.existsSync(path.join(dstPkg, 'package.json'))) continue;
+  fs.rmSync(dstPkg, { recursive: true, force: true });
+  fs.cpSync(srcPkg, dstPkg, { recursive: true });
+  const ver = JSON.parse(fs.readFileSync(path.join(dstPkg, 'package.json'), 'utf8')).version;
+  console.log(`[patch-metro] promoted ${name}@${ver} to top level`);
+}
+
 // expo nests some of its own packages; they must be at the top level so Metro
 // can resolve them during bundling (e.g. @expo/vector-icons → expo-font).
 const expoNested = path.join(nm, 'expo', 'node_modules');
