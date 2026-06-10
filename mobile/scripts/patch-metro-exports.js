@@ -37,10 +37,10 @@ if (patched === 0) console.log('[patch-metro] metro: nothing to patch');
 const promotions = [
   // expo-asset: @expo/metro-config requires it from the project root
   [path.join(dst, 'expo', 'node_modules', 'expo-asset'), path.join(dst, 'expo-asset')],
-  // react-native-worklets: nativewind/babel plugin requires it from the project root
+  // nativewind nests its runtime deps; they must be at top level for Metro resolution
   [path.join(dst, 'nativewind', 'node_modules', 'react-native-worklets'), path.join(dst, 'react-native-worklets')],
-  // react-native-reanimated: nativewind depends on it; may also be needed at root
   [path.join(dst, 'nativewind', 'node_modules', 'react-native-reanimated'), path.join(dst, 'react-native-reanimated')],
+  [path.join(dst, 'nativewind', 'node_modules', 'react-native-css-interop'), path.join(dst, 'react-native-css-interop')],
 ];
 
 for (const [srcPkg, dstPkg] of promotions) {
