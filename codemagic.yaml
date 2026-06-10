@@ -35,7 +35,7 @@ workflows:
     scripts:
       - name: Install JS dependencies
         working_directory: mobile
-        script: npm ci
+        script: npm install --legacy-peer-deps
 
       - name: Expo prebuild (generate native iOS project)
         working_directory: mobile
