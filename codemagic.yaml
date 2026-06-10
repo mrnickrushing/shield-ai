@@ -14,7 +14,7 @@ workflows:
         CI: "1"
       node: "18"
       xcode: latest
-      cocoapods: default
+      cocoapods: 1.15.2
 
     triggering:
       events:
