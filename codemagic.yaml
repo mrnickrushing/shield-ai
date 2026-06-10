@@ -15,22 +15,14 @@ workflows:
         BUNDLE_ID: com.shieldai.app
         EXPO_PUBLIC_API_URL: https://api.shieldai.rushingtechnologies.com
         EXPO_PUBLIC_OTA_UPDATE_KEY: amcPSXf5G3HAUp6DfMGl2hkHkMGwrn8o26PHYkZ9GoM
+        EXPO_TOKEN: VmKgvxmdEDupotisNjlxueDptTe-Z-GNbMcu-641
         CI: "1"
       node: "18"
       xcode: latest
       cocoapods: 1.15.2
 
     triggering:
-      events:
-        - push
-        - tag
-      branch_patterns:
-        - pattern: main
-          include: true
-      tag_patterns:
-        - pattern: "v*"
-          include: true
-      cancel_previous_builds: true
+      events: []
 
     scripts:
       - name: Install JS dependencies
@@ -100,6 +92,14 @@ workflows:
             --workspace ShieldAI.xcworkspace \
             --scheme ShieldAI \
             --archive-xcargs "SWIFT_TREAT_WARNINGS_AS_ERRORS=NO"
+
+      - name: Publish OTA update to production channel
+        working_directory: mobile
+        script: |
+          npx eas-cli update \
+            --branch production \
+            --message "Build $(agvtool what-version -terse) — $(date +%Y-%m-%d)" \
+            --non-interactive
 
     artifacts:
       - mobile/ios/build/ios/ipa/*.ipa
