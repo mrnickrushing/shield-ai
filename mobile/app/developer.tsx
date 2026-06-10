@@ -46,7 +46,6 @@ export default function DeveloperScreen() {
     borderRadius: radius.md,
     color: colors.text,
     padding: spacing.md,
-    flex: 1,
   } as const;
 
   return (
@@ -74,7 +73,7 @@ export default function DeveloperScreen() {
         <Text style={{ color: colors.text, fontWeight: "700", fontSize: 15, marginBottom: spacing.sm }}>
           Create API Key
         </Text>
-        <View style={{ flexDirection: "row", gap: spacing.sm }}>
+        <View>
           <TextInput
             placeholder="Key name (e.g. Production)"
             placeholderTextColor={colors.textMuted}
@@ -85,7 +84,7 @@ export default function DeveloperScreen() {
           <Pressable
             onPress={() => createMutation.mutate()}
             disabled={createMutation.isPending}
-            style={{ backgroundColor: colors.primary, borderRadius: radius.md, paddingHorizontal: spacing.md, justifyContent: "center" }}
+            style={{ backgroundColor: colors.primary, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.md, alignItems: "center" }}
           >
             {createMutation.isPending ? <ActivityIndicator color="#fff" /> : <Text style={{ color: "#fff", fontWeight: "700" }}>Create</Text>}
           </Pressable>
