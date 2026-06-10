@@ -29,6 +29,13 @@ workflows:
         working_directory: mobile
         script: npm install --legacy-peer-deps
 
+      - name: Verify key modules
+        working_directory: mobile
+        script: |
+          echo "=== metro ===" && cat node_modules/metro/package.json | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['version'])"
+          echo "=== js-polyfills ===" && cat node_modules/@react-native/js-polyfills/package.json | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['version'])"
+          echo "=== css-interop ===" && cat node_modules/react-native-css-interop/package.json | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['version'])" 2>/dev/null || echo "not found (ok if nested)"
+
       - name: Expo prebuild (generate native iOS project)
         working_directory: mobile
         script: npx expo prebuild --clean --platform ios
