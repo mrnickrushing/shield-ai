@@ -1,4 +1,5 @@
 import * as AppleAuthentication from "expo-apple-authentication";
+import * as SecureStore from "expo-secure-store";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
@@ -90,7 +91,10 @@ export default function Login() {
     setLoading(true);
     try {
       if (mode === "email_login") await login(email, password);
-      else await register(email, password, name);
+      else {
+        await register(email, password, name);
+        await SecureStore.setItemAsync("pendingTour", "true");
+      }
       router.replace(mode === "email_register" ? "/paywall" : "/(tabs)/dashboard");
     } catch (e: any) {
       setError(e?.response?.data?.detail ?? "Something went wrong. Try again.");
