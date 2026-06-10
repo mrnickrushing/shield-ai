@@ -6,7 +6,8 @@ workflows:
 
     environment:
       vars:
-        EXPO_TOKEN: VmKgvxmdEDupotisNjlxueDptTe-Z-GNbMcu-641
+        EXPO_PUBLIC_API_URL: https://api.shieldai.rushingtechnologies.com
+        EXPO_TOKEN: 0jmTCQH3xPGBbv_LC-D9jYK8Gppf5ya1e6323T-E
         CI: "1"
       node: "18"
 
@@ -23,7 +24,7 @@ workflows:
         script: |
           APP_VERSION=$(node -e "console.log(require('./app.json').expo.version)")
           npx eas-cli update \
-            --branch production \
+            --channel production \
             --platform ios \
             --message "OTA v${APP_VERSION} — $(date +%Y-%m-%d)" \
             --non-interactive
@@ -44,7 +45,7 @@ workflows:
         BUNDLE_ID: com.shieldai.app
         EXPO_PUBLIC_API_URL: https://api.shieldai.rushingtechnologies.com
         EXPO_PUBLIC_OTA_UPDATE_KEY: amcPSXf5G3HAUp6DfMGl2hkHkMGwrn8o26PHYkZ9GoM
-        EXPO_TOKEN: VmKgvxmdEDupotisNjlxueDptTe-Z-GNbMcu-641
+        EXPO_TOKEN: 0jmTCQH3xPGBbv_LC-D9jYK8Gppf5ya1e6323T-E
         CI: "1"
       node: "18"
       xcode: latest
@@ -144,7 +145,7 @@ workflows:
           APP_VERSION=$(node -e "console.log(require('./app.json').expo.version)")
           BUILD_NUM=$(cd ios && agvtool what-version -terse)
           npx eas-cli update \
-            --branch production \
+            --channel production \
             --platform ios \
             --message "v${APP_VERSION} (${BUILD_NUM}) — $(date +%Y-%m-%d)" \
             --non-interactive
