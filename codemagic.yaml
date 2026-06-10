@@ -44,7 +44,7 @@ workflows:
           # parent group; xcodeproj 1.27.0 raises when react-native calls real_path on it.
           # Wrap the call in a rescue so it falls through to the fallback path.
           sed -i '' 's/return existing_file\.real_path/begin; return existing_file.real_path; rescue; end/' \
-            ../../node_modules/react-native/scripts/cocoapods/privacy_manifest_utils.rb
+            ../node_modules/react-native/scripts/cocoapods/privacy_manifest_utils.rb
           pod install
 
       - name: Set up code signing
