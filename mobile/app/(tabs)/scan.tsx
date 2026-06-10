@@ -2,7 +2,7 @@ import * as Clipboard from "expo-clipboard";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -34,6 +34,11 @@ export default function ScanScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ type?: string }>();
   const [mode, setMode] = useState<ScanMode>((params.type as ScanMode) ?? "link");
+
+  // Sync mode when navigating to this tab with a ?type= param (tab stays mounted)
+  useEffect(() => {
+    if (params.type) setMode(params.type as ScanMode);
+  }, [params.type]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const qrScanned = useRef(false);

@@ -9,6 +9,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
 
 import { ShieldAPI, Scan } from "@/lib/api";
@@ -24,6 +25,7 @@ const RISK_COLORS: Record<string, string> = {
 
 export default function BrowserScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [inputUrl, setInputUrl] = useState("");
   const [scanResult, setScanResult] = useState<Scan | null>(null);
   const [scanning, setScanning] = useState(false);
@@ -81,7 +83,9 @@ export default function BrowserScreen() {
     >
       {/* Header */}
       <View style={{
-        padding: spacing.md,
+        paddingTop: insets.top + spacing.sm,
+        paddingHorizontal: spacing.md,
+        paddingBottom: spacing.md,
         borderBottomColor: colors.border,
         borderBottomWidth: 1,
         gap: spacing.sm,
