@@ -12,6 +12,7 @@
     "postinstall": "patch-package && node scripts/patch-metro-exports.js"
   },
   "dependencies": {
+    "@react-native/js-polyfills": "0.76.5",
     "@hookform/resolvers": "^3.9.1",
     "@tanstack/react-query": "^5.62.0",
     "axios": "^1.7.9",
