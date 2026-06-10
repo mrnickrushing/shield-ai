@@ -4,6 +4,7 @@
   },
   "build": {
     "production": {
+      "channel": "production",
       "ios": {
         "buildConfiguration": "Release"
       }
@@ -11,10 +12,5 @@
   },
   "submit": {
     "production": {}
-  },
-  "update": {
-    "production": {
-      "channel": "production"
-    }
   }
 }
