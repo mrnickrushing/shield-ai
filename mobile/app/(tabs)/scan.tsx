@@ -1,8 +1,9 @@
+import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -13,61 +14,213 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ShieldAPI } from "@/lib/api";
 import { colors, radius, spacing } from "@/theme/theme";
 
-type ScanMode = "link" | "image" | "qr" | "message" | "email" | "phone" | "marketplace" | "social";
+type ScanMode =
+  | "link"
+  | "image"
+  | "qr"
+  | "message"
+  | "email"
+  | "phone"
+  | "marketplace"
+  | "social";
 
-const MODES: Array<{
-  value: ScanMode;
+type ModeMeta = {
   label: string;
-  icon: string;
-  color: string;
-}> = [
-  { value: "link",        label: "Link",        icon: "🔗", color: colors.primaryBright },
-  { value: "image",       label: "Screenshot",  icon: "📸", color: colors.teal },
-  { value: "message",     label: "Message",     icon: "💬", color: colors.safe },
-  { value: "email",       label: "Email",       icon: "✉️", color: colors.accent },
-  { value: "phone",       label: "Phone",       icon: "📞", color: colors.suspicious },
-  { value: "marketplace", label: "Marketplace", icon: "🛒", color: colors.low },
-  { value: "social",      label: "Social",      icon: "👥", color: colors.purple },
-  { value: "qr",          label: "QR Code",     icon: "📷", color: colors.rose },
+  title: string;
+  subtitle: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  accent: string;
+  cta: string;
+  bestFor: string[];
+};
+
+const MODE_ORDER: ScanMode[] = [
+  "link",
+  "image",
+  "qr",
+  "message",
+  "email",
+  "phone",
+  "marketplace",
+  "social",
 ];
 
-const MODE_PLACEHOLDERS: Record<ScanMode, string> = {
-  link: "Paste a suspicious URL…",
-  image: "",
-  qr: "",
-  message: "Paste the suspicious message…",
-  email: "Paste the email body…",
-  phone: "+1 (555) 000-0000",
-  marketplace: "Paste the listing or buyer message…",
-  social: "Paste the post or DM…",
+const MODE_META: Record<ScanMode, ModeMeta> = {
+  link: {
+    label: "Link",
+    title: "Preflight a link before you open it",
+    subtitle: "We check domain age, redirects, impersonation patterns, and known threat signals before you click.",
+    icon: "link-outline",
+    accent: colors.primaryBright,
+    cta: "Analyze Link",
+    bestFor: ["Package texts", "Bank alerts", "Password reset links"],
+  },
+  image: {
+    label: "Screenshot",
+    title: "Read the screenshot like an analyst",
+    subtitle: "Upload a message, fake checkout screen, or suspicious email and let OCR plus scam heuristics do the triage.",
+    icon: "image-outline",
+    accent: colors.safe,
+    cta: "Choose Screenshot",
+    bestFor: ["Prize scams", "Fake support chats", "Payment requests"],
+  },
+  qr: {
+    label: "QR",
+    title: "Preview a QR destination before it opens",
+    subtitle: "QR codes hide the real destination. Scan first, then decide whether it deserves your trust.",
+    icon: "scan-outline",
+    accent: colors.suspicious,
+    cta: "Scan QR Code",
+    bestFor: ["Parking meters", "Restaurant tables", "Flyers and posters"],
+  },
+  message: {
+    label: "Message",
+    title: "Break down pressure-heavy messages",
+    subtitle: "Paste SMS, WhatsApp, Telegram, or iMessage content and we score urgency, impersonation, and payment cues.",
+    icon: "chatbubble-ellipses-outline",
+    accent: colors.high,
+    cta: "Analyze Message",
+    bestFor: ["Delivery texts", "Work-from-home offers", "Account warnings"],
+  },
+  email: {
+    label: "Email",
+    title: "Spot spoofing and reply-to traps",
+    subtitle: "Check the sender, reply-to, subject, and body for the classic phishing mismatches people miss.",
+    icon: "mail-open-outline",
+    accent: colors.primaryBright,
+    cta: "Analyze Email",
+    bestFor: ["Brand impersonation", "Invoice scams", "Login prompts"],
+  },
+  phone: {
+    label: "Phone",
+    title: "Check whether a number deserves a callback",
+    subtitle: "We score spam, suspicious numbering patterns, and scam markers before you dial back or reply.",
+    icon: "call-outline",
+    accent: colors.critical,
+    cta: "Look Up Number",
+    bestFor: ["Voicemails", "Unknown callers", "Bank callback requests"],
+  },
+  marketplace: {
+    label: "Marketplace",
+    title: "Stress-test a buyer or seller conversation",
+    subtitle: "Paste listing text or DMs to catch overpayment, fake escrow, off-platform pressure, and shipping fraud.",
+    icon: "storefront-outline",
+    accent: colors.low,
+    cta: "Analyze Listing",
+    bestFor: ["Facebook Marketplace", "Craigslist", "OfferUp deals"],
+  },
+  social: {
+    label: "Social",
+    title: "Catch fake giveaways and account bait",
+    subtitle: "Run DMs and posts through impersonation, crypto lure, and social takeover patterns before you engage.",
+    icon: "people-outline",
+    accent: colors.purple,
+    cta: "Analyze Post",
+    bestFor: ["Influencer giveaways", "Crypto pitches", "Fake account recovery DMs"],
+  },
 };
 
-const MODE_PROMPTS: Record<ScanMode, string> = {
-  link: "Paste any URL — get a risk score and red flags in seconds.",
-  image: "Upload a screenshot of a suspicious message, email, or website.",
-  qr: "Point your camera at a QR code to preview its destination safely.",
-  message: "Copy a suspicious text, WhatsApp, or iMessage and paste it here.",
-  email: "Fill in the details from a suspicious email to detect phishing.",
-  phone: "Enter a phone number to check its spam and scam reputation.",
-  marketplace: "Paste a listing or buyer/seller message to detect scam patterns.",
-  social: "Paste a social post or DM to check for giveaways, impersonation, or crypto lures.",
-};
+function AccentPill({
+  label,
+  active,
+  accent,
+  icon,
+  onPress,
+}: {
+  label: string;
+  active: boolean;
+  accent: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={{
+        width: "48%",
+        minHeight: 90,
+        backgroundColor: active ? `${accent}18` : colors.surface,
+        borderColor: active ? `${accent}88` : colors.border,
+        borderWidth: 1,
+        borderRadius: radius.lg,
+        padding: spacing.md,
+        justifyContent: "space-between",
+      }}
+    >
+      <View
+        style={{
+          width: 38,
+          height: 38,
+          borderRadius: 19,
+          backgroundColor: `${accent}22`,
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Ionicons name={icon} size={18} color={accent} />
+      </View>
+      <Text style={{ color: active ? colors.text : colors.textMuted, fontWeight: "700", fontSize: 14 }}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <Text
+      style={{
+        color: colors.textDim,
+        fontSize: 11,
+        marginBottom: 6,
+        textTransform: "uppercase",
+        letterSpacing: 1,
+        fontWeight: "700",
+      }}
+    >
+      {children}
+    </Text>
+  );
+}
+
+function ChoicePill({
+  label,
+  active,
+  accent,
+  onPress,
+}: {
+  label: string;
+  active: boolean;
+  accent: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={{
+        paddingHorizontal: spacing.sm,
+        paddingVertical: 6,
+        borderRadius: radius.pill,
+        backgroundColor: active ? accent : colors.surface,
+        borderWidth: 1,
+        borderColor: active ? accent : colors.border,
+      }}
+    >
+      <Text style={{ color: active ? "#08111f" : colors.textMuted, fontWeight: "700", fontSize: 12 }}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
 
 export default function ScanScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ type?: string }>();
   const [mode, setMode] = useState<ScanMode>((params.type as ScanMode) ?? "link");
-
-  useEffect(() => {
-    if (params.type) setMode(params.type as ScanMode);
-  }, [params.type]);
-
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const qrScanned = useRef(false);
@@ -85,10 +238,34 @@ export default function ScanScreen() {
   const [marketplacePlatform, setMarketplacePlatform] = useState("");
   const [socialText, setSocialText] = useState("");
   const [socialPlatform, setSocialPlatform] = useState("");
-
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
 
-  const navigate = (scan: { id: string }) => router.push(`/result?id=${scan.id}` as any);
+  useEffect(() => {
+    if (params.type) setMode(params.type as ScanMode);
+  }, [params.type]);
+
+  const active = MODE_META[mode];
+
+  const inputStyle = useMemo(
+    () => ({
+      backgroundColor: colors.bg,
+      borderColor: `${active.accent}44`,
+      borderWidth: 1,
+      borderRadius: radius.md,
+      color: colors.text,
+      padding: spacing.md,
+      marginBottom: spacing.sm,
+    }),
+    [active.accent]
+  );
+
+  const multilineStyle = {
+    ...inputStyle,
+    minHeight: 120,
+    textAlignVertical: "top" as const,
+  };
+
+  const navigate = (scan: { id: string }) => router.push(`/result?id=${scan.id}`);
 
   const wrap = async (fn: () => Promise<{ id: string }>) => {
     setError(null);
@@ -102,6 +279,11 @@ export default function ScanScreen() {
     }
   };
 
+  const pasteText = async (setter: (text: string) => void) => {
+    const text = await Clipboard.getStringAsync();
+    if (text) setter(text.trim());
+  };
+
   const runLink = () => wrap(() => ShieldAPI.scanLink(url.trim()));
 
   const runImage = async () => {
@@ -110,7 +292,7 @@ export default function ScanScreen() {
     if (res.canceled || !res.assets[0]?.base64) return;
     setLoading(true);
     try {
-      navigate(await ShieldAPI.scanImage(res.assets[0].base64!));
+      navigate(await ShieldAPI.scanImage(res.assets[0].base64));
     } catch (e: any) {
       setError(e?.response?.data?.detail ?? "Scan failed.");
     } finally {
@@ -126,8 +308,7 @@ export default function ScanScreen() {
     });
   };
 
-  const runMessage = () => wrap(() => ShieldAPI.scanMessage(messageText.trim(), platformHint));
-
+  const runMessage = () => wrap(() => ShieldAPI.scanMessage(messageText.trim(), platformHint || undefined));
   const runEmail = () =>
     wrap(() =>
       ShieldAPI.scanEmail({
@@ -138,476 +319,478 @@ export default function ScanScreen() {
         body_text: emailBody.trim() || undefined,
       })
     );
-
   const runPhone = () => wrap(() => ShieldAPI.scanPhone(phoneNumber.trim()));
-  const runMarketplace = () => wrap(() => ShieldAPI.scanMarketplace(marketplaceText.trim(), marketplacePlatform));
-  const runSocial = () => wrap(() => ShieldAPI.scanSocial(socialText.trim(), socialPlatform));
-
-  const activeMode = MODES.find((m) => m.value === mode)!;
-
-  const inputBase = {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radius.md,
-    color: colors.text,
-    padding: spacing.md,
-    fontSize: 15,
-  } as const;
-
-  const multilineInput = { ...inputBase, height: 130, textAlignVertical: "top" as const };
-
-  function PlatformPills({
-    options,
-    value,
-    onSelect,
-  }: {
-    options: string[];
-    value: string;
-    onSelect: (v: string) => void;
-  }) {
-    return (
-      <View style={{ flexDirection: "row", gap: spacing.xs, flexWrap: "wrap", marginBottom: spacing.sm }}>
-        {options.map((p) => (
-          <Pressable
-            key={p || "other"}
-            onPress={() => onSelect(p)}
-            style={{
-              paddingHorizontal: spacing.sm,
-              paddingVertical: 5,
-              borderRadius: radius.pill,
-              backgroundColor: value === p ? activeMode.color : colors.surface,
-              borderColor: value === p ? activeMode.color : colors.border,
-              borderWidth: 1,
-            }}
-          >
-            <Text
-              style={{
-                color: value === p ? "#fff" : colors.textMuted,
-                fontSize: 12,
-                fontWeight: "600",
-              }}
-            >
-              {p || "Other"}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
+  const runMarketplace = () =>
+    wrap(() =>
+      ShieldAPI.scanMarketplace(marketplaceText.trim(), marketplacePlatform || undefined)
     );
-  }
+  const runSocial = () =>
+    wrap(() => ShieldAPI.scanSocial(socialText.trim(), socialPlatform || undefined));
 
-  function AnalyzeButton({
+  const PrimaryButton = ({
     label,
     onPress,
     disabled,
+    icon,
   }: {
     label: string;
     onPress: () => void;
     disabled?: boolean;
-  }) {
-    return (
-      <Pressable
-        onPress={onPress}
-        disabled={disabled || loading}
-        style={{
-          backgroundColor: disabled || loading ? colors.surface : activeMode.color,
-          borderWidth: disabled || loading ? 1 : 0,
-          borderColor: colors.border,
-          padding: spacing.md,
-          borderRadius: radius.lg,
-          alignItems: "center",
-          marginTop: spacing.sm,
-        }}
-      >
-        {loading ? (
-          <ActivityIndicator color={disabled ? colors.textMuted : "#fff"} />
-        ) : (
-          <Text
-            style={{
-              color: disabled ? colors.textMuted : "#fff",
-              fontWeight: "800",
-              fontSize: 16,
-            }}
-          >
-            {label}
-          </Text>
-        )}
-      </Pressable>
-    );
-  }
-
-  function FieldLabel({ children }: { children: string }) {
-    return (
-      <Text
-        style={{
-          color: colors.textMuted,
-          fontSize: 11,
-          fontWeight: "700",
-          letterSpacing: 0.8,
-          marginBottom: 5,
-          marginTop: spacing.sm,
-        }}
-      >
-        {children.toUpperCase()}
-      </Text>
-    );
-  }
+    icon?: keyof typeof Ionicons.glyphMap;
+  }) => (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled || loading}
+      style={{
+        backgroundColor: disabled || loading ? colors.surfaceActive : active.accent,
+        padding: spacing.md,
+        borderRadius: radius.md,
+        alignItems: "center",
+        justifyContent: "center",
+        marginTop: spacing.sm,
+        flexDirection: "row",
+        gap: spacing.sm,
+      }}
+    >
+      {loading ? (
+        <ActivityIndicator color="#08111f" />
+      ) : (
+        <>
+          {icon ? <Ionicons name={icon} size={18} color="#08111f" /> : null}
+          <Text style={{ color: "#08111f", fontWeight: "800", fontSize: 15 }}>{label}</Text>
+        </>
+      )}
+    </Pressable>
+  );
 
   return (
     <KeyboardAvoidingView
       style={{ flex: 1, backgroundColor: colors.bg }}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      {/* Header */}
-      <View
-        style={{
-          paddingTop: insets.top + spacing.sm,
-          paddingHorizontal: spacing.lg,
-          paddingBottom: spacing.md,
-          borderBottomWidth: 1,
-          borderBottomColor: colors.border,
-        }}
-      >
-        <Text
-          style={{
-            color: colors.text,
-            fontSize: 22,
-            fontWeight: "900",
-            letterSpacing: -0.7,
-          }}
-        >
-          Analyze
-        </Text>
-        <Text style={{ color: colors.textMuted, fontSize: 13, marginTop: 2 }}>
-          What are you checking?
-        </Text>
-      </View>
-
-      {/* Mode selector */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: spacing.xs, paddingHorizontal: spacing.md, paddingVertical: spacing.sm }}
-        style={{ flexGrow: 0, borderBottomWidth: 1, borderBottomColor: colors.border }}
-      >
-        {MODES.map(({ value, label, icon, color }) => {
-          const active = mode === value;
-          return (
-            <Pressable
-              key={value}
-              onPress={() => {
-                setMode(value);
-                setError(null);
-              }}
-              style={{
-                paddingHorizontal: spacing.md,
-                paddingVertical: spacing.sm,
-                borderRadius: radius.pill,
-                backgroundColor: active ? color + "22" : colors.surface,
-                borderColor: active ? color : colors.border,
-                borderWidth: 1,
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 6,
-              }}
-            >
-              <Text style={{ fontSize: 14 }}>{icon}</Text>
-              <Text
-                style={{
-                  color: active ? color : colors.textMuted,
-                  fontWeight: "700",
-                  fontSize: 13,
-                }}
-              >
-                {label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
-
-      <ScrollView contentContainerStyle={{ padding: spacing.lg }}>
-        {/* Active mode prompt */}
+      <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xl }}>
         <View
           style={{
-            flexDirection: "row",
-            alignItems: "center",
-            gap: spacing.sm,
-            marginBottom: spacing.lg,
-            backgroundColor: activeMode.color + "14",
-            borderRadius: radius.md,
+            backgroundColor: colors.surface,
+            borderRadius: 24,
             borderWidth: 1,
-            borderColor: activeMode.color + "30",
-            padding: spacing.md,
+            borderColor: `${active.accent}33`,
+            padding: spacing.lg,
+            overflow: "hidden",
+            marginBottom: spacing.lg,
           }}
         >
-          <Text style={{ fontSize: 22 }}>{activeMode.icon}</Text>
-          <Text
+          <View
             style={{
-              flex: 1,
-              color: activeMode.color,
-              fontSize: 13,
-              lineHeight: 18,
-              fontWeight: "600",
+              position: "absolute",
+              width: 180,
+              height: 180,
+              borderRadius: 90,
+              backgroundColor: `${active.accent}15`,
+              top: -55,
+              right: -40,
+            }}
+          />
+          <View
+            style={{
+              alignSelf: "flex-start",
+              backgroundColor: `${active.accent}1f`,
+              borderRadius: radius.pill,
+              paddingHorizontal: spacing.sm,
+              paddingVertical: 6,
+              marginBottom: spacing.md,
             }}
           >
-            {MODE_PROMPTS[mode]}
+            <Text style={{ color: active.accent, fontSize: 12, fontWeight: "800", letterSpacing: 1 }}>
+              THREAT LAB
+            </Text>
+          </View>
+          <Text style={{ color: colors.text, fontSize: 29, fontWeight: "900", letterSpacing: -1, marginBottom: 8 }}>
+            Analyze anything before you act.
           </Text>
-        </View>
-
-        {/* Link */}
-        {mode === "link" && (
-          <>
-            <View style={{ flexDirection: "row", gap: spacing.sm }}>
-              <TextInput
-                placeholder={MODE_PLACEHOLDERS.link}
-                placeholderTextColor={colors.textMuted}
-                autoCapitalize="none"
-                keyboardType="url"
-                value={url}
-                onChangeText={setUrl}
-                style={{ ...inputBase, flex: 1 }}
-              />
-              <Pressable
-                onPress={async () => {
-                  const text = await Clipboard.getStringAsync();
-                  if (text) setUrl(text.trim());
-                }}
+          <Text style={{ color: colors.textMuted, fontSize: 14, lineHeight: 22, marginBottom: spacing.lg }}>
+            Start with the suspicious artifact you actually have. We’ll turn it into a verdict, evidence, and a next move.
+          </Text>
+          <View
+            style={{
+              backgroundColor: colors.bg,
+              borderWidth: 1,
+              borderColor: `${active.accent}2a`,
+              borderRadius: radius.lg,
+              padding: spacing.md,
+            }}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, marginBottom: 6 }}>
+              <View
                 style={{
-                  backgroundColor: colors.surface,
-                  borderColor: colors.border,
-                  borderWidth: 1,
-                  borderRadius: radius.md,
-                  paddingHorizontal: spacing.md,
+                  width: 36,
+                  height: 36,
+                  borderRadius: 18,
+                  backgroundColor: `${active.accent}22`,
+                  alignItems: "center",
                   justifyContent: "center",
                 }}
               >
-                <Text style={{ color: colors.primaryBright, fontWeight: "700", fontSize: 13 }}>
-                  Paste
-                </Text>
-              </Pressable>
-            </View>
-            <AnalyzeButton label="Analyze Link" onPress={runLink} disabled={!url.trim()} />
-          </>
-        )}
-
-        {/* Screenshot */}
-        {mode === "image" && (
-          <AnalyzeButton label="Choose Screenshot" onPress={runImage} />
-        )}
-
-        {/* QR Code */}
-        {mode === "qr" && (
-          <>
-            {!cameraPermission?.granted ? (
-              <Pressable
-                onPress={requestCameraPermission}
-                style={{
-                  backgroundColor: activeMode.color,
-                  padding: spacing.md,
-                  borderRadius: radius.lg,
-                  alignItems: "center",
-                }}
-              >
-                <Text style={{ color: "#fff", fontWeight: "800" }}>Allow Camera Access</Text>
-              </Pressable>
-            ) : (
-              <View style={{ borderRadius: radius.xl, overflow: "hidden", height: 300 }}>
-                <CameraView
-                  style={{ flex: 1 }}
-                  facing="back"
-                  onBarcodeScanned={loading ? undefined : handleQRScanned}
-                  barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
-                />
-                {loading && (
-                  <View
-                    style={{
-                      ...absoluteFill,
-                      backgroundColor: "rgba(6,6,11,0.75)",
-                      justifyContent: "center",
-                      alignItems: "center",
-                    }}
-                  >
-                    <ActivityIndicator color={colors.rose} size="large" />
-                    <Text style={{ color: "#fff", marginTop: spacing.sm, fontWeight: "700" }}>
-                      Analyzing…
-                    </Text>
-                  </View>
-                )}
+                <Ionicons name={active.icon} size={18} color={active.accent} />
               </View>
-            )}
-          </>
-        )}
-
-        {/* Message */}
-        {mode === "message" && (
-          <>
-            <TextInput
-              placeholder={MODE_PLACEHOLDERS.message}
-              placeholderTextColor={colors.textMuted}
-              multiline
-              value={messageText}
-              onChangeText={setMessageText}
-              style={multilineInput}
-            />
-            <FieldLabel>Source (optional)</FieldLabel>
-            <PlatformPills
-              options={["", "sms", "whatsapp", "imessage", "telegram"]}
-              value={platformHint}
-              onSelect={setPlatformHint}
-            />
-            <AnalyzeButton
-              label="Analyze Message"
-              onPress={runMessage}
-              disabled={!messageText.trim()}
-            />
-          </>
-        )}
-
-        {/* Email */}
-        {mode === "email" && (
-          <>
-            <FieldLabel>Sender Address</FieldLabel>
-            <TextInput
-              placeholder="sender@example.com"
-              placeholderTextColor={colors.textMuted}
-              autoCapitalize="none"
-              keyboardType="email-address"
-              value={emailSender}
-              onChangeText={setEmailSender}
-              style={inputBase}
-            />
-            <FieldLabel>Display Name Shown</FieldLabel>
-            <TextInput
-              placeholder="e.g. PayPal Support"
-              placeholderTextColor={colors.textMuted}
-              value={emailDisplayName}
-              onChangeText={setEmailDisplayName}
-              style={inputBase}
-            />
-            <FieldLabel>Reply-To Address</FieldLabel>
-            <TextInput
-              placeholder="reply-to@example.com (if different)"
-              placeholderTextColor={colors.textMuted}
-              autoCapitalize="none"
-              keyboardType="email-address"
-              value={emailReplyTo}
-              onChangeText={setEmailReplyTo}
-              style={inputBase}
-            />
-            <FieldLabel>Subject</FieldLabel>
-            <TextInput
-              placeholder="Email subject line"
-              placeholderTextColor={colors.textMuted}
-              value={emailSubject}
-              onChangeText={setEmailSubject}
-              style={inputBase}
-            />
-            <FieldLabel>Body</FieldLabel>
-            <TextInput
-              placeholder="Paste the email body here…"
-              placeholderTextColor={colors.textMuted}
-              multiline
-              value={emailBody}
-              onChangeText={setEmailBody}
-              style={multilineInput}
-            />
-            <AnalyzeButton
-              label="Analyze Email"
-              onPress={runEmail}
-              disabled={!emailSender && !emailSubject && !emailBody}
-            />
-          </>
-        )}
-
-        {/* Phone */}
-        {mode === "phone" && (
-          <>
-            <TextInput
-              placeholder={MODE_PLACEHOLDERS.phone}
-              placeholderTextColor={colors.textMuted}
-              keyboardType="phone-pad"
-              value={phoneNumber}
-              onChangeText={setPhoneNumber}
-              style={inputBase}
-            />
-            <AnalyzeButton
-              label="Look Up Number"
-              onPress={runPhone}
-              disabled={!phoneNumber.trim()}
-            />
-          </>
-        )}
-
-        {/* Marketplace */}
-        {mode === "marketplace" && (
-          <>
-            <TextInput
-              placeholder={MODE_PLACEHOLDERS.marketplace}
-              placeholderTextColor={colors.textMuted}
-              multiline
-              value={marketplaceText}
-              onChangeText={setMarketplaceText}
-              style={multilineInput}
-            />
-            <FieldLabel>Platform (optional)</FieldLabel>
-            <PlatformPills
-              options={["", "facebook", "ebay", "craigslist", "offerup"]}
-              value={marketplacePlatform}
-              onSelect={setMarketplacePlatform}
-            />
-            <AnalyzeButton
-              label="Analyze Listing"
-              onPress={runMarketplace}
-              disabled={!marketplaceText.trim()}
-            />
-          </>
-        )}
-
-        {/* Social */}
-        {mode === "social" && (
-          <>
-            <TextInput
-              placeholder={MODE_PLACEHOLDERS.social}
-              placeholderTextColor={colors.textMuted}
-              multiline
-              value={socialText}
-              onChangeText={setSocialText}
-              style={multilineInput}
-            />
-            <FieldLabel>Platform (optional)</FieldLabel>
-            <PlatformPills
-              options={["", "instagram", "facebook", "twitter", "tiktok", "youtube"]}
-              value={socialPlatform}
-              onSelect={setSocialPlatform}
-            />
-            <AnalyzeButton
-              label="Analyze Post"
-              onPress={runSocial}
-              disabled={!socialText.trim()}
-            />
-          </>
-        )}
-
-        {error && (
-          <View
-            style={{
-              backgroundColor: colors.criticalDim,
-              borderRadius: radius.md,
-              borderWidth: 1,
-              borderColor: colors.critical + "40",
-              padding: spacing.md,
-              marginTop: spacing.md,
-            }}
-          >
-            <Text style={{ color: colors.critical, textAlign: "center", fontWeight: "600" }}>
-              {error}
+              <Text style={{ color: colors.text, fontSize: 17, fontWeight: "800", flex: 1 }}>
+                {active.title}
+              </Text>
+            </View>
+            <Text style={{ color: colors.textMuted, fontSize: 13, lineHeight: 20 }}>
+              {active.subtitle}
             </Text>
           </View>
-        )}
+        </View>
+
+        <Text style={{ color: colors.textDim, fontSize: 11, fontWeight: "800", letterSpacing: 1.2, marginBottom: spacing.sm }}>
+          PICK AN INPUT
+        </Text>
+        <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", rowGap: spacing.sm, marginBottom: spacing.lg }}>
+          {MODE_ORDER.map((value) => {
+            const meta = MODE_META[value];
+            return (
+              <AccentPill
+                key={value}
+                label={meta.label}
+                active={mode === value}
+                accent={meta.accent}
+                icon={meta.icon}
+                onPress={() => {
+                  setMode(value);
+                  setError(null);
+                }}
+              />
+            );
+          })}
+        </View>
+
+        <View
+          style={{
+            backgroundColor: colors.surface,
+            borderRadius: 24,
+            borderWidth: 1,
+            borderColor: `${active.accent}33`,
+            padding: spacing.lg,
+            marginBottom: spacing.md,
+          }}
+        >
+          <Text style={{ color: active.accent, fontSize: 11, fontWeight: "800", letterSpacing: 1.1, marginBottom: 6 }}>
+            BEST FOR
+          </Text>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.xs, marginBottom: spacing.md }}>
+            {active.bestFor.map((tip) => (
+              <View
+                key={tip}
+                style={{
+                  backgroundColor: `${active.accent}14`,
+                  borderRadius: radius.pill,
+                  paddingHorizontal: spacing.sm,
+                  paddingVertical: 6,
+                }}
+              >
+                <Text style={{ color: colors.text, fontSize: 12, fontWeight: "700" }}>{tip}</Text>
+              </View>
+            ))}
+          </View>
+
+          {mode === "link" && (
+            <>
+              <FieldLabel>Suspicious URL</FieldLabel>
+              <View style={{ flexDirection: "row", gap: spacing.sm, marginBottom: spacing.sm }}>
+                <TextInput
+                  placeholder="https://..."
+                  placeholderTextColor={colors.textMuted}
+                  autoCapitalize="none"
+                  keyboardType="url"
+                  value={url}
+                  onChangeText={setUrl}
+                  style={{ ...inputStyle, flex: 1, marginBottom: 0 }}
+                />
+                <Pressable
+                  onPress={() => pasteText(setUrl)}
+                  style={{
+                    backgroundColor: colors.bg,
+                    borderColor: colors.border,
+                    borderWidth: 1,
+                    borderRadius: radius.md,
+                    paddingHorizontal: spacing.md,
+                    justifyContent: "center",
+                  }}
+                >
+                  <Text style={{ color: active.accent, fontWeight: "800", fontSize: 13 }}>Paste</Text>
+                </Pressable>
+              </View>
+              <PrimaryButton label={active.cta} onPress={runLink} disabled={!url.trim()} icon="shield-checkmark-outline" />
+            </>
+          )}
+
+          {mode === "image" && (
+            <>
+              <Text style={{ color: colors.textMuted, lineHeight: 21, marginBottom: spacing.sm }}>
+                Upload the screenshot exactly as you received it. Include the sender, warning, or payment request in frame.
+              </Text>
+              <PrimaryButton label={active.cta} onPress={runImage} icon="images-outline" />
+            </>
+          )}
+
+          {mode === "qr" && (
+            <>
+              <Text style={{ color: colors.textMuted, lineHeight: 21, marginBottom: spacing.sm }}>
+                Hold the code inside the frame. We’ll inspect the hidden destination before you open it.
+              </Text>
+              {!cameraPermission?.granted ? (
+                <PrimaryButton label="Allow Camera Access" onPress={requestCameraPermission} icon="camera-outline" />
+              ) : (
+                <View style={{ borderRadius: radius.lg, overflow: "hidden", height: 320, marginTop: spacing.sm }}>
+                  <CameraView
+                    style={{ flex: 1 }}
+                    facing="back"
+                    onBarcodeScanned={loading ? undefined : handleQRScanned}
+                    barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
+                  />
+                  <View
+                    style={{
+                      ...StyleSheet_absoluteFill,
+                      borderWidth: 2,
+                      borderColor: `${active.accent}66`,
+                    }}
+                    pointerEvents="none"
+                  />
+                  {loading && (
+                    <View
+                      style={{
+                        ...StyleSheet_absoluteFill,
+                        backgroundColor: "rgba(6,12,24,0.78)",
+                        justifyContent: "center",
+                        alignItems: "center",
+                      }}
+                    >
+                      <ActivityIndicator color={active.accent} size="large" />
+                      <Text style={{ color: colors.text, marginTop: spacing.sm, fontWeight: "700" }}>
+                        Analyzing QR destination...
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              )}
+            </>
+          )}
+
+          {mode === "message" && (
+            <>
+              <FieldLabel>Message Body</FieldLabel>
+              <TextInput
+                placeholder="Paste the message here..."
+                placeholderTextColor={colors.textMuted}
+                multiline
+                value={messageText}
+                onChangeText={setMessageText}
+                style={multilineStyle}
+              />
+              <Pressable onPress={() => pasteText(setMessageText)} style={{ alignSelf: "flex-start", marginBottom: spacing.sm }}>
+                <Text style={{ color: active.accent, fontSize: 13, fontWeight: "800" }}>Paste from clipboard</Text>
+              </Pressable>
+              <FieldLabel>Source</FieldLabel>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.xs }}>
+                {["Other", "SMS", "WhatsApp", "iMessage", "Telegram"].map((value) => {
+                  const normalized = value === "Other" ? "" : value.toLowerCase();
+                  return (
+                    <ChoicePill
+                      key={value}
+                      label={value}
+                      active={platformHint === normalized}
+                      accent={active.accent}
+                      onPress={() => setPlatformHint(normalized)}
+                    />
+                  );
+                })}
+              </View>
+              <PrimaryButton label={active.cta} onPress={runMessage} disabled={!messageText.trim()} icon="flash-outline" />
+            </>
+          )}
+
+          {mode === "email" && (
+            <>
+              <FieldLabel>Sender Address</FieldLabel>
+              <TextInput
+                placeholder="sender@example.com"
+                placeholderTextColor={colors.textMuted}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                value={emailSender}
+                onChangeText={setEmailSender}
+                style={inputStyle}
+              />
+              <FieldLabel>Display Name</FieldLabel>
+              <TextInput
+                placeholder="Example: PayPal Support"
+                placeholderTextColor={colors.textMuted}
+                value={emailDisplayName}
+                onChangeText={setEmailDisplayName}
+                style={inputStyle}
+              />
+              <FieldLabel>Reply-To Address</FieldLabel>
+              <TextInput
+                placeholder="reply@example.com"
+                placeholderTextColor={colors.textMuted}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                value={emailReplyTo}
+                onChangeText={setEmailReplyTo}
+                style={inputStyle}
+              />
+              <FieldLabel>Subject</FieldLabel>
+              <TextInput
+                placeholder="Subject line"
+                placeholderTextColor={colors.textMuted}
+                value={emailSubject}
+                onChangeText={setEmailSubject}
+                style={inputStyle}
+              />
+              <FieldLabel>Email Body</FieldLabel>
+              <TextInput
+                placeholder="Paste the email body here..."
+                placeholderTextColor={colors.textMuted}
+                multiline
+                value={emailBody}
+                onChangeText={setEmailBody}
+                style={multilineStyle}
+              />
+              <Pressable onPress={() => pasteText(setEmailBody)} style={{ alignSelf: "flex-start", marginBottom: spacing.sm }}>
+                <Text style={{ color: active.accent, fontSize: 13, fontWeight: "800" }}>Paste body from clipboard</Text>
+              </Pressable>
+              <PrimaryButton
+                label={active.cta}
+                onPress={runEmail}
+                disabled={!emailSender.trim() && !emailSubject.trim() && !emailBody.trim()}
+                icon="mail-unread-outline"
+              />
+            </>
+          )}
+
+          {mode === "phone" && (
+            <>
+              <FieldLabel>Phone Number</FieldLabel>
+              <TextInput
+                placeholder="+1 (555) 000-0000"
+                placeholderTextColor={colors.textMuted}
+                keyboardType="phone-pad"
+                value={phoneNumber}
+                onChangeText={setPhoneNumber}
+                style={inputStyle}
+              />
+              <PrimaryButton label={active.cta} onPress={runPhone} disabled={!phoneNumber.trim()} icon="call-outline" />
+            </>
+          )}
+
+          {mode === "marketplace" && (
+            <>
+              <FieldLabel>Listing Or Chat</FieldLabel>
+              <TextInput
+                placeholder="Paste the listing or buyer/seller exchange..."
+                placeholderTextColor={colors.textMuted}
+                multiline
+                value={marketplaceText}
+                onChangeText={setMarketplaceText}
+                style={multilineStyle}
+              />
+              <Pressable onPress={() => pasteText(setMarketplaceText)} style={{ alignSelf: "flex-start", marginBottom: spacing.sm }}>
+                <Text style={{ color: active.accent, fontSize: 13, fontWeight: "800" }}>Paste from clipboard</Text>
+              </Pressable>
+              <FieldLabel>Platform</FieldLabel>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.xs }}>
+                {["Other", "Facebook", "eBay", "Craigslist", "OfferUp"].map((value) => {
+                  const normalized = value === "Other" ? "" : value.toLowerCase();
+                  return (
+                    <ChoicePill
+                      key={value}
+                      label={value}
+                      active={marketplacePlatform === normalized}
+                      accent={active.accent}
+                      onPress={() => setMarketplacePlatform(normalized)}
+                    />
+                  );
+                })}
+              </View>
+              <PrimaryButton label={active.cta} onPress={runMarketplace} disabled={!marketplaceText.trim()} icon="storefront-outline" />
+            </>
+          )}
+
+          {mode === "social" && (
+            <>
+              <FieldLabel>Post Or DM</FieldLabel>
+              <TextInput
+                placeholder="Paste the post, comment, or DM..."
+                placeholderTextColor={colors.textMuted}
+                multiline
+                value={socialText}
+                onChangeText={setSocialText}
+                style={multilineStyle}
+              />
+              <Pressable onPress={() => pasteText(setSocialText)} style={{ alignSelf: "flex-start", marginBottom: spacing.sm }}>
+                <Text style={{ color: active.accent, fontSize: 13, fontWeight: "800" }}>Paste from clipboard</Text>
+              </Pressable>
+              <FieldLabel>Platform</FieldLabel>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.xs }}>
+                {["Other", "Instagram", "Facebook", "Twitter", "TikTok", "YouTube"].map((value) => {
+                  const normalized = value === "Other" ? "" : value.toLowerCase();
+                  return (
+                    <ChoicePill
+                      key={value}
+                      label={value}
+                      active={socialPlatform === normalized}
+                      accent={active.accent}
+                      onPress={() => setSocialPlatform(normalized)}
+                    />
+                  );
+                })}
+              </View>
+              <PrimaryButton label={active.cta} onPress={runSocial} disabled={!socialText.trim()} icon="sparkles-outline" />
+            </>
+          )}
+        </View>
+
+        {error ? (
+          <View
+            style={{
+              backgroundColor: `${colors.critical}18`,
+              borderWidth: 1,
+              borderColor: `${colors.critical}44`,
+              borderRadius: radius.lg,
+              padding: spacing.md,
+              marginBottom: spacing.md,
+            }}
+          >
+            <Text style={{ color: colors.critical, fontWeight: "700" }}>{error}</Text>
+          </View>
+        ) : null}
+
+        <View
+          style={{
+            backgroundColor: colors.bg,
+            borderWidth: 1,
+            borderColor: colors.border,
+            borderRadius: radius.lg,
+            padding: spacing.md,
+          }}
+        >
+          <Text style={{ color: colors.text, fontWeight: "800", marginBottom: 4 }}>
+            What happens next
+          </Text>
+          <Text style={{ color: colors.textMuted, fontSize: 13, lineHeight: 20 }}>
+            Every scan returns a verdict, why we reached it, and the next safest move. High-risk results can jump straight into recovery guidance.
+          </Text>
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
-const absoluteFill = { position: "absolute" as const, top: 0, left: 0, right: 0, bottom: 0 };
+const StyleSheet_absoluteFill = {
+  position: "absolute" as const,
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+};

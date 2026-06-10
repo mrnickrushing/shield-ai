@@ -192,6 +192,15 @@ export type ScamPatternOut = {
   created_at: string;
 };
 
+export type EmailScanPayload = {
+  raw_email?: string;
+  sender_email?: string;
+  sender_display_name?: string;
+  reply_to_email?: string;
+  subject?: string;
+  body_text?: string;
+};
+
 // ---------------------------------------------------------------------------
 // API surface
 // ---------------------------------------------------------------------------
@@ -205,6 +214,17 @@ export const ShieldAPI = {
   updateProfile: (patch: { display_name?: string; large_text_mode?: boolean; simple_language_mode?: boolean }) => api.patch<UserProfile>("/auth/me", patch).then((r) => r.data),
   scanLink: (url: string) => api.post<Scan>("/scans/link", { url }).then((r) => r.data),
   scanImage: (image_base64: string, filename = "screenshot.png") => api.post<Scan>("/scans/image", { image_base64, filename }).then((r) => r.data),
+  scanQR: (qr_content: string) => api.post<Scan>("/scans/qr", { qr_content }).then((r) => r.data),
+  scanMessage: (message_text: string, platform_hint?: string) =>
+    api.post<Scan>("/scans/message", { message_text, platform_hint }).then((r) => r.data),
+  scanEmail: (payload: EmailScanPayload) =>
+    api.post<Scan>("/scans/email", payload).then((r) => r.data),
+  scanPhone: (phone_number: string) =>
+    api.post<Scan>("/scans/phone", { phone_number }).then((r) => r.data),
+  scanMarketplace: (content_text: string, platform_hint?: string) =>
+    api.post<Scan>("/scans/marketplace", { content_text, platform_hint }).then((r) => r.data),
+  scanSocial: (content_text: string, platform?: string) =>
+    api.post<Scan>("/scans/social", { content_text, platform }).then((r) => r.data),
   listScans: () => api.get<Scan[]>("/scans").then((r) => r.data),
   getScan: (id: string) => api.get<Scan>(`/scans/${id}`).then((r) => r.data),
   feedback: (id: string, feedback: "helpful" | "false_positive") =>

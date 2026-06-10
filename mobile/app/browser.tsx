@@ -1,5 +1,5 @@
-import { useRouter } from "expo-router";
-import React, { useRef, useState } from "react";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -25,6 +25,7 @@ const RISK_COLORS: Record<string, string> = {
 
 export default function BrowserScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ url?: string; trusted?: string }>();
   const insets = useSafeAreaInsets();
   const [inputUrl, setInputUrl] = useState("");
   const [scanResult, setScanResult] = useState<Scan | null>(null);
@@ -32,6 +33,17 @@ export default function BrowserScreen() {
   const [error, setError] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);
   const [currentUrl, setCurrentUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!params.url) return;
+    const decoded = decodeURIComponent(params.url);
+    setInputUrl(decoded);
+    if (params.trusted === "1") {
+      const normalized = decoded.startsWith("http") ? decoded : `https://${decoded}`;
+      setCurrentUrl(normalized);
+      setConfirmed(true);
+    }
+  }, [params.trusted, params.url]);
 
   const handleScan = async () => {
     const raw = inputUrl.trim();
