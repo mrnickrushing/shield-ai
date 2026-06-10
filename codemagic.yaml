@@ -8,6 +8,9 @@ workflows:
       app_store_connect: CyberLab ASC Key
 
     environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.shieldai.app
       vars:
         BUNDLE_ID: com.shieldai.app
         EXPO_PUBLIC_API_URL: https://api.shieldai.rushingtechnologies.com
@@ -49,24 +52,12 @@ workflows:
 
       - name: Set up code signing
         script: |
-          keychain initialize
-          echo "=== Fetching profiles for $BUNDLE_ID ==="
-          app-store-connect fetch-signing-files "$BUNDLE_ID" \
-            --type IOS_APP_STORE \
-            --create
-          echo "=== Fetching profiles for ${BUNDLE_ID}.ShareExtension ==="
-          app-store-connect fetch-signing-files "${BUNDLE_ID}.ShareExtension" \
-            --type IOS_APP_STORE \
-            --create
-          echo "=== Downloaded profiles ==="
-          ls ~/Library/MobileDevice/Provisioning\ Profiles/ 2>/dev/null || echo "No profiles found"
+          echo "=== Profiles fetched by automatic ios_signing ==="
           for f in ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision; do
             echo "--- $f ---"
-            security cms -D -i "$f" 2>/dev/null | grep -E "(Name|application-identifier|Entitlements|AppID|TeamIdentifier)" | head -20
+            security cms -D -i "$f" 2>/dev/null | grep -E -A1 "(Name|application-identifier|aps-environment|applesignin|application-groups)" | head -30
           done
-          keychain add-certificates
-          echo "=== Applying profiles ==="
-          xcode-project use-profiles --verbose || xcode-project use-profiles
+          xcode-project use-profiles
 
       - name: Increment build number
         working_directory: mobile/ios
