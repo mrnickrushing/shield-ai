@@ -35,11 +35,7 @@ workflows:
     scripts:
       - name: Install JS dependencies
         working_directory: mobile
-        script: |
-          npm ci
-          # expo-auth-session is used in app/login.tsx but missing from the lock file;
-          # install it without touching package.json or the lock file.
-          npm install expo-auth-session@~7.0.0 --no-save --legacy-peer-deps
+        script: npm ci
 
       - name: Expo prebuild (generate native iOS project)
         working_directory: mobile
