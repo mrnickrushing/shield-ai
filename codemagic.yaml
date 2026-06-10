@@ -69,6 +69,16 @@ workflows:
         working_directory: mobile
         script: npx expo prebuild --clean --platform ios
 
+      - name: Patch Expo.plist — embed OTA channel
+        working_directory: mobile/ios
+        script: |
+          PLIST="ShieldAI/Supporting/Expo.plist"
+          echo "=== Before patch ===" && /usr/libexec/PlistBuddy -c "Print :EXUpdatesRequestHeaders" "$PLIST" 2>/dev/null || echo "(no EXUpdatesRequestHeaders yet)"
+          /usr/libexec/PlistBuddy -c "Add :EXUpdatesRequestHeaders dict" "$PLIST" 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :EXUpdatesRequestHeaders:expo-channel-name string production" "$PLIST" 2>/dev/null || \
+          /usr/libexec/PlistBuddy -c "Set :EXUpdatesRequestHeaders:expo-channel-name production" "$PLIST"
+          echo "=== After patch ===" && /usr/libexec/PlistBuddy -c "Print :EXUpdatesRequestHeaders" "$PLIST"
+
       - name: Install CocoaPods
         working_directory: mobile/ios
         script: |
