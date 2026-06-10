@@ -198,7 +198,7 @@ export default function Result() {
         ? {
             label: "Open In Safe Browser",
             icon: "globe-outline" as const,
-            onPress: () => router.push(`/browser?url=${encodeURIComponent(targetUrl)}&trusted=1`),
+            onPress: () => router.push(`/browser?url=${encodeURIComponent(targetUrl)}`),
           }
         : {
             label: "Analyze Something Else",

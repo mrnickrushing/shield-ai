@@ -1,6 +1,7 @@
 import axios from "axios";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "";
+const ADMIN_TOKEN_KEY = "shield_admin_token";
 
 export const api = axios.create({
   baseURL: `${API_URL}/api/v1`,
@@ -9,10 +10,25 @@ export const api = axios.create({
 
 export function setToken(t: string) {
   api.defaults.headers.common["Authorization"] = `Bearer ${t}`;
+  if (typeof window !== "undefined") {
+    window.localStorage.setItem(ADMIN_TOKEN_KEY, t);
+  }
 }
 
 export function clearToken() {
   delete api.defaults.headers.common["Authorization"];
+  if (typeof window !== "undefined") {
+    window.localStorage.removeItem(ADMIN_TOKEN_KEY);
+  }
+}
+
+export function hydrateToken() {
+  if (typeof window === "undefined") return null;
+  const token = window.localStorage.getItem(ADMIN_TOKEN_KEY);
+  if (token) {
+    api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+  }
+  return token;
 }
 
 export type AdminStats = {
