@@ -1,4 +1,33 @@
 workflows:
+  ota-update:
+    name: OTA Update → Expo production
+    max_build_duration: 15
+    instance_type: linux_x2
+
+    environment:
+      vars:
+        EXPO_TOKEN: VmKgvxmdEDupotisNjlxueDptTe-Z-GNbMcu-641
+        CI: "1"
+      node: "18"
+
+    triggering:
+      events: []
+
+    scripts:
+      - name: Install JS dependencies
+        working_directory: mobile
+        script: npm install --legacy-peer-deps
+
+      - name: Publish OTA update to production channel
+        working_directory: mobile
+        script: |
+          APP_VERSION=$(node -e "console.log(require('./app.json').expo.version)")
+          npx eas-cli update \
+            --branch production \
+            --platform ios \
+            --message "OTA v${APP_VERSION} — $(date +%Y-%m-%d)" \
+            --non-interactive
+
   ios-testflight:
     name: iOS → TestFlight
     max_build_duration: 60
