@@ -10,7 +10,7 @@ workflows:
     environment:
       ios_signing:
         distribution_type: app_store
-        bundle_identifier: com.shieldai.app*
+        bundle_identifier: com.shieldai.app
       vars:
         BUNDLE_ID: com.shieldai.app
         EXPO_PUBLIC_API_URL: https://api.shieldai.rushingtechnologies.com
@@ -56,6 +56,12 @@ workflows:
           PROFILES_DIR=~/Library/MobileDevice/Provisioning\ Profiles
           LOG=/tmp/shield_signing.log
           echo "=== Set up code signing $(date) ===" | tee -a "$LOG"
+
+          # Install share extension profile from repo (ios_signing only covers main bundle).
+          mkdir -p "$PROFILES_DIR"
+          cp "$CM_BUILD_DIR/scripts/share_extension.mobileprovision" \
+            "$PROFILES_DIR/share_extension.mobileprovision"
+          echo "Installed share extension profile from repo" | tee -a "$LOG"
 
           echo "=== Installed profiles ===" | tee -a "$LOG"
           for f in "$PROFILES_DIR"/*.mobileprovision; do
