@@ -51,7 +51,8 @@ def run_migrations() -> None:
 
 def promote_initial_admins() -> None:
     """One-shot admin promotion: reads INITIAL_ADMIN_EMAILS (comma-separated),
-    sets is_admin=True for those users, then does nothing if the var is unset."""
+    sets is_admin=True for those users, then does nothing if the var is unset.
+    If INITIAL_ADMIN_PASSWORD is also set, resets the password for those users."""
     emails_raw = os.environ.get("INITIAL_ADMIN_EMAILS", "").strip()
     if not emails_raw:
         return
@@ -66,6 +67,17 @@ def promote_initial_admins() -> None:
             )
             conn.commit()
             print(f"[startup] promoted {result.rowcount} user(s) to admin: {emails}")
+
+            password = os.environ.get("INITIAL_ADMIN_PASSWORD", "").strip()
+            if password:
+                import bcrypt
+                hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+                r2 = conn.execute(
+                    text("UPDATE users SET hashed_password = :h WHERE email = ANY(:emails)"),
+                    {"h": hashed, "emails": emails},
+                )
+                conn.commit()
+                print(f"[startup] reset password for {r2.rowcount} admin user(s)")
     except Exception as exc:
         print(f"[startup] admin promotion skipped: {exc}")
 
