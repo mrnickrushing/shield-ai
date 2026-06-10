@@ -41,16 +41,10 @@ workflows:
         working_directory: mobile/ios
         script: |
           # expo-share-intent leaves an orphaned PrivacyInfo.xcprivacy BuildFile with no
-          # parent group; react-native's privacy_manifest_utils.rb calls real_path on it
-          # and xcodeproj 1.27.0 raises. Wrap the call in a rescue so it falls through.
-          ruby -i -e '
-            src = STDIN.read
-            src.gsub!(
-              "        if existing_file\n            return existing_file.real_path\n        end",
-              "        if existing_file\n            begin\n                return existing_file.real_path\n            rescue\n            end\n        end"
-            )
-            print src
-          ' ../../node_modules/react-native/scripts/cocoapods/privacy_manifest_utils.rb
+          # parent group; xcodeproj 1.27.0 raises when react-native calls real_path on it.
+          # Wrap the call in a rescue so it falls through to the fallback path.
+          sed -i '' 's/return existing_file\.real_path/begin; return existing_file.real_path; rescue; end/' \
+            ../../node_modules/react-native/scripts/cocoapods/privacy_manifest_utils.rb
           pod install
 
       - name: Set up code signing
