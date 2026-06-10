@@ -140,10 +140,8 @@ export default function ProtectScreen() {
         </Text>
       </View>
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md }}
-      >
+      <ScrollView showsVerticalScrollIndicator={false}>
+        <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md }}>
         {/* Identity — full width with badge */}
         <FeatureCard
           icon="shield-checkmark-outline"
@@ -211,6 +209,7 @@ export default function ProtectScreen() {
           onPress={() => router.push("/education")}
           wide
         />
+        </View>
       </ScrollView>
     </View>
   );
