@@ -95,23 +95,6 @@
         "origin": false
       },
       "eas": {
-        "build": {
-          "experimental": {
-            "ios": {
-              "appExtensions": [
-                {
-                  "targetName": "ShareExtension",
-                  "bundleIdentifier": "com.shieldai.app.share-extension",
-                  "entitlements": {
-                    "com.apple.security.application-groups": [
-                      "group.com.shieldai.app"
-                    ]
-                  }
-                }
-              ]
-            }
-          }
-        },
         "projectId": "80d9208f-a5e9-47c3-bf6a-a20105e6bb60"
       }
     }
