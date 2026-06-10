@@ -10,10 +10,11 @@ workflows:
     environment:
       ios_signing:
         distribution_type: app_store
-        bundle_identifier: com.shieldai.app
+        bundle_identifier: com.shieldai.app*
       vars:
         BUNDLE_ID: com.shieldai.app
         EXPO_PUBLIC_API_URL: https://api.shieldai.rushingtechnologies.com
+        EXPO_PUBLIC_OTA_UPDATE_KEY: amcPSXf5G3HAUp6DfMGl2hkHkMGwrn8o26PHYkZ9GoM
         CI: "1"
       node: "18"
       xcode: latest
@@ -53,28 +54,8 @@ workflows:
       - name: Set up code signing
         script: |
           PROFILES_DIR=~/Library/MobileDevice/Provisioning\ Profiles
-          SHARE_BUNDLE="${BUNDLE_ID}.share-extension"
           LOG=/tmp/shield_signing.log
           echo "=== Set up code signing $(date) ===" | tee -a "$LOG"
-
-          # Remove locally-cached profiles for the share extension so
-          # use-profiles only sees a fresh one. [ -e ] guard handles the
-          # case where the glob doesn't match any files yet.
-          for f in "$PROFILES_DIR"/*.mobileprovision; do
-            [ -e "$f" ] || continue
-            bid=$(security cms -D -i "$f" 2>/dev/null \
-              | awk '/<key>application-identifier<\/key>/{getline; gsub(/.*<string>|<\/string>.*/,""); print}')
-            if [[ "$bid" == *".share-extension"* || "$bid" == *"SharedExtension"* ]]; then
-              echo "Removing stale cached profile: $f (bundle: $bid)" | tee -a "$LOG"
-              rm -f "$f"
-            fi
-          done
-
-          # Fetch the share-extension profile from Apple.
-          # App Groups capability is pre-configured on the App ID (B23XNJ2MKG).
-          app-store-connect fetch-signing-files "$SHARE_BUNDLE" \
-            --type IOS_APP_STORE \
-            --create 2>&1 | tee -a "$LOG"
 
           echo "=== Installed profiles ===" | tee -a "$LOG"
           for f in "$PROFILES_DIR"/*.mobileprovision; do
@@ -88,16 +69,16 @@ workflows:
             echo "    app-groups: $grp" | tee -a "$LOG"
           done
 
-          # Auto-assign profiles to project targets.
+          # Assign installed profiles to Xcode project targets.
           xcode-project use-profiles 2>&1 | tee -a "$LOG"
 
-          # Diagnostic: show ShareExtension bundle ID in pbxproj.
-          grep -A2 "ShareExtension" \
+          # Diagnostic: show ShareExtension bundle ID stored in pbxproj.
+          grep -E "BUNDLE_IDENTIFIER|PRODUCT_BUNDLE_IDENTIFIER" \
             "$CM_BUILD_DIR/mobile/ios/ShieldAI.xcodeproj/project.pbxproj" 2>/dev/null \
-            | grep "BUNDLE_IDENTIFIER\|PRODUCT_BUNDLE_IDENTIFIER" | head -4 | tee -a "$LOG" || true
+            | grep -i share | head -4 | tee -a "$LOG" || true
 
-          # Explicitly patch the pbxproj in case use-profiles couldn't resolve
-          # a variable bundle ID reference for the ShareExtension target.
+          # Patch the pbxproj directly in case use-profiles couldn't resolve
+          # the ShareExtension bundle ID (stored as a variable in the project).
           python3 "$CM_BUILD_DIR/scripts/patch_share_extension_profile.py" 2>&1 | tee -a "$LOG"
 
       - name: Increment build number
