@@ -52,11 +52,37 @@ workflows:
 
       - name: Set up code signing
         script: |
-          echo "=== Profiles fetched by automatic ios_signing ==="
-          for f in ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision; do
-            echo "--- $f ---"
-            security cms -D -i "$f" 2>/dev/null | grep -E -A1 "(Name|application-identifier|aps-environment|applesignin|application-groups)" | head -30
+          PROFILES_DIR=~/Library/MobileDevice/Provisioning\ Profiles
+
+          # Remove any stale profile for the wrong extension bundle ID that
+          # Codemagic may have cached from a previous mis-registered identifier.
+          for f in "$PROFILES_DIR"/*.mobileprovision; do
+            bid=$(security cms -D -i "$f" 2>/dev/null \
+              | awk '/<key>application-identifier<\/key>/{getline; gsub(/.*<string>|<\/string>.*/,""); print}')
+            if [[ "$bid" == *"SharedExtension"* ]]; then
+              echo "Removing stale cached profile: $f (bundle: $bid)"
+              rm -f "$f"
+            fi
           done
+
+          # Fetch the correct share-extension profile from Apple.
+          # ios_signing has already installed the distribution cert, so this
+          # call will find it and only needs to write the missing profile.
+          app-store-connect fetch-signing-files "${BUNDLE_ID}.share-extension" \
+            --type IOS_APP_STORE \
+            --create
+
+          echo "=== Installed profiles ==="
+          for f in "$PROFILES_DIR"/*.mobileprovision; do
+            bid=$(security cms -D -i "$f" 2>/dev/null \
+              | awk '/<key>application-identifier<\/key>/{getline; gsub(/.*<string>|<\/string>.*/,""); print}')
+            grp=$(security cms -D -i "$f" 2>/dev/null \
+              | awk '/<key>com.apple.security.application-groups<\/key>/{found=1} found && /<string>/{gsub(/.*<string>|<\/string>.*/,""); print; found=0}')
+            echo "  $f"
+            echo "    app-id:     $bid"
+            echo "    app-groups: $grp"
+          done
+
           xcode-project use-profiles
 
       - name: Increment build number
