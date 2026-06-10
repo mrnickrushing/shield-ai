@@ -50,14 +50,23 @@ workflows:
       - name: Set up code signing
         script: |
           keychain initialize
+          echo "=== Fetching profiles for $BUNDLE_ID ==="
           app-store-connect fetch-signing-files "$BUNDLE_ID" \
             --type IOS_APP_STORE \
             --create
+          echo "=== Fetching profiles for ${BUNDLE_ID}.ShareExtension ==="
           app-store-connect fetch-signing-files "${BUNDLE_ID}.ShareExtension" \
             --type IOS_APP_STORE \
             --create
+          echo "=== Downloaded profiles ==="
+          ls ~/Library/MobileDevice/Provisioning\ Profiles/ 2>/dev/null || echo "No profiles found"
+          for f in ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision; do
+            echo "--- $f ---"
+            security cms -D -i "$f" 2>/dev/null | grep -E "(Name|application-identifier|Entitlements|AppID|TeamIdentifier)" | head -20
+          done
           keychain add-certificates
-          xcode-project use-profiles
+          echo "=== Applying profiles ==="
+          xcode-project use-profiles --verbose || xcode-project use-profiles
 
       - name: Increment build number
         working_directory: mobile/ios
