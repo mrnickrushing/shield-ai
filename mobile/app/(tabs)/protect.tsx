@@ -25,6 +25,7 @@ function FeatureCard({ icon, color, title, body, badge, tag, onPress, wide }: Fe
       onPress={onPress}
       style={({ pressed }) => ({
         flex: wide ? undefined : 1,
+        minWidth: 0,
         backgroundColor: pressed ? colors.surfaceActive : colors.surface,
         borderRadius: radius.xl,
         borderWidth: 1,
@@ -141,7 +142,7 @@ export default function ProtectScreen() {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xxl }}
+        contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md }}
       >
         {/* Identity — full width with badge */}
         <FeatureCard
