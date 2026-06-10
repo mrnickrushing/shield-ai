@@ -84,7 +84,10 @@
       "url": "https://u.expo.dev/80d9208f-a5e9-47c3-bf6a-a20105e6bb60",
       "enabled": true,
       "fallbackToCacheTimeout": 0,
-      "checkAutomatically": "ON_LOAD"
+      "checkAutomatically": "ON_LOAD",
+      "requestHeaders": {
+        "expo-channel-name": "production"
+      }
     },
     "experiments": {
       "typedRoutes": true
