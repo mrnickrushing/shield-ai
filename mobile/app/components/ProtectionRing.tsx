@@ -38,32 +38,34 @@ export function ProtectionRing({ score, size = 148 }: { score: number; size?: nu
   const color = ringColor(score);
 
   return (
-    <View style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }}>
-      <Svg width={size} height={size} style={{ position: "absolute" }}>
-        <Circle
-          cx={size / 2} cy={size / 2} r={R}
-          fill="none" stroke={colors.border} strokeWidth={9}
-        />
-        <AnimatedCircle
-          cx={size / 2} cy={size / 2} r={R}
-          fill="none"
-          stroke={color}
-          strokeWidth={9}
-          strokeLinecap="round"
-          strokeDasharray={circ}
-          animatedProps={animatedProps}
-          transform={`rotate(-90 ${size / 2} ${size / 2})`}
-        />
-      </Svg>
-      <View style={{ alignItems: "center", gap: 2 }}>
-        <Ionicons name="shield-checkmark" size={18} color={color} />
-        <Text style={{ color: colors.text, fontSize: 38, fontWeight: "900", letterSpacing: -2, lineHeight: 44 }}>
-          {score}
-        </Text>
-        <Text style={{ color, fontSize: 10, fontWeight: "800", letterSpacing: 1.2 }}>
-          {ringLabel(score)}
-        </Text>
+    <View style={{ alignItems: "center" }}>
+      <View style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }}>
+        <Svg width={size} height={size} style={{ position: "absolute" }}>
+          <Circle
+            cx={size / 2} cy={size / 2} r={R}
+            fill="none" stroke={colors.border} strokeWidth={9}
+          />
+          <AnimatedCircle
+            cx={size / 2} cy={size / 2} r={R}
+            fill="none"
+            stroke={color}
+            strokeWidth={9}
+            strokeLinecap="round"
+            strokeDasharray={circ}
+            animatedProps={animatedProps}
+            transform={`rotate(-90 ${size / 2} ${size / 2})`}
+          />
+        </Svg>
+        <View style={{ alignItems: "center", gap: 2 }}>
+          <Ionicons name="shield-checkmark" size={18} color={color} />
+          <Text style={{ color: colors.text, fontSize: 38, fontWeight: "900", letterSpacing: -2, lineHeight: 44 }}>
+            {score}
+          </Text>
+        </View>
       </View>
+      <Text style={{ color, fontSize: 10, fontWeight: "800", letterSpacing: 1.2, marginTop: -8 }}>
+        {ringLabel(score)}
+      </Text>
     </View>
   );
 }
