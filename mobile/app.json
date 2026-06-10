@@ -20,7 +20,8 @@
       "bundleIdentifier": "com.shieldai.app",
       "infoPlist": {
         "NSCameraUsageDescription": "Shield AI uses the camera to scan QR codes for threat analysis.",
-        "NSPhotoLibraryUsageDescription": "Shield AI accesses your photo library to scan screenshots for scam detection."
+        "NSPhotoLibraryUsageDescription": "Shield AI accesses your photo library to scan screenshots for scam detection.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -78,14 +79,15 @@
         }
       ]
     ],
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
+    "runtimeVersion": "0.2.0",
     "updates": {
       "url": "https://u.expo.dev/80d9208f-a5e9-47c3-bf6a-a20105e6bb60",
       "enabled": true,
       "fallbackToCacheTimeout": 0,
-      "checkAutomatically": "ON_LOAD"
+      "checkAutomatically": "ON_LOAD",
+      "requestHeaders": {
+        "expo-channel-name": "production"
+      }
     },
     "experiments": {
       "typedRoutes": true
@@ -95,23 +97,6 @@
         "origin": false
       },
       "eas": {
-        "build": {
-          "experimental": {
-            "ios": {
-              "appExtensions": [
-                {
-                  "targetName": "ShareExtension",
-                  "bundleIdentifier": "com.shieldai.app.share-extension",
-                  "entitlements": {
-                    "com.apple.security.application-groups": [
-                      "group.com.shieldai.app"
-                    ]
-                  }
-                }
-              ]
-            }
-          }
-        },
         "projectId": "80d9208f-a5e9-47c3-bf6a-a20105e6bb60"
       }
     }

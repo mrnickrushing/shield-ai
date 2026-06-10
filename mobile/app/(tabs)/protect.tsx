@@ -2,11 +2,14 @@ import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import React from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { Dimensions, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ShieldAPI } from "@/lib/api";
 import { colors, radius, shadow, spacing } from "@/theme/theme";
+
+const SCREEN_W = Dimensions.get("window").width;
+const COL_W = (SCREEN_W - spacing.lg * 2 - spacing.md) / 2;
 
 type FeatureCardProps = {
   icon: keyof typeof Ionicons.glyphMap;
@@ -24,9 +27,7 @@ function FeatureCard({ icon, color, title, body, badge, tag, onPress, wide }: Fe
     <Pressable
       onPress={onPress}
       style={({ pressed }) => ({
-        flex: wide ? undefined : 1,
-        flexBasis: wide ? undefined : 0,
-        minWidth: 0,
+        width: wide ? "100%" : COL_W,
         backgroundColor: pressed ? colors.surfaceActive : colors.surface,
         borderRadius: radius.xl,
         borderWidth: 1,
@@ -141,10 +142,8 @@ export default function ProtectScreen() {
         </Text>
       </View>
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xxl }}
-      >
+      <ScrollView showsVerticalScrollIndicator={false}>
+        <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md }}>
         {/* Identity — full width with badge */}
         <FeatureCard
           icon="shield-checkmark-outline"
@@ -212,6 +211,7 @@ export default function ProtectScreen() {
           onPress={() => router.push("/education")}
           wide
         />
+        </View>
       </ScrollView>
     </View>
   );
