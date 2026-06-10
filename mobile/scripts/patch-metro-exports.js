@@ -32,16 +32,24 @@ for (const pkg of pkgs) {
 }
 if (patched === 0) console.log('[patch-metro] metro: nothing to patch');
 
-// expo-asset is only installed nested under expo/node_modules but
-// @expo/metro-config resolves it from the project root.
-const expoAssetSrc = path.join(dst, 'expo', 'node_modules', 'expo-asset');
-const expoAssetDst = path.join(dst, 'expo-asset');
-if (
-  fs.existsSync(path.join(expoAssetSrc, 'package.json')) &&
-  !fs.existsSync(path.join(expoAssetDst, 'package.json'))
-) {
-  fs.rmSync(expoAssetDst, { recursive: true, force: true });
-  fs.cpSync(expoAssetSrc, expoAssetDst, { recursive: true });
-  const ver = JSON.parse(fs.readFileSync(path.join(expoAssetDst, 'package.json'), 'utf8')).version;
-  console.log(`[patch-metro] promoted expo-asset@${ver} to top level`);
+// Packages that are nested under their parent but must be at the top level
+// so Babel / metro can resolve them from the project root.
+const promotions = [
+  // expo-asset: @expo/metro-config requires it from the project root
+  [path.join(dst, 'expo', 'node_modules', 'expo-asset'), path.join(dst, 'expo-asset')],
+  // react-native-worklets: nativewind/babel plugin requires it from the project root
+  [path.join(dst, 'nativewind', 'node_modules', 'react-native-worklets'), path.join(dst, 'react-native-worklets')],
+  // react-native-reanimated: nativewind depends on it; may also be needed at root
+  [path.join(dst, 'nativewind', 'node_modules', 'react-native-reanimated'), path.join(dst, 'react-native-reanimated')],
+];
+
+for (const [srcPkg, dstPkg] of promotions) {
+  const srcJson = path.join(srcPkg, 'package.json');
+  const dstJson = path.join(dstPkg, 'package.json');
+  if (!fs.existsSync(srcJson)) continue;
+  if (fs.existsSync(dstJson)) continue;  // already at top level
+  fs.rmSync(dstPkg, { recursive: true, force: true });
+  fs.cpSync(srcPkg, dstPkg, { recursive: true });
+  const ver = JSON.parse(fs.readFileSync(dstJson, 'utf8')).version;
+  console.log(`[patch-metro] promoted ${path.basename(dstPkg)}@${ver} to top level`);
 }
