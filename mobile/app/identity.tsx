@@ -70,7 +70,6 @@ export default function IdentityScreen() {
     color: colors.text,
     padding: spacing.md,
     marginBottom: spacing.sm,
-    flex: 1,
   } as const;
 
   return (
@@ -102,7 +101,7 @@ export default function IdentityScreen() {
           <Text style={{ color: colors.text, fontSize: 16, fontWeight: "700", marginBottom: spacing.sm }}>
             Email Breach Check
           </Text>
-          <View style={{ flexDirection: "row", gap: spacing.sm }}>
+          <View>
             <TextInput
               placeholder="your@email.com"
               placeholderTextColor={colors.textMuted}
@@ -119,7 +118,8 @@ export default function IdentityScreen() {
                 backgroundColor: email.trim() ? colors.primary : colors.surface,
                 borderRadius: radius.md,
                 paddingHorizontal: spacing.md,
-                justifyContent: "center",
+                paddingVertical: spacing.md,
+                alignItems: "center",
               }}
             >
               {breachMutation.isPending ? (
@@ -213,7 +213,7 @@ export default function IdentityScreen() {
           <Text style={{ color: colors.textMuted, fontSize: 13, marginBottom: spacing.sm }}>
             Uses k-anonymity — your password is never sent. Only a 5-character hash prefix is transmitted.
           </Text>
-          <View style={{ flexDirection: "row", gap: spacing.sm }}>
+          <View>
             <TextInput
               placeholder="Enter a password to check…"
               placeholderTextColor={colors.textMuted}
@@ -229,7 +229,8 @@ export default function IdentityScreen() {
                 backgroundColor: password ? colors.primary : colors.surface,
                 borderRadius: radius.md,
                 paddingHorizontal: spacing.md,
-                justifyContent: "center",
+                paddingVertical: spacing.md,
+                alignItems: "center",
               }}
             >
               {pwndMutation.isPending ? (

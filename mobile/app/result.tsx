@@ -27,7 +27,9 @@ function SignalTile({
   return (
     <View
       style={{
-        width: "48%",
+        flexGrow: 1,
+        flexBasis: "48%",
+        minWidth: 0,
         backgroundColor: colors.surface,
         borderRadius: radius.lg,
         padding: spacing.md,
@@ -38,7 +40,9 @@ function SignalTile({
       <Text style={{ color: colors.textDim, fontSize: 11, fontWeight: "800", letterSpacing: 1, marginBottom: 4 }}>
         {label}
       </Text>
-      <Text style={{ color: colors.text, fontWeight: "800", fontSize: 15 }}>{value}</Text>
+      <Text style={{ color: colors.text, fontWeight: "800", fontSize: 15 }} numberOfLines={3}>
+        {value}
+      </Text>
     </View>
   );
 }

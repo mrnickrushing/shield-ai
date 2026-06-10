@@ -3,7 +3,6 @@ import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import React from "react";
 import {
-  Dimensions,
   Pressable,
   ScrollView,
   Text,
@@ -16,8 +15,6 @@ import { ScanCard } from "@/components/ScanCard";
 import { ShieldAPI } from "@/lib/api";
 import { useAuth } from "@/state/auth";
 import { colors, radius, shadow, spacing } from "@/theme/theme";
-
-const { width: SCREEN_W } = Dimensions.get("window");
 
 const QUICK_SCANS: Array<{
   type: string;
@@ -48,8 +45,6 @@ const PROTECT_ITEMS: Array<{
   { title: "Education",     body: "Spot scams faster",       icon: "book-outline",             color: colors.safe,          route: "/education" },
 ];
 
-const TILE_W = (SCREEN_W - spacing.lg * 2 - spacing.sm * 3) / 4;
-
 function QuickScanTile({
   item,
   onPress,
@@ -61,8 +56,10 @@ function QuickScanTile({
     <Pressable
       onPress={onPress}
       style={({ pressed }) => ({
-        width: TILE_W,
-        aspectRatio: 0.9,
+        flexGrow: 1,
+        flexBasis: "31%",
+        minWidth: 0,
+        minHeight: 88,
         backgroundColor: pressed ? colors.surfaceActive : colors.surface,
         borderRadius: radius.lg,
         borderWidth: 1,
@@ -70,6 +67,8 @@ function QuickScanTile({
         alignItems: "center",
         justifyContent: "center",
         gap: spacing.xs,
+        paddingHorizontal: spacing.xs,
+        paddingVertical: spacing.sm,
       })}
     >
       <View
@@ -92,7 +91,7 @@ function QuickScanTile({
           textAlign: "center",
           letterSpacing: 0.2,
         }}
-        numberOfLines={1}
+        numberOfLines={2}
       >
         {item.label}
       </Text>
