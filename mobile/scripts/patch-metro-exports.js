@@ -1,30 +1,31 @@
 // nativewind@4.2.5 includes @react-native/community-cli-plugin@0.86.0 which
-// causes npm to hoist metro@0.84.x to node_modules. metro@0.84.x added a strict
-// exports map that prevents @expo/cli@0.22.x and @expo/metro-config from importing
-// internal paths (e.g. metro/src/lib/TerminalReporter, metro-cache/src/stores/FileStore).
+// causes npm to hoist metro@0.84.x to node_modules. metro@0.84.x removed
+// src/lib/TerminalReporter.js (and other files) that @expo/cli@0.22.x depends on.
 //
-// Fix: remove the "exports" field from all top-level metro-* package.json files so
-// that Node resolves internal paths the old way (direct file lookup). This avoids
-// the cascade dependency issues that come from replacing the entire metro-* packages
-// with their 0.81.5 equivalents.
+// Fix: replace all top-level metro-* packages (and ob1, which metro-source-map
+// needs) with the 0.81.5 copies that @react-native/community-cli-plugin uses.
+// These copies are already in node_modules; we just need them at the top level.
 const fs = require('fs');
 const path = require('path');
 const nm = path.join(__dirname, '..', 'node_modules');
+const src = path.join(nm, '@react-native', 'community-cli-plugin', 'node_modules');
 
-const metroPkgs = [
-  'metro', 'metro-babel-transformer', 'metro-cache', 'metro-cache-key',
-  'metro-config', 'metro-core', 'metro-file-map', 'metro-minify-terser',
-  'metro-resolver', 'metro-runtime', 'metro-source-map', 'metro-symbolicate',
-  'metro-transform-plugins', 'metro-transform-worker',
-];
-for (const pkg of metroPkgs) {
-  const jsonPath = path.join(nm, pkg, 'package.json');
-  if (!fs.existsSync(jsonPath)) continue;
-  const data = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
-  if (data.exports) {
-    delete data.exports;
-    fs.writeFileSync(jsonPath, JSON.stringify(data, null, 2) + '\n');
-    console.log(`[patch-metro] removed exports restriction from ${pkg}@${data.version}`);
+if (!fs.existsSync(src)) {
+  console.log('[patch-metro] community-cli-plugin nested modules not found, skipping metro replacement');
+} else {
+  // Replace metro-* and ob1 with 0.81.5 from the nested community-cli-plugin copy
+  const replace = fs.readdirSync(src).filter(n => n.startsWith('metro') || n === 'ob1');
+  for (const pkg of replace) {
+    const srcPkg = path.join(src, pkg);
+    const dstPkg = path.join(nm, pkg);
+    const srcVer = JSON.parse(fs.readFileSync(path.join(srcPkg, 'package.json'), 'utf8')).version;
+    const dstVer = fs.existsSync(path.join(dstPkg, 'package.json'))
+      ? JSON.parse(fs.readFileSync(path.join(dstPkg, 'package.json'), 'utf8')).version
+      : '(none)';
+    if (srcVer === dstVer) continue;
+    fs.rmSync(dstPkg, { recursive: true, force: true });
+    fs.cpSync(srcPkg, dstPkg, { recursive: true });
+    console.log(`[patch-metro] replaced ${pkg}: ${dstVer} → ${srcVer}`);
   }
 }
 
