@@ -89,10 +89,7 @@ function FeatureCard({
     <Pressable
       onPress={onPress}
       style={({ pressed }) => ({
-        flex: wide ? undefined : 1,
-        flexBasis: wide ? undefined : 0,
-        minWidth: 0,
-        width: wide ? "100%" : undefined,
+        width: wide ? "100%" : "48%",
         backgroundColor: pressed ? colors.surfaceActive : colors.surface,
         borderRadius: radius.xl,
         borderWidth: 1,
@@ -298,15 +295,18 @@ export default function ProtectScreen() {
         </View>
 
         <SectionLabel>PROACTIVE TOOLS</SectionLabel>
-        <View style={{ gap: spacing.md, marginBottom: spacing.lg }}>
-          <View style={{ flexDirection: "row", gap: spacing.md }}>
-            <FeatureCard {...primaryLanes[0]} />
-            <FeatureCard {...primaryLanes[1]} />
-          </View>
-          <View style={{ flexDirection: "row", gap: spacing.md }}>
-            <FeatureCard {...primaryLanes[2]} />
-            <FeatureCard {...primaryLanes[3]} />
-          </View>
+        <View
+          style={{
+            flexDirection: "row",
+            flexWrap: "wrap",
+            justifyContent: "space-between",
+            rowGap: spacing.md,
+            marginBottom: spacing.lg,
+          }}
+        >
+          {primaryLanes.map((lane) => (
+            <FeatureCard key={lane.id} {...lane} />
+          ))}
         </View>
 
         <SectionLabel>STAY SHARP</SectionLabel>
