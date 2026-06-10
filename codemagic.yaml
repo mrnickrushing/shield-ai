@@ -54,9 +54,10 @@ workflows:
         script: |
           set -euo pipefail
           PROFILES_DIR=~/Library/MobileDevice/Provisioning\ Profiles
+          SHARE_BUNDLE="${BUNDLE_ID}.share-extension"
 
           # Remove locally-cached profiles for the share extension so
-          # use-profiles only sees the fresh one we create below.
+          # use-profiles only sees a fresh one.
           for f in "$PROFILES_DIR"/*.mobileprovision; do
             bid=$(security cms -D -i "$f" 2>/dev/null \
               | awk '/<key>application-identifier<\/key>/{getline; gsub(/.*<string>|<\/string>.*/,""); print}')
@@ -66,10 +67,12 @@ workflows:
             fi
           done
 
-          # Enable App Groups on the share-extension App ID, delete stale
-          # remote profiles, create a fresh profile that includes App Groups,
-          # and install it to ~/Library/MobileDevice/Provisioning Profiles.
-          python3 "$CM_BUILD_DIR/scripts/setup_share_extension_signing.py"
+          # Fetch the share-extension profile from Apple.
+          # App Groups capability is pre-configured on the App ID (B23XNJ2MKG)
+          # so the created profile will include it.
+          app-store-connect fetch-signing-files "$SHARE_BUNDLE" \
+            --type IOS_APP_STORE \
+            --create
 
           echo "=== Installed profiles ==="
           for f in "$PROFILES_DIR"/*.mobileprovision; do
