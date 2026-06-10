@@ -1,5 +1,6 @@
 import Constants from "expo-constants";
 import * as Notifications from "expo-notifications";
+import * as Updates from "expo-updates";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -49,16 +50,28 @@ async function registerDeviceForPush() {
   );
 }
 
+async function checkForOTAUpdate() {
+  try {
+    const update = await Updates.checkForUpdateAsync();
+    if (update.isAvailable) {
+      await Updates.fetchUpdateAsync();
+      await Updates.reloadAsync();
+    }
+  } catch (_) {}
+}
+
 export default function RootLayout() {
   const hydrate = useAuth((s) => s.hydrate);
   const user = useAuth((s) => s.user);
   useEffect(() => { hydrate(); }, [hydrate]);
 
   useEffect(() => {
+    if (!__DEV__) checkForOTAUpdate();
+  }, []);
+
+  useEffect(() => {
     if (!user?.id) return;
-    registerDeviceForPush().catch(() => {
-      // Push registration is best-effort so auth and navigation are never blocked.
-    });
+    registerDeviceForPush().catch(() => {});
   }, [user?.id]);
 
   return (

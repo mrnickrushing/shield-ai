@@ -104,6 +104,7 @@ function FeatureCard({
           borderBottomWidth: 1,
           borderBottomColor: `${color}30`,
           padding: spacing.md,
+          height: 68,
           flexDirection: "row",
           justifyContent: "space-between",
           alignItems: "center",
