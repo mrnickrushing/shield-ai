@@ -58,13 +58,19 @@ export default function TabsLayout() {
   const [showTour, setShowTour] = useState(false);
 
   useEffect(() => {
-    SecureStore.getItemAsync("hasSeenTour").then((val) => {
-      if (!val) setShowTour(true);
+    Promise.all([
+      SecureStore.getItemAsync("hasSeenTour"),
+      SecureStore.getItemAsync("pendingTour"),
+    ]).then(([hasSeenTour, pendingTour]) => {
+      if (pendingTour === "true" || !hasSeenTour) {
+        setShowTour(true);
+      }
     });
   }, []);
 
   const handleTourDone = async () => {
     await SecureStore.setItemAsync("hasSeenTour", "true");
+    await SecureStore.deleteItemAsync("pendingTour");
     setShowTour(false);
   };
 

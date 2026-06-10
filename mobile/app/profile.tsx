@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, Switch, Text, TextInput, View } from "react-native";
 
 import { useAuth } from "@/state/auth";
@@ -15,6 +15,12 @@ export default function Profile() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setName(user?.display_name ?? "");
+    setLargeText(user?.large_text_mode ?? false);
+    setSimpleLanguage(user?.simple_language_mode ?? false);
+  }, [user?.display_name, user?.large_text_mode, user?.simple_language_mode]);
 
   const isDirty =
     name.trim() !== (user?.display_name ?? "") ||

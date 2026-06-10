@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from "react-router-dom";
-import { AdminAPI, clearToken, setToken } from "./api";
+import { AdminAPI, clearToken, hydrateToken, setToken } from "./api";
 import DashboardPage from "./pages/Dashboard";
 import PatternsPage from "./pages/Patterns";
 import ReportsPage from "./pages/Reports";
@@ -24,16 +24,22 @@ function LoginPage({ onLogin }: { onLogin: () => void }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setLoading(true);
     try {
       const { data } = await AdminAPI.login(email, password);
       setToken(data.access_token);
+      await AdminAPI.stats();
       onLogin();
     } catch {
+      clearToken();
       setError("Invalid credentials or no admin access.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -58,8 +64,8 @@ function LoginPage({ onLogin }: { onLogin: () => void }) {
           type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)}
           style={{ width: "100%", padding: "10px 12px", backgroundColor: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, marginBottom: 20, boxSizing: "border-box", fontSize: 14 }}
         />
-        <button type="submit" style={{ width: "100%", padding: "10px 0", backgroundColor: C.primary, color: "#fff", border: "none", borderRadius: 8, fontWeight: 700, fontSize: 15, cursor: "pointer" }}>
-          Sign In
+        <button type="submit" disabled={loading} style={{ width: "100%", padding: "10px 0", backgroundColor: C.primary, color: "#fff", border: "none", borderRadius: 8, fontWeight: 700, fontSize: 15, cursor: loading ? "wait" : "pointer", opacity: loading ? 0.7 : 1 }}>
+          {loading ? "Checking access..." : "Sign In"}
         </button>
       </form>
     </div>
@@ -108,7 +114,38 @@ function AdminLayout({ onLogout, children }: { onLogout: () => void; children: R
 
 function AdminApp() {
   const [authed, setAuthed] = useState(false);
+  const [checking, setChecking] = useState(true);
+
+  useEffect(() => {
+    const verifyExistingSession = async () => {
+      const token = hydrateToken();
+      if (!token) {
+        setChecking(false);
+        return;
+      }
+      try {
+        await AdminAPI.stats();
+        setAuthed(true);
+      } catch {
+        clearToken();
+        setAuthed(false);
+      } finally {
+        setChecking(false);
+      }
+    };
+
+    void verifyExistingSession();
+  }, []);
+
   const logout = () => { clearToken(); setAuthed(false); };
+
+  if (checking) {
+    return (
+      <div style={{ minHeight: "100vh", backgroundColor: C.bg, display: "flex", alignItems: "center", justifyContent: "center", color: C.muted, fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
+        Verifying admin session...
+      </div>
+    );
+  }
 
   if (!authed) return <LoginPage onLogin={() => setAuthed(true)} />;
 
