@@ -20,7 +20,8 @@
       "bundleIdentifier": "com.shieldai.app",
       "infoPlist": {
         "NSCameraUsageDescription": "Shield AI uses the camera to scan QR codes for threat analysis.",
-        "NSPhotoLibraryUsageDescription": "Shield AI accesses your photo library to scan screenshots for scam detection."
+        "NSPhotoLibraryUsageDescription": "Shield AI accesses your photo library to scan screenshots for scam detection.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
