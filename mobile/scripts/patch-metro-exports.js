@@ -30,4 +30,18 @@ for (const pkg of pkgs) {
   console.log(`[patch-metro] replaced ${pkg}: ${dstVer} → ${srcVer}`);
   patched++;
 }
-if (patched === 0) console.log('[patch-metro] nothing to patch');
+if (patched === 0) console.log('[patch-metro] metro: nothing to patch');
+
+// expo-asset is only installed nested under expo/node_modules but
+// @expo/metro-config resolves it from the project root.
+const expoAssetSrc = path.join(dst, 'expo', 'node_modules', 'expo-asset');
+const expoAssetDst = path.join(dst, 'expo-asset');
+if (
+  fs.existsSync(path.join(expoAssetSrc, 'package.json')) &&
+  !fs.existsSync(path.join(expoAssetDst, 'package.json'))
+) {
+  fs.rmSync(expoAssetDst, { recursive: true, force: true });
+  fs.cpSync(expoAssetSrc, expoAssetDst, { recursive: true });
+  const ver = JSON.parse(fs.readFileSync(path.join(expoAssetDst, 'package.json'), 'utf8')).version;
+  console.log(`[patch-metro] promoted expo-asset@${ver} to top level`);
+}
