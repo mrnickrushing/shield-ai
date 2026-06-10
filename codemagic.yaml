@@ -102,7 +102,7 @@ workflows:
             --archive-xcargs "SWIFT_TREAT_WARNINGS_AS_ERRORS=NO"
 
     artifacts:
-      - build/ios/ipa/*.ipa
+      - mobile/ios/build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
       - /tmp/shield_signing.log
       - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM
