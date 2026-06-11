@@ -4,6 +4,7 @@ import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -22,6 +23,18 @@ import { Ionicons } from "@expo/vector-icons";
 WebBrowser.maybeCompleteAuthSession();
 
 const GOOGLE_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ?? "";
+
+function extractErrorMessage(error: any, fallback: string) {
+  const detail = error?.response?.data?.detail;
+  if (typeof detail === "string" && detail.trim()) return detail;
+  if (Array.isArray(detail) && detail.length > 0) {
+    const first = detail[0];
+    if (typeof first === "string" && first.trim()) return first;
+    if (typeof first?.msg === "string" && first.msg.trim()) return first.msg;
+  }
+  if (typeof error?.message === "string" && error.message.trim()) return error.message;
+  return fallback;
+}
 
 export default function Login() {
   const router = useRouter();
@@ -59,10 +72,15 @@ export default function Login() {
     setError(null);
     setLoading(true);
     try {
-      await loginWithSocial(provider, token, emailHint, displayName);
+      await loginWithSocial(provider, token, emailHint?.trim().toLowerCase(), displayName?.trim());
       router.replace("/(tabs)/dashboard");
     } catch (e: any) {
-      setError(e?.response?.data?.detail ?? `${provider === "apple" ? "Apple" : "Google"} sign-in failed.`);
+      setError(
+        extractErrorMessage(
+          e,
+          `${provider === "apple" ? "Apple" : "Google"} sign-in failed.`
+        )
+      );
     } finally {
       setLoading(false);
     }
@@ -81,23 +99,43 @@ export default function Login() {
       await handleSocial("apple", cred.identityToken, cred.email ?? undefined, fullName || undefined);
     } catch (e: any) {
       if (e.code !== "ERR_REQUEST_CANCELED") {
-        setError("Apple Sign In failed. Try again.");
+        setError(extractErrorMessage(e, "Apple Sign In failed. Try again."));
       }
     }
   };
 
   const submitEmail = async () => {
+    const normalizedEmail = email.trim().toLowerCase();
+    const trimmedName = name.trim();
+    if (!normalizedEmail) {
+      setError("Enter your email address.");
+      return;
+    }
+    if (!password) {
+      setError("Enter your password.");
+      return;
+    }
+    if (mode === "email_register" && !trimmedName) {
+      setError("Enter your display name.");
+      return;
+    }
+    if (mode === "email_register" && password.length < 8) {
+      setError("Password must be at least 8 characters.");
+      return;
+    }
+
+    Keyboard.dismiss();
     setError(null);
     setLoading(true);
     try {
-      if (mode === "email_login") await login(email, password);
+      if (mode === "email_login") await login(normalizedEmail, password);
       else {
-        await register(email, password, name);
+        await register(normalizedEmail, password, trimmedName);
         await SecureStore.setItemAsync("pendingTour", "true");
       }
       router.replace(mode === "email_register" ? "/paywall" : "/(tabs)/dashboard");
     } catch (e: any) {
-      setError(e?.response?.data?.detail ?? "Something went wrong. Try again.");
+      setError(extractErrorMessage(e, "Something went wrong. Try again."));
     } finally {
       setLoading(false);
     }
@@ -117,8 +155,20 @@ export default function Login() {
   if (mode !== "options") {
     return (
       <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-        <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingTop: spacing.xl }}>
-          <Pressable onPress={() => setMode("options")} style={{ marginBottom: spacing.xl }}>
+        <ScrollView
+          contentContainerStyle={{ padding: spacing.lg, paddingTop: spacing.xl }}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+        >
+          <Pressable
+            onPress={() => {
+              Keyboard.dismiss();
+              setError(null);
+              setMode("options");
+            }}
+            style={{ marginBottom: spacing.xl, alignSelf: "flex-start" }}
+            hitSlop={12}
+          >
             <Text style={{ color: colors.primaryBright, fontSize: 15 }}>← Back</Text>
           </Pressable>
           <Text style={{ color: colors.text, fontSize: 26, fontWeight: "900", letterSpacing: -0.5, marginBottom: 4 }}>
@@ -128,10 +178,38 @@ export default function Login() {
             {mode === "email_login" ? "Sign in to your Shield AI account." : "Protect yourself in under a minute."}
           </Text>
           {mode === "email_register" && (
-            <TextInput style={input} placeholder="Display name" placeholderTextColor={colors.textMuted} value={name} onChangeText={setName} />
+            <TextInput
+              style={input}
+              placeholder="Display name"
+              placeholderTextColor={colors.textMuted}
+              value={name}
+              onChangeText={setName}
+              returnKeyType="next"
+            />
           )}
-          <TextInput style={input} placeholder="Email address" placeholderTextColor={colors.textMuted} autoCapitalize="none" keyboardType="email-address" value={email} onChangeText={setEmail} />
-          <TextInput style={input} placeholder="Password" placeholderTextColor={colors.textMuted} secureTextEntry value={password} onChangeText={setPassword} />
+          <TextInput
+            style={input}
+            placeholder="Email address"
+            placeholderTextColor={colors.textMuted}
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="email-address"
+            textContentType="emailAddress"
+            value={email}
+            onChangeText={setEmail}
+            returnKeyType="next"
+          />
+          <TextInput
+            style={input}
+            placeholder="Password"
+            placeholderTextColor={colors.textMuted}
+            secureTextEntry
+            textContentType={mode === "email_login" ? "password" : "newPassword"}
+            value={password}
+            onChangeText={setPassword}
+            onSubmitEditing={submitEmail}
+            returnKeyType="go"
+          />
           {error && <Text style={{ color: colors.critical, marginBottom: spacing.md }}>{error}</Text>}
           <Pressable onPress={submitEmail} disabled={loading} style={{ backgroundColor: colors.primary, padding: spacing.lg, borderRadius: radius.lg, alignItems: "center" }}>
             {loading ? <ActivityIndicator color="#fff" /> : <Text style={{ color: "#fff", fontWeight: "800", fontSize: 16 }}>{mode === "email_login" ? "Sign In" : "Create Account"}</Text>}

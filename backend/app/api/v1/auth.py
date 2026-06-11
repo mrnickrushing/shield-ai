@@ -2,7 +2,6 @@
 import base64
 import json
 import secrets
-from datetime import datetime, timezone
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -17,7 +16,7 @@ from app.core.security import (
     verify_password,
 )
 from app.db.session import get_db
-from app.models.models import AuditLog, Profile, User
+from app.models.models import AuditLog, Profile, SocialIdentity, User
 from app.schemas.schemas import (
     ProfileUpdate,
     RefreshRequest,
@@ -29,6 +28,21 @@ from app.schemas.schemas import (
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+def _normalize_email(email: str | None) -> str | None:
+    if email is None:
+        return None
+    normalized = email.strip().lower()
+    return normalized or None
+
+
+def _decode_jwt_payload(token: str) -> dict:
+    parts = token.split(".")
+    if len(parts) < 2:
+        raise ValueError("Malformed JWT")
+    padding = "=" * (-len(parts[1]) % 4)
+    return json.loads(base64.urlsafe_b64decode(parts[1] + padding))
 
 
 def _user_out(user: User) -> UserOut:
@@ -45,12 +59,15 @@ def _user_out(user: User) -> UserOut:
 
 @router.post("/register", response_model=TokenPair, status_code=status.HTTP_201_CREATED)
 def register(payload: UserRegister, db: Session = Depends(get_db)):
-    if db.query(User).filter(User.email == payload.email).first():
+    email = _normalize_email(payload.email)
+    if not email:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Email is required")
+    if db.query(User).filter(User.email == email).first():
         raise HTTPException(status.HTTP_409_CONFLICT, "Email already registered")
-    user = User(email=payload.email, hashed_password=hash_password(payload.password))
+    user = User(email=email, hashed_password=hash_password(payload.password))
     db.add(user)
     db.flush()
-    db.add(Profile(user_id=user.id, display_name=payload.display_name))
+    db.add(Profile(user_id=user.id, display_name=payload.display_name.strip()))
     db.add(AuditLog(user_id=user.id, action="register"))
     db.commit()
     return TokenPair(
@@ -61,7 +78,7 @@ def register(payload: UserRegister, db: Session = Depends(get_db)):
 
 @router.post("/login", response_model=TokenPair)
 def login(payload: UserLogin, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == payload.email).first()
+    user = db.query(User).filter(User.email == _normalize_email(payload.email)).first()
     if not user or not verify_password(payload.password, user.hashed_password):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid email or password")
     db.add(AuditLog(user_id=user.id, action="login"))
@@ -76,7 +93,8 @@ def login(payload: UserLogin, db: Session = Depends(get_db)):
 def social_auth(payload: SocialAuthRequest, db: Session = Depends(get_db)):
     """Sign in or register via Apple or Google identity token."""
     email: str | None = None
-    display_name = payload.display_name or ""
+    subject: str | None = None
+    display_name = (payload.display_name or "").strip()
 
     if payload.provider == "google":
         try:
@@ -84,7 +102,8 @@ def social_auth(payload: SocialAuthRequest, db: Session = Depends(get_db)):
             if r.status_code != 200:
                 raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid Google token")
             info = r.json()
-            email = info.get("email")
+            email = _normalize_email(info.get("email"))
+            subject = info.get("sub")
             if not display_name:
                 display_name = info.get("name", "")
         except httpx.RequestError:
@@ -92,29 +111,61 @@ def social_auth(payload: SocialAuthRequest, db: Session = Depends(get_db)):
 
     elif payload.provider == "apple":
         try:
-            parts = payload.token.split(".")
-            padded = parts[1] + "=" * (4 - len(parts[1]) % 4)
-            claims = json.loads(base64.urlsafe_b64decode(padded))
-            email = claims.get("email") or payload.email
+            claims = _decode_jwt_payload(payload.token)
+            email = _normalize_email(claims.get("email") or payload.email)
+            subject = claims.get("sub")
         except Exception:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid Apple token")
     else:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Unknown provider")
 
-    if not email:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Could not determine email from token")
+    if not subject:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Identity token did not include a valid account subject")
 
-    is_new = False
-    user = db.query(User).filter(User.email == email).first()
+    identity = (
+        db.query(SocialIdentity)
+        .filter(
+            SocialIdentity.provider == payload.provider,
+            SocialIdentity.subject == subject,
+        )
+        .first()
+    )
+
+    user = db.get(User, identity.user_id) if identity else None
+    if user is None and email:
+        user = db.query(User).filter(User.email == email).first()
+
     if not user:
-        is_new = True
+        if not email:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                "We could not match this account. Sign in with email once, then try Apple again.",
+            )
         user = User(email=email, hashed_password=hash_password(secrets.token_urlsafe(32)))
         db.add(user)
         db.flush()
         db.add(Profile(user_id=user.id, display_name=display_name))
         db.add(AuditLog(user_id=user.id, action=f"register_{payload.provider}"))
     else:
+        if email and user.email != email:
+            user.email = email
+        if user.profile is None:
+            db.add(Profile(user_id=user.id, display_name=display_name))
+        elif display_name and not user.profile.display_name:
+            user.profile.display_name = display_name
         db.add(AuditLog(user_id=user.id, action=f"login_{payload.provider}"))
+
+    if identity is None:
+        db.add(
+            SocialIdentity(
+                user_id=user.id,
+                provider=payload.provider,
+                subject=subject,
+                email=email or user.email,
+            )
+        )
+    elif email and identity.email != email:
+        identity.email = email
 
     db.commit()
     return TokenPair(

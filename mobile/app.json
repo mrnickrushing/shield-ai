@@ -18,6 +18,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.shieldai.app",
+      "usesAppleSignIn": true,
       "infoPlist": {
         "NSCameraUsageDescription": "Shield AI uses the camera to scan QR codes for threat analysis.",
         "NSPhotoLibraryUsageDescription": "Shield AI accesses your photo library to scan screenshots for scam detection.",
