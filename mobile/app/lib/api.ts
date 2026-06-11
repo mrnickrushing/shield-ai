@@ -3,7 +3,7 @@ import axios from "axios";
 import Constants from "expo-constants";
 import * as SecureStore from "expo-secure-store";
 
-const API_URL =
+export const API_URL =
   (Constants.expoConfig?.extra?.apiUrl as string) ??
   process.env.EXPO_PUBLIC_API_URL ??
   "http://localhost:8000";
@@ -211,6 +211,8 @@ export const ShieldAPI = {
   me: () => api.get<UserProfile>("/auth/me").then((r) => r.data),
   socialAuth: (provider: "apple" | "google", token: string, email?: string, display_name?: string) =>
     api.post<{ access_token: string; refresh_token: string }>("/auth/social", { provider, token, email, display_name }).then((r) => r.data),
+  googleAuthStartUrl: (return_url: string) =>
+    `${API_URL}/api/v1/auth/google/start?return_url=${encodeURIComponent(return_url)}`,
   updateProfile: (patch: { display_name?: string; large_text_mode?: boolean; simple_language_mode?: boolean }) => api.patch<UserProfile>("/auth/me", patch).then((r) => r.data),
   scanLink: (url: string) => api.post<Scan>("/scans/link", { url }).then((r) => r.data),
   scanImage: (image_base64: string, filename = "screenshot.png") => api.post<Scan>("/scans/image", { image_base64, filename }).then((r) => r.data),

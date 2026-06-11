@@ -8,6 +8,7 @@ type AuthState = {
   user: UserProfile | null;
   hydrated: boolean;
   hydrate: () => Promise<void>;
+  acceptTokens: (accessToken: string, refreshToken: string) => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, name: string) => Promise<void>;
   loginWithSocial: (provider: "apple" | "google", token: string, email?: string, displayName?: string) => Promise<void>;
@@ -30,6 +31,11 @@ export const useAuth = create<AuthState>((set) => ({
       }
     }
     set({ hydrated: true });
+  },
+
+  acceptTokens: async (accessToken, refreshToken) => {
+    await saveTokens(accessToken, refreshToken);
+    set({ user: await ShieldAPI.me() });
   },
 
   login: async (email, password) => {
