@@ -1,4 +1,5 @@
 import * as AppleAuthentication from "expo-apple-authentication";
+import * as Linking from "expo-linking";
 import * as SecureStore from "expo-secure-store";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
@@ -13,16 +14,14 @@ import {
   TextInput,
   View,
 } from "react-native";
-import * as AuthSession from "expo-auth-session";
 import * as WebBrowser from "expo-web-browser";
 
+import { ShieldAPI } from "@/lib/api";
 import { useAuth } from "@/state/auth";
 import { colors, radius, spacing } from "@/theme/theme";
 import { Ionicons } from "@expo/vector-icons";
 
 WebBrowser.maybeCompleteAuthSession();
-
-const GOOGLE_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ?? "";
 
 function extractErrorMessage(error: any, fallback: string) {
   const detail = error?.response?.data?.detail;
@@ -38,7 +37,7 @@ function extractErrorMessage(error: any, fallback: string) {
 
 export default function Login() {
   const router = useRouter();
-  const { login, register, loginWithSocial } = useAuth();
+  const { acceptTokens, login, register, loginWithSocial } = useAuth();
   const [mode, setMode] = useState<"options" | "email_login" | "email_register">("options");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -47,26 +46,11 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null);
   const [appleAvailable, setAppleAvailable] = useState(false);
 
-  const [googleRequest, googleResponse, promptGoogleAsync] = AuthSession.useAuthRequest(
-    {
-      clientId: GOOGLE_CLIENT_ID,
-      scopes: ["openid", "profile", "email"],
-      redirectUri: AuthSession.makeRedirectUri({ scheme: "shieldai" }),
-    },
-    { authorizationEndpoint: "https://accounts.google.com/o/oauth2/v2/auth", tokenEndpoint: "https://oauth2.googleapis.com/token" }
-  );
-
   useEffect(() => {
     if (Platform.OS === "ios") {
       AppleAuthentication.isAvailableAsync().then(setAppleAvailable);
     }
   }, []);
-
-  useEffect(() => {
-    if (googleResponse?.type === "success" && googleResponse.authentication?.idToken) {
-      handleSocial("google", googleResponse.authentication.idToken);
-    }
-  }, [googleResponse]);
 
   const handleSocial = async (provider: "apple" | "google", token: string, emailHint?: string, displayName?: string) => {
     setError(null);
@@ -101,6 +85,52 @@ export default function Login() {
       if (e.code !== "ERR_REQUEST_CANCELED") {
         setError(extractErrorMessage(e, "Apple Sign In failed. Try again."));
       }
+    }
+  };
+
+  const handleGoogle = async () => {
+    const returnUrl = Linking.createURL("google-auth");
+    setError(null);
+    setLoading(true);
+    try {
+      const result = await WebBrowser.openAuthSessionAsync(
+        ShieldAPI.googleAuthStartUrl(returnUrl),
+        returnUrl
+      );
+
+      if (result.type !== "success" || !result.url) {
+        if (result.type !== "cancel") {
+          setError("Google sign-in was cancelled before it completed.");
+        }
+        return;
+      }
+
+      const parsed = Linking.parse(result.url);
+      const accessToken = Array.isArray(parsed.queryParams?.access_token)
+        ? parsed.queryParams?.access_token[0]
+        : parsed.queryParams?.access_token;
+      const refreshToken = Array.isArray(parsed.queryParams?.refresh_token)
+        ? parsed.queryParams?.refresh_token[0]
+        : parsed.queryParams?.refresh_token;
+      const authError = Array.isArray(parsed.queryParams?.error)
+        ? parsed.queryParams?.error[0]
+        : parsed.queryParams?.error;
+
+      if (typeof authError === "string" && authError.trim()) {
+        setError(decodeURIComponent(authError));
+        return;
+      }
+      if (typeof accessToken !== "string" || typeof refreshToken !== "string") {
+        setError("Google sign-in did not return valid session tokens.");
+        return;
+      }
+
+      await acceptTokens(accessToken, refreshToken);
+      router.replace("/(tabs)/dashboard");
+    } catch (e: any) {
+      setError(extractErrorMessage(e, "Google sign-in failed."));
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -258,10 +288,7 @@ export default function Login() {
 
       {/* Google Sign In */}
       <Pressable
-        onPress={() => {
-          if (!GOOGLE_CLIENT_ID) { setError("Google Sign In requires EXPO_PUBLIC_GOOGLE_CLIENT_ID to be configured."); return; }
-          promptGoogleAsync();
-        }}
+        onPress={handleGoogle}
         style={{ backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: radius.lg, padding: spacing.lg, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.sm, marginBottom: spacing.md }}
       >
         <Ionicons name="logo-google" size={20} color={colors.text} />
