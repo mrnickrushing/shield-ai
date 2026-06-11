@@ -4,6 +4,8 @@ import os
 os.environ["DATABASE_URL"] = "sqlite+pysqlite:///:memory:"
 os.environ["ENVIRONMENT"] = "development"
 
+import base64
+import json
 import uuid
 
 import pytest
@@ -37,6 +39,15 @@ app.dependency_overrides[get_db] = _override_db
 client = TestClient(app)
 
 
+def _fake_apple_token(subject: str, email: str | None = None) -> str:
+    header = base64.urlsafe_b64encode(json.dumps({"alg": "none", "typ": "JWT"}).encode()).decode().rstrip("=")
+    payload = {"sub": subject}
+    if email is not None:
+        payload["email"] = email
+    body = base64.urlsafe_b64encode(json.dumps(payload).encode()).decode().rstrip("=")
+    return f"{header}.{body}.signature"
+
+
 def test_health():
     r = client.get("/health")
     assert r.status_code == 200
@@ -58,6 +69,43 @@ def test_register_login_flow():
     )
     assert me.status_code == 200
     assert me.json()["email"] == "test@example.com"
+
+
+def test_register_normalizes_email():
+    r = client.post(
+        "/api/v1/auth/register",
+        json={"email": " TEST@Example.com ", "password": "supersecret1", "display_name": "Test"},
+    )
+    assert r.status_code == 201, r.text
+    me = client.get(
+        "/api/v1/auth/me",
+        headers={"Authorization": f"Bearer {r.json()['access_token']}"},
+    )
+    assert me.status_code == 200
+    assert me.json()["email"] == "test@example.com"
+
+
+def test_apple_social_auth_reuses_identity_without_email():
+    token1 = _fake_apple_token("apple-user-123", "apple-user@example.com")
+    r1 = client.post(
+        "/api/v1/auth/social",
+        json={"provider": "apple", "token": token1, "display_name": "Apple User"},
+    )
+    assert r1.status_code == 200, r1.text
+
+    token2 = _fake_apple_token("apple-user-123")
+    r2 = client.post(
+        "/api/v1/auth/social",
+        json={"provider": "apple", "token": token2},
+    )
+    assert r2.status_code == 200, r2.text
+
+    me = client.get(
+        "/api/v1/auth/me",
+        headers={"Authorization": f"Bearer {r2.json()['access_token']}"},
+    )
+    assert me.status_code == 200
+    assert me.json()["email"] == "apple-user@example.com"
 
 
 def test_update_profile():
