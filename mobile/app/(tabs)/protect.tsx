@@ -29,7 +29,7 @@ const PRIMARY_LANES: ProtectLane[] = [
     icon: "globe-outline",
     color: colors.teal,
     title: "Safe Browser",
-    body: "Pre-scan a URL, inspect the destination, and only open it after the warning gate clears.",
+    body: "Pre-scan a link, inspect the destination, and open it only after the gate clears.",
     tag: "LIVE",
     onPress: () => {},
   },
@@ -38,7 +38,7 @@ const PRIMARY_LANES: ProtectLane[] = [
     icon: "storefront-outline",
     color: colors.suspicious,
     title: "Marketplace",
-    body: "Catch overpayment, fake escrow, and off-platform pressure before a deal turns expensive.",
+    body: "Catch overpayment, fake escrow, and off-platform pressure before a deal goes bad.",
     onPress: () => {},
   },
   {
@@ -46,7 +46,7 @@ const PRIMARY_LANES: ProtectLane[] = [
     icon: "people-outline",
     color: colors.purple,
     title: "Social Scan",
-    body: "Stress-test giveaways, crypto bait, and impersonation DMs before you reply.",
+    body: "Pressure-test giveaways, crypto bait, and impersonation DMs before you reply.",
     onPress: () => {},
   },
   {
@@ -54,7 +54,7 @@ const PRIMARY_LANES: ProtectLane[] = [
     icon: "heart-outline",
     color: colors.rose,
     title: "Family",
-    body: "Set up contacts you trust so scam recovery and alert-sharing are one tap away.",
+    body: "Set up trusted contacts so recovery help and alert-sharing stay one tap away.",
     onPress: () => {},
   },
 ];
@@ -85,12 +85,14 @@ function FeatureCard({
   onPress,
   wide,
 }: FeatureCardProps) {
+  const bodyLines = wide ? 2 : 3;
+
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => ({
         width: wide ? "100%" : "48%",
-        height: wide ? undefined : 168,
+        minHeight: wide ? 144 : 168,
         backgroundColor: pressed ? colors.surfaceActive : colors.surface,
         borderRadius: radius.xl,
         borderWidth: 1,
@@ -157,11 +159,13 @@ function FeatureCard({
         </View>
       </View>
 
-      <View style={{ padding: spacing.md, flex: 1 }}>
+      <View style={{ padding: spacing.md, flex: 1, justifyContent: "space-between" }}>
         <Text style={{ color: colors.text, fontSize: 15, fontWeight: "800", marginBottom: 4 }} numberOfLines={1}>
           {title}
         </Text>
-        <Text style={{ color: colors.textMuted, fontSize: 12, lineHeight: 17 }} numberOfLines={3}>{body}</Text>
+        <Text style={{ color: colors.textMuted, fontSize: 12, lineHeight: 17 }} numberOfLines={bodyLines}>
+          {body}
+        </Text>
       </View>
     </Pressable>
   );
@@ -288,7 +292,7 @@ export default function ProtectScreen() {
             icon="shield-checkmark-outline"
             color={colors.primaryBright}
             title="Identity Protection"
-            body="Check breach exposure, review alerts, and get the exact next step when your identity posture changes."
+            body="Check breach exposure, review alerts, and get the next move when your identity posture changes."
             badge={unreadAlerts}
             tag={unreadAlerts > 0 ? "NEEDS REVIEW" : "MONITORING"}
             onPress={() => router.push("/identity")}
@@ -317,7 +321,7 @@ export default function ProtectScreen() {
             icon="globe-outline"
             color={colors.accent}
             title="Community Intel"
-            body="See the scam patterns people are reporting across the network so you recognize the playbook faster."
+            body="See the scam patterns people are reporting so you recognize the playbook faster."
             tag="LIVE"
             onPress={() => router.push("/community")}
             wide
@@ -326,7 +330,7 @@ export default function ProtectScreen() {
             icon="book-outline"
             color={colors.safe}
             title="Education Center"
-            body="Short lessons that build pattern recognition, so risky requests feel wrong before they feel urgent."
+            body="Short lessons that build pattern recognition before risky requests start feeling urgent."
             onPress={() => router.push("/education")}
             wide
           />
