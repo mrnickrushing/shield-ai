@@ -90,6 +90,7 @@ function FeatureCard({
       onPress={onPress}
       style={({ pressed }) => ({
         width: wide ? "100%" : "48%",
+        height: wide ? undefined : 168,
         backgroundColor: pressed ? colors.surfaceActive : colors.surface,
         borderRadius: radius.xl,
         borderWidth: 1,
@@ -104,6 +105,7 @@ function FeatureCard({
           borderBottomWidth: 1,
           borderBottomColor: `${color}30`,
           padding: spacing.md,
+          height: 68,
           flexDirection: "row",
           justifyContent: "space-between",
           alignItems: "center",
@@ -155,11 +157,11 @@ function FeatureCard({
         </View>
       </View>
 
-      <View style={{ padding: spacing.md }}>
-        <Text style={{ color: colors.text, fontSize: 15, fontWeight: "800", marginBottom: 4 }}>
+      <View style={{ padding: spacing.md, flex: 1 }}>
+        <Text style={{ color: colors.text, fontSize: 15, fontWeight: "800", marginBottom: 4 }} numberOfLines={1}>
           {title}
         </Text>
-        <Text style={{ color: colors.textMuted, fontSize: 12, lineHeight: 17 }}>{body}</Text>
+        <Text style={{ color: colors.textMuted, fontSize: 12, lineHeight: 17 }} numberOfLines={3}>{body}</Text>
       </View>
     </Pressable>
   );
