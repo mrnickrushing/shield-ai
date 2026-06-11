@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import React from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ShieldAPI } from "@/lib/api";
@@ -16,6 +16,7 @@ type FeatureCardProps = {
   badge?: number;
   tag?: string;
   wide?: boolean;
+  compactWidth?: number;
   onPress: () => void;
 };
 
@@ -84,6 +85,7 @@ function FeatureCard({
   tag,
   onPress,
   wide,
+  compactWidth,
 }: FeatureCardProps) {
   const bodyLines = wide ? 2 : 3;
 
@@ -91,7 +93,7 @@ function FeatureCard({
     <Pressable
       onPress={onPress}
       style={({ pressed }) => ({
-        width: wide ? "100%" : "48%",
+        width: wide ? "100%" : compactWidth,
         minHeight: wide ? 144 : 168,
         backgroundColor: pressed ? colors.surfaceActive : colors.surface,
         borderRadius: radius.xl,
@@ -174,6 +176,8 @@ function FeatureCard({
 export default function ProtectScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const compactCardWidth = Math.floor((width - spacing.lg * 2 - spacing.md) / 2);
 
   const { data: alerts } = useQuery({
     queryKey: ["identity-alerts"],
@@ -305,13 +309,13 @@ export default function ProtectScreen() {
           style={{
             flexDirection: "row",
             flexWrap: "wrap",
-            justifyContent: "space-between",
+            columnGap: spacing.md,
             rowGap: spacing.md,
             marginBottom: spacing.lg,
           }}
         >
           {primaryLanes.map((lane) => (
-            <FeatureCard key={lane.id} {...lane} />
+            <FeatureCard key={lane.id} {...lane} compactWidth={compactCardWidth} />
           ))}
         </View>
 
