@@ -18,19 +18,30 @@ class LLMConfig:
 
 
 _ROUTE_TABLE: dict[str, LLMConfig] = {
-    # URL / link scans — factual, low creativity needed
+    # URL / link scans — factual, Safe Browsing is authoritative
     "link": LLMConfig(
         model="gpt-4o-mini",
         temperature=0.1,
         max_tokens=512,
-        system_hint="You are a cybersecurity analyst evaluating URLs for phishing and malware. Be concise and factual.",
+        system_hint=(
+            "You are a cybersecurity analyst evaluating URLs for phishing and malware. "
+            "Be concise and factual. Prioritize the deterministic signals provided."
+        ),
     ),
-    # Screenshot / image — needs richer reasoning over OCR text
+    # Screenshot / image — GPT-4o for best visual reasoning (vision call handled separately)
     "image": LLMConfig(
-        model="gpt-4o-mini",
-        temperature=0.2,
-        max_tokens=768,
-        system_hint="You are a cybersecurity analyst evaluating screenshot text for scams and fraud. Focus on visual deception tactics.",
+        model="gpt-4o",
+        temperature=0.15,
+        max_tokens=1024,
+        system_hint=(
+            "You are a cybersecurity expert specializing in visual phishing and screenshot analysis. "
+            "Screenshots may show phishing login pages, fake invoices, tech-support scam popups, "
+            "social engineering DMs, or brand-impersonation pages. "
+            "Be aggressive about flagging suspicious content — missing a scam is far worse than a false positive. "
+            "Focus on: brand logos/design copied from real companies, urgency banners, "
+            "any request for credentials or payment, suspicious URLs visible on screen, "
+            "fake security warnings, and any language pressuring the user to act immediately."
+        ),
     ),
     # QR codes decode to URLs — same profile as link
     "qr": LLMConfig(
@@ -39,21 +50,34 @@ _ROUTE_TABLE: dict[str, LLMConfig] = {
         max_tokens=512,
         system_hint="You are a cybersecurity analyst evaluating QR code destinations for phishing and malware.",
     ),
-    # SMS / chat — needs social engineering understanding
+    # SMS / chat — social engineering needs strong reasoning
     "message": LLMConfig(
-        model="gpt-4o-mini",
-        temperature=0.2,
-        max_tokens=640,
-        system_hint="You are a cybersecurity analyst evaluating text messages for social engineering, phishing, and scam patterns.",
-    ),
-    # Email — complex headers + body; needs highest reasoning
-    "email": LLMConfig(
-        model="gpt-4o-mini",
+        model="gpt-4o",
         temperature=0.15,
-        max_tokens=896,
-        system_hint="You are a cybersecurity analyst evaluating emails for spoofing, phishing, and business email compromise. Analyze sender legitimacy, reply-to mismatches, and urgency manipulation.",
+        max_tokens=768,
+        system_hint=(
+            "You are a cybersecurity analyst evaluating text messages for social engineering, "
+            "phishing, smishing, and scam patterns. "
+            "Common patterns include: fake package delivery fees, government/IRS impersonation, "
+            "prize/lottery fraud, romance scams, fake job offers, and bank account alerts. "
+            "Be aggressive — sophisticated scams are designed to look legitimate. "
+            "If something feels off, flag it even if you can't pin down the exact pattern."
+        ),
     ),
-    # Phone — short input, fast response preferred
+    # Email — complex analysis; needs highest reasoning
+    "email": LLMConfig(
+        model="gpt-4o",
+        temperature=0.15,
+        max_tokens=1024,
+        system_hint=(
+            "You are a cybersecurity analyst evaluating emails for spoofing, phishing, and business "
+            "email compromise. Analyze sender legitimacy, reply-to mismatches, urgency manipulation, "
+            "brand impersonation, embedded links, and requests for credentials or wire transfers. "
+            "Treat any mismatch between the displayed sender name and the actual email domain as a "
+            "serious red flag."
+        ),
+    ),
+    # Phone — short input, fast response
     "phone": LLMConfig(
         model="gpt-4o-mini",
         temperature=0.1,
@@ -62,17 +86,27 @@ _ROUTE_TABLE: dict[str, LLMConfig] = {
     ),
     # Marketplace listings — fraud pattern recognition
     "marketplace": LLMConfig(
-        model="gpt-4o-mini",
-        temperature=0.2,
-        max_tokens=640,
-        system_hint="You are a fraud analyst evaluating marketplace listings for overpayment scams, fake escrow, and buyer/seller fraud.",
+        model="gpt-4o",
+        temperature=0.15,
+        max_tokens=768,
+        system_hint=(
+            "You are a fraud analyst evaluating marketplace listings and conversations for scam patterns. "
+            "Key patterns: overpayment scams (buyer sends too much, asks for refund), fake escrow services, "
+            "pressure to move off-platform, rental scams, and fake payment confirmations. "
+            "Be aggressive — marketplace fraud causes direct financial loss."
+        ),
     ),
-    # Social media posts — misinformation + social engineering
+    # Social media — impersonation + investment fraud
     "social": LLMConfig(
-        model="gpt-4o-mini",
-        temperature=0.2,
-        max_tokens=640,
-        system_hint="You are a cybersecurity analyst evaluating social media content for fake giveaways, impersonation, crypto lures, and account-takeover phishing.",
+        model="gpt-4o",
+        temperature=0.15,
+        max_tokens=768,
+        system_hint=(
+            "You are a cybersecurity analyst evaluating social media content for fake giveaways, "
+            "celebrity/brand impersonation, crypto investment lures, pig-butchering setups, "
+            "account-takeover phishing, and romance scams. "
+            "Verified accounts can be compromised — don't assume a blue check means it's safe."
+        ),
     ),
 }
 
