@@ -98,6 +98,7 @@
       "typedRoutes": true
     },
     "extra": {
+      "apiUrl": "https://api.shieldai.rushingtechnologies.com",
       "router": {
         "origin": false
       },

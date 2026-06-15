@@ -6,7 +6,7 @@ import * as SecureStore from "expo-secure-store";
 export const API_URL =
   (Constants.expoConfig?.extra?.apiUrl as string) ??
   process.env.EXPO_PUBLIC_API_URL ??
-  "http://localhost:8000";
+  "https://api.shieldai.rushingtechnologies.com";
 
 export const api = axios.create({ baseURL: `${API_URL}/api/v1`, timeout: 30000 });
 
