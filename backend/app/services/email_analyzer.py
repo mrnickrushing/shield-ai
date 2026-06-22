@@ -29,6 +29,11 @@ _BRAND_DOMAINS: dict[str, list[str]] = {
     "usps": ["usps.com", "usps.gov"],
     "fedex": ["fedex.com"],
     "ups": ["ups.com"],
+    "mcafee": ["mcafee.com"],
+    "norton": ["norton.com", "nortonlifelock.com", "gen.com"],
+    "lifelock": ["lifelock.com", "nortonlifelock.com"],
+    "webroot": ["webroot.com"],
+    "malwarebytes": ["malwarebytes.com"],
 }
 
 _URL_RE = re.compile(r'https?://[^\s<>"{}|\\^`\[\]]+')

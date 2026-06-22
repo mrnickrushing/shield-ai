@@ -295,6 +295,12 @@ def combine(
                 "Full AI analysis was unavailable — review the red flags below before acting."
             )
             confidence = min(confidence, 0.5)
+            # Safety floor: when AI analysis didn't run, deterministic keyword
+            # matching is the only signal we have, and it's brittle (OCR noise,
+            # phrasing variation). Don't let a sparse match alone produce a
+            # falsely reassuring "looks mostly okay" verdict — at least one
+            # real flag with no AI corroboration should read as "suspicious".
+            final = max(final, 30)
 
     final = max(0, min(final, 100))
     level = level_for_score(final)
