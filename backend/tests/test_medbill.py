@@ -3,7 +3,7 @@ from app.verticals import medbill
 
 
 def test_parses_line_items_with_code_and_amount():
-    items = medbill._parse_lines("Office visit 99213 $250.00\nCBC panel 85025 $80.00")
+    items, _ = medbill._parse("Office visit 99213 $250.00\nCBC panel 85025 $80.00")
     assert len(items) == 2
     assert items[0].code == "99213"
     assert items[0].amount == 250.0
@@ -12,7 +12,7 @@ def test_parses_line_items_with_code_and_amount():
 
 
 def test_total_line_is_not_a_charge_line():
-    items = medbill._parse_lines("Office visit $250.00\nTotal due $250.00")
+    items, _ = medbill._parse("Office visit $250.00\nTotal due $250.00")
     # The "Total due" summary line must not be counted as a charge.
     assert len(items) == 1
     assert items[0].amount == 250.0
@@ -48,3 +48,28 @@ def test_clean_bill_has_low_score_and_no_error_flags():
     assert res.score == 0
     assert not any("duplicate" in f.lower() for f in res.flags)
     assert res.evidence["estimated_overcharge"] == 0.0
+
+
+def test_charge_line_containing_total_is_not_dropped():
+    # "Total knee replacement" is a service, not a summary row — keep it.
+    items, totals = medbill._parse("Total knee replacement 27447 $15,000.00")
+    assert len(items) == 1
+    assert items[0].code == "27447"
+    assert items[0].amount == 15000.0
+    assert totals == []
+
+    # A genuine summary row (no procedure code) is still treated as a total.
+    items2, totals2 = medbill._parse("Office visit $150.00\nTotal $150.00")
+    assert len(items2) == 1
+    assert totals2 == [150.0]
+
+
+def test_dispute_letter_includes_out_of_network_concern():
+    res = medbill.analyze("Surgery 12345 $5,000.00\nThis provider is out-of-network", {})
+    # No line item is a duplicate, but the OON concern must still be in the letter.
+    assert "out-of-network" in res.output_artifact.lower()
+
+
+def test_dispute_letter_includes_math_error_concern():
+    res = medbill.analyze("Office visit $300.00\nLab $300.00\nTotal due $400.00", {})
+    assert "stated total" in res.output_artifact.lower()
