@@ -215,9 +215,9 @@ export const ShieldAPI = {
     `${API_URL}/api/v1/auth/google/start?return_url=${encodeURIComponent(return_url)}`,
   updateProfile: (patch: { display_name?: string; large_text_mode?: boolean; simple_language_mode?: boolean }) => api.patch<UserProfile>("/auth/me", patch).then((r) => r.data),
   scanLink: (url: string) => api.post<Scan>("/scans/link", { url }).then((r) => r.data),
-  // GPT-4o vision (detail: "high") + OCR + URL enrichment routinely runs past
-  // the default 30s timeout, which surfaces as a response-less error here —
-  // give image scans more headroom than the rest of the API.
+  // Claude vision + OCR + URL enrichment routinely runs past the default
+  // 30s timeout, which surfaces as a response-less error here — give image
+  // scans more headroom than the rest of the API.
   scanImage: (image_base64: string, filename = "screenshot.png") =>
     api.post<Scan>("/scans/image", { image_base64, filename }, { timeout: 60000 }).then((r) => r.data),
   scanQR: (qr_content: string) => api.post<Scan>("/scans/qr", { qr_content }).then((r) => r.data),
