@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ProtectionRing } from "@/components/ProtectionRing";
 import { ScanCard } from "@/components/ScanCard";
-import { AnimatedNumber, Button, Eyebrow, FadeIn, GlowOrb, Surface } from "@/components/ui";
+import { AnimatedNumber, Button, Eyebrow, FadeIn, GlowOrb, PulseIcon, Surface } from "@/components/ui";
 import { ShieldAPI } from "@/lib/api";
 import { useAuth } from "@/state/auth";
 import { colors, gradients, radius, spacing, withAlpha } from "@/theme/theme";
@@ -54,30 +54,34 @@ function QuickScanTile({
         paddingVertical: spacing.sm,
       })}
     >
-      <View
-        style={{
-          width: 38,
-          height: 38,
-          borderRadius: radius.md,
-          backgroundColor: withAlpha(item.color, "22"),
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <Ionicons name={item.icon} size={18} color={item.color} />
-      </View>
-      <Text
-        style={{
-          color: colors.textDim,
-          fontSize: 10,
-          fontWeight: "700",
-          textAlign: "center",
-          letterSpacing: 0.2,
-        }}
-        numberOfLines={2}
-      >
-        {item.label}
-      </Text>
+      {({ pressed }) => (
+        <>
+          <View
+            style={{
+              width: 38,
+              height: 38,
+              borderRadius: radius.md,
+              backgroundColor: withAlpha(item.color, "22"),
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <PulseIcon name={item.icon} size={18} color={item.color} pressed={pressed} />
+          </View>
+          <Text
+            style={{
+              color: colors.textDim,
+              fontSize: 10,
+              fontWeight: "700",
+              textAlign: "center",
+              letterSpacing: 0.2,
+            }}
+            numberOfLines={2}
+          >
+            {item.label}
+          </Text>
+        </>
+      )}
     </Pressable>
   );
 }
@@ -123,22 +127,26 @@ function IconButton({
         justifyContent: "center",
       }}
     >
-      <Ionicons name={icon} size={18} color={colors.textDim} />
-      {badge ? (
-        <View
-          style={{
-            position: "absolute",
-            top: 7,
-            right: 8,
-            width: 8,
-            height: 8,
-            borderRadius: 4,
-            backgroundColor: colors.critical,
-            borderWidth: 1.5,
-            borderColor: colors.surface,
-          }}
-        />
-      ) : null}
+      {({ pressed }) => (
+        <>
+          <PulseIcon name={icon} size={18} color={colors.textDim} pressed={pressed} />
+          {badge ? (
+            <View
+              style={{
+                position: "absolute",
+                top: 7,
+                right: 8,
+                width: 8,
+                height: 8,
+                borderRadius: 4,
+                backgroundColor: colors.critical,
+                borderWidth: 1.5,
+                borderColor: colors.surface,
+              }}
+            />
+          ) : null}
+        </>
+      )}
     </Pressable>
   );
 }
