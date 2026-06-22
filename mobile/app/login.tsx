@@ -16,9 +16,10 @@ import {
 } from "react-native";
 import * as WebBrowser from "expo-web-browser";
 
+import { Button, FadeIn, GlowOrb } from "@/components/ui";
 import { ShieldAPI } from "@/lib/api";
 import { useAuth } from "@/state/auth";
-import { colors, radius, spacing } from "@/theme/theme";
+import { colors, radius, spacing, withAlpha } from "@/theme/theme";
 import { Ionicons } from "@expo/vector-icons";
 
 WebBrowser.maybeCompleteAuthSession();
@@ -241,9 +242,12 @@ export default function Login() {
             returnKeyType="go"
           />
           {error && <Text style={{ color: colors.critical, marginBottom: spacing.md }}>{error}</Text>}
-          <Pressable onPress={submitEmail} disabled={loading} style={{ backgroundColor: colors.primary, padding: spacing.lg, borderRadius: radius.lg, alignItems: "center" }}>
-            {loading ? <ActivityIndicator color="#fff" /> : <Text style={{ color: "#fff", fontWeight: "800", fontSize: 16 }}>{mode === "email_login" ? "Sign In" : "Create Account"}</Text>}
-          </Pressable>
+          <Button
+            label={mode === "email_login" ? "Sign In" : "Create Account"}
+            onPress={submitEmail}
+            loading={loading}
+            style={{ borderRadius: radius.lg }}
+          />
           <Pressable onPress={() => setMode(mode === "email_login" ? "email_register" : "email_login")} style={{ marginTop: spacing.lg }}>
             <Text style={{ color: colors.primaryBright, textAlign: "center" }}>
               {mode === "email_login" ? "Need an account? Register" : "Have an account? Sign in"}
@@ -257,64 +261,70 @@ export default function Login() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg, padding: spacing.lg, justifyContent: "center" }}>
       {/* Logo */}
-      <View style={{ alignItems: "center", marginBottom: spacing.xl }}>
-        <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: colors.primaryDim, alignItems: "center", justifyContent: "center", marginBottom: spacing.md, borderWidth: 2, borderColor: colors.primary + "44" }}>
-          <Ionicons name="shield-checkmark" size={40} color={colors.primaryBright} />
+      <FadeIn>
+        <View style={{ alignItems: "center", marginBottom: spacing.xl }}>
+          <View style={{ alignItems: "center", justifyContent: "center", marginBottom: spacing.md }}>
+            <GlowOrb color={colors.primaryBright} size={180} opacity={0.45} style={{ top: -50, left: -50 }} />
+            <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: colors.primaryDim, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: withAlpha(colors.primary, "44") }}>
+              <Ionicons name="shield-checkmark" size={40} color={colors.primaryBright} />
+            </View>
+          </View>
+          <Text style={{ color: colors.text, fontSize: 30, fontWeight: "900", letterSpacing: -0.8 }}>Shield AI</Text>
+          <Text style={{ color: colors.textMuted, fontSize: 14, marginTop: 6, textAlign: "center" }}>
+            Before you click. Before you pay.{"\n"}Before you trust.
+          </Text>
         </View>
-        <Text style={{ color: colors.text, fontSize: 30, fontWeight: "900", letterSpacing: -0.8 }}>Shield AI</Text>
-        <Text style={{ color: colors.textMuted, fontSize: 14, marginTop: 6, textAlign: "center" }}>
-          Before you click. Before you pay.{"\n"}Before you trust.
-        </Text>
-      </View>
+      </FadeIn>
 
       {error && (
-        <View style={{ backgroundColor: colors.critical + "22", borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.md }}>
+        <View style={{ backgroundColor: withAlpha(colors.critical, "22"), borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.md }}>
           <Text style={{ color: colors.critical, textAlign: "center" }}>{error}</Text>
         </View>
       )}
 
       {loading && <ActivityIndicator color={colors.primaryBright} style={{ marginBottom: spacing.md }} />}
 
-      {/* Apple Sign In */}
-      {appleAvailable && (
-        <AppleAuthentication.AppleAuthenticationButton
-          buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
-          buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
-          cornerRadius={10}
-          style={{ width: "100%", height: 52, marginBottom: spacing.md }}
-          onPress={handleApple}
+      <FadeIn delay={80}>
+        {/* Apple Sign In */}
+        {appleAvailable && (
+          <AppleAuthentication.AppleAuthenticationButton
+            buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+            buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
+            cornerRadius={10}
+            style={{ width: "100%", height: 52, marginBottom: spacing.md }}
+            onPress={handleApple}
+          />
+        )}
+
+        {/* Google Sign In */}
+        <Pressable
+          onPress={handleGoogle}
+          style={{ backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: radius.lg, padding: spacing.lg, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.sm, marginBottom: spacing.md }}
+        >
+          <Ionicons name="logo-google" size={20} color={colors.text} />
+          <Text style={{ color: colors.text, fontWeight: "700", fontSize: 16 }}>Continue with Google</Text>
+        </Pressable>
+
+        {/* Divider */}
+        <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md, marginVertical: spacing.md }}>
+          <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+          <Text style={{ color: colors.textMuted, fontSize: 13 }}>or</Text>
+          <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+        </View>
+
+        {/* Email options */}
+        <Button
+          label="Sign up with Email"
+          onPress={() => setMode("email_register")}
+          style={{ borderRadius: radius.lg, marginBottom: spacing.sm }}
         />
-      )}
-
-      {/* Google Sign In */}
-      <Pressable
-        onPress={handleGoogle}
-        style={{ backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: radius.lg, padding: spacing.lg, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.sm, marginBottom: spacing.md }}
-      >
-        <Ionicons name="logo-google" size={20} color={colors.text} />
-        <Text style={{ color: colors.text, fontWeight: "700", fontSize: 16 }}>Continue with Google</Text>
-      </Pressable>
-
-      {/* Divider */}
-      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md, marginVertical: spacing.md }}>
-        <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
-        <Text style={{ color: colors.textMuted, fontSize: 13 }}>or</Text>
-        <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
-      </View>
-
-      {/* Email options */}
-      <Pressable
-        onPress={() => setMode("email_register")}
-        style={{ backgroundColor: colors.primary, borderRadius: radius.lg, padding: spacing.lg, alignItems: "center", marginBottom: spacing.sm }}
-      >
-        <Text style={{ color: "#fff", fontWeight: "800", fontSize: 16 }}>Sign up with Email</Text>
-      </Pressable>
-      <Pressable
-        onPress={() => setMode("email_login")}
-        style={{ backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: radius.lg, padding: spacing.lg, alignItems: "center" }}
-      >
-        <Text style={{ color: colors.text, fontWeight: "700", fontSize: 16 }}>Sign in with Email</Text>
-      </Pressable>
+        <Button
+          label="Sign in with Email"
+          variant="secondary"
+          onPress={() => setMode("email_login")}
+          style={{ borderRadius: radius.lg }}
+        />
+      </FadeIn>
 
       <Text style={{ color: colors.textMuted, fontSize: 12, textAlign: "center", marginTop: spacing.lg }}>
         By continuing you agree to our Terms of Service and Privacy Policy.

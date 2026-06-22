@@ -3,19 +3,16 @@ import { useRouter } from "expo-router";
 import React from "react";
 import { ActivityIndicator, FlatList, Pressable, Text, View } from "react-native";
 
+import { FadeIn, Surface } from "@/components/ui";
 import { Notification, ShieldAPI } from "@/lib/api";
-import { colors, radius, spacing } from "@/theme/theme";
+import { colors, spacing } from "@/theme/theme";
 
 function NotifItem({ item, onPress }: { item: Notification; onPress: () => void }) {
   return (
-    <Pressable
+    <Surface
       onPress={onPress}
       style={{
         backgroundColor: item.is_read ? colors.bg : colors.surface,
-        borderColor: colors.border,
-        borderWidth: 1,
-        borderRadius: radius.md,
-        padding: spacing.md,
         marginBottom: spacing.sm,
         flexDirection: "row",
         alignItems: "flex-start",
@@ -35,7 +32,7 @@ function NotifItem({ item, onPress }: { item: Notification; onPress: () => void 
           {new Date(item.created_at).toLocaleString()}
         </Text>
       </View>
-    </Pressable>
+    </Surface>
   );
 }
 
@@ -88,7 +85,11 @@ export default function NotificationsScreen() {
         data={notifications ?? []}
         keyExtractor={(n) => n.id}
         contentContainerStyle={{ padding: spacing.md, paddingTop: unreadCount > 0 ? 0 : spacing.md }}
-        renderItem={({ item }) => <NotifItem item={item} onPress={() => handlePress(item)} />}
+        renderItem={({ item, index }) => (
+          <FadeIn delay={Math.min(index, 6) * 40}>
+            <NotifItem item={item} onPress={() => handlePress(item)} />
+          </FadeIn>
+        )}
         ListEmptyComponent={
           <Text style={{ color: colors.textMuted, textAlign: "center", marginTop: spacing.xl }}>
             No notifications yet.
