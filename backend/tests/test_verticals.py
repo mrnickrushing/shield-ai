@@ -171,3 +171,64 @@ def test_empty_input_rejected():
         headers=_auth_headers(),
     )
     assert r.status_code == 422
+
+
+def _user_id(headers: dict) -> str:
+    return client.get("/api/v1/auth/me", headers=headers).json()["id"]
+
+
+def test_vertical_scan_enforces_free_quota():
+    from app.core.config import settings
+    from app.models.models import ApiUsage
+
+    headers = _auth_headers()
+    uid = _user_id(headers)
+    # Pre-fill today's vertical usage up to the free limit.
+    db = TestingSession()
+    try:
+        for _ in range(settings.FREE_TIER_DAILY_SCANS):
+            db.add(ApiUsage(user_id=uid, provider="vertical"))
+        db.commit()
+    finally:
+        db.close()
+
+    r = client.post("/api/v1/verticals/job/scan", json={"input": "hello"}, headers=headers)
+    assert r.status_code == 429
+
+
+def test_vertical_scan_premium_bypasses_quota():
+    from app.core.config import settings
+    from app.models.models import ApiUsage, User
+
+    headers = _auth_headers()
+    uid = _user_id(headers)
+    db = TestingSession()
+    try:
+        db.get(User, uid).is_premium = True
+        for _ in range(settings.FREE_TIER_DAILY_SCANS + 2):
+            db.add(ApiUsage(user_id=uid, provider="vertical"))
+        db.commit()
+    finally:
+        db.close()
+
+    r = client.post("/api/v1/verticals/job/scan", json={"input": "hello"}, headers=headers)
+    assert r.status_code == 200
+
+
+def test_vertical_scan_records_usage():
+    from app.models.models import ApiUsage
+
+    headers = _auth_headers()
+    uid = _user_id(headers)
+    client.post("/api/v1/verticals/medbill/scan", json={"input": "Office visit $250.00"}, headers=headers)
+
+    db = TestingSession()
+    try:
+        count = (
+            db.query(ApiUsage)
+            .filter(ApiUsage.user_id == uid, ApiUsage.provider == "vertical")
+            .count()
+        )
+    finally:
+        db.close()
+    assert count == 1
