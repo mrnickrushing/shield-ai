@@ -20,7 +20,7 @@ class LLMConfig:
 _ROUTE_TABLE: dict[str, LLMConfig] = {
     # URL / link scans — factual, Safe Browsing is authoritative
     "link": LLMConfig(
-        model="gpt-4o-mini",
+        model="claude-haiku-4-5-20251001",
         temperature=0.1,
         max_tokens=512,
         system_hint=(
@@ -28,9 +28,9 @@ _ROUTE_TABLE: dict[str, LLMConfig] = {
             "Be concise and factual. Prioritize the deterministic signals provided."
         ),
     ),
-    # Screenshot / image — GPT-4o for best visual reasoning (vision call handled separately)
+    # Screenshot / image — Sonnet for best visual reasoning (vision call handled separately)
     "image": LLMConfig(
-        model="gpt-4o",
+        model="claude-sonnet-4-6",
         temperature=0.15,
         max_tokens=1024,
         system_hint=(
@@ -45,14 +45,14 @@ _ROUTE_TABLE: dict[str, LLMConfig] = {
     ),
     # QR codes decode to URLs — same profile as link
     "qr": LLMConfig(
-        model="gpt-4o-mini",
+        model="claude-haiku-4-5-20251001",
         temperature=0.1,
         max_tokens=512,
         system_hint="You are a cybersecurity analyst evaluating QR code destinations for phishing and malware.",
     ),
     # SMS / chat — social engineering needs strong reasoning
     "message": LLMConfig(
-        model="gpt-4o",
+        model="claude-sonnet-4-6",
         temperature=0.15,
         max_tokens=768,
         system_hint=(
@@ -66,7 +66,7 @@ _ROUTE_TABLE: dict[str, LLMConfig] = {
     ),
     # Email — complex analysis; needs highest reasoning
     "email": LLMConfig(
-        model="gpt-4o",
+        model="claude-sonnet-4-6",
         temperature=0.15,
         max_tokens=1024,
         system_hint=(
@@ -79,14 +79,14 @@ _ROUTE_TABLE: dict[str, LLMConfig] = {
     ),
     # Phone — short input, fast response
     "phone": LLMConfig(
-        model="gpt-4o-mini",
+        model="claude-haiku-4-5-20251001",
         temperature=0.1,
         max_tokens=384,
         system_hint="You are a cybersecurity analyst evaluating phone numbers for scam and spam reputation.",
     ),
     # Marketplace listings — fraud pattern recognition
     "marketplace": LLMConfig(
-        model="gpt-4o",
+        model="claude-sonnet-4-6",
         temperature=0.15,
         max_tokens=768,
         system_hint=(
@@ -98,7 +98,7 @@ _ROUTE_TABLE: dict[str, LLMConfig] = {
     ),
     # Social media — impersonation + investment fraud
     "social": LLMConfig(
-        model="gpt-4o",
+        model="claude-sonnet-4-6",
         temperature=0.15,
         max_tokens=768,
         system_hint=(
@@ -111,7 +111,7 @@ _ROUTE_TABLE: dict[str, LLMConfig] = {
 }
 
 _DEFAULT = LLMConfig(
-    model="gpt-4o-mini",
+    model="claude-haiku-4-5-20251001",
     temperature=0.2,
     max_tokens=512,
     system_hint="You are a cybersecurity analyst evaluating content for scams, phishing, and fraud.",

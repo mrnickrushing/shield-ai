@@ -550,7 +550,7 @@ def test_model_router_unknown_type_returns_default():
     from app.services import model_router
 
     cfg = model_router.get_config("unknown_type")
-    assert cfg.model == "gpt-4o-mini"
+    assert cfg.model == "claude-haiku-4-5-20251001"
 
 
 def test_threat_intel_matches_regex_pattern():
