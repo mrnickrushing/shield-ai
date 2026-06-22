@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { BottomTabBarButtonProps } from "@react-navigation/bottom-tabs";
 import * as SecureStore from "expo-secure-store";
 import { Tabs, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
@@ -8,11 +9,14 @@ import AppTour from "@/components/AppTour";
 import { PulseIcon } from "@/components/ui";
 import { colors, spacing } from "@/theme/theme";
 
-function ScanTabButton(props: any) {
-  const focused = props.accessibilityState?.selected ?? false;
+function ScanTabButton(props: BottomTabBarButtonProps) {
+  const { onPress, accessibilityState, ref, ...rest } = props;
+  const focused = accessibilityState?.selected ?? false;
   return (
     <Pressable
-      onPress={props.onPress}
+      {...rest}
+      onPress={onPress}
+      accessibilityState={accessibilityState}
       hitSlop={8}
       style={{ flex: 1, alignItems: "center", justifyContent: "flex-end", paddingBottom: 6 }}
     >
@@ -63,18 +67,18 @@ function ScanTabButton(props: any) {
 function TabButton({
   icon,
   label,
-  onPress,
-  accessibilityState,
+  ...props
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
-  onPress?: (e: any) => void;
-  accessibilityState?: { selected?: boolean };
-}) {
+} & BottomTabBarButtonProps) {
+  const { onPress, accessibilityState, ref, ...rest } = props;
   const focused = accessibilityState?.selected ?? false;
   return (
     <Pressable
+      {...rest}
       onPress={onPress}
+      accessibilityState={accessibilityState}
       hitSlop={8}
       style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 2 }}
     >
