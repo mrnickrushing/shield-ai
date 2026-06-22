@@ -89,6 +89,8 @@ export default function RootLayout() {
         <Stack.Screen name="browser" options={{ title: "Safe Browser", headerShown: false }} />
         <Stack.Screen name="share" options={{ title: "Report a Scam" }} />
         <Stack.Screen name="developer" options={{ title: "Developer" }} />
+        <Stack.Screen name="labs" options={{ title: "Shield Labs" }} />
+        <Stack.Screen name="vertical/[key]" options={{ title: "Shield Labs" }} />
       </Stack>
     </QueryClientProvider>
   );

@@ -72,9 +72,11 @@ def test_register_login_flow():
 
 
 def test_register_normalizes_email():
+    # Use a distinct local-part so this doesn't collide with the address
+    # registered in test_register_login_flow (shared in-memory DB).
     r = client.post(
         "/api/v1/auth/register",
-        json={"email": " TEST@Example.com ", "password": "supersecret1", "display_name": "Test"},
+        json={"email": " NORMALIZE@Example.com ", "password": "supersecret1", "display_name": "Test"},
     )
     assert r.status_code == 201, r.text
     me = client.get(
@@ -82,7 +84,7 @@ def test_register_normalizes_email():
         headers={"Authorization": f"Bearer {r.json()['access_token']}"},
     )
     assert me.status_code == 200
-    assert me.json()["email"] == "test@example.com"
+    assert me.json()["email"] == "normalize@example.com"
 
 
 def test_apple_social_auth_reuses_identity_without_email():
