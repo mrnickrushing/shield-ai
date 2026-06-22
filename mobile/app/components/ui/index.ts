@@ -5,4 +5,5 @@ export { Eyebrow } from "./Eyebrow";
 export { FadeIn } from "./FadeIn";
 export { GlowOrb } from "./GlowOrb";
 export { GradientLayer } from "./GradientLayer";
+export { PulseIcon } from "./PulseIcon";
 export { Surface } from "./Surface";
