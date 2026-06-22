@@ -35,10 +35,10 @@ All CNAMEs are DNS-only (not proxied — required for Railway TLS).
 ### Backend env vars (already set)
 `ENVIRONMENT=production`, `DEBUG=false`, `SECRET_KEY` (generated), `DATABASE_URL`
 (points at `postgres.railway.internal:5432`), `REDIS_URL` / `CELERY_*`
-(point at `redis.railway.internal:6379`), `OPENAI_MODEL=gpt-4o-mini`,
+(point at `redis.railway.internal:6379`), `ANTHROPIC_API_KEY` (set),
 `FREE_TIER_DAILY_SCANS=15`, `CORS_ORIGINS=["*"]`.
 
-**Still to add:** `OPENAI_API_KEY`, `GOOGLE_SAFE_BROWSING_KEY`,
+**Still to add:** `GOOGLE_SAFE_BROWSING_KEY`,
 `VIRUSTOTAL_API_KEY` (optional). Without these the app still runs — the LLM
 layer and Safe Browsing simply fall back gracefully (deterministic rules only).
 

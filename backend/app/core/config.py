@@ -33,8 +33,7 @@ class Settings(BaseSettings):
     CORS_ORIGINS: List[str] = ["*"]
 
     # --- Third-party detection APIs ---
-    OPENAI_API_KEY: str = ""
-    OPENAI_MODEL: str = "gpt-4o-mini"
+    ANTHROPIC_API_KEY: str = ""
     GOOGLE_SAFE_BROWSING_KEY: str = ""
     VIRUSTOTAL_API_KEY: str = ""
     GOOGLE_OAUTH_CLIENT_ID: str = ""

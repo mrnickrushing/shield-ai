@@ -94,7 +94,7 @@ def create_image_scan(
     db.refresh(scan)
 
     scan_service.process_image_scan(db, scan, image_bytes, storage_key=payload.filename)
-    db.add(ApiUsage(user_id=user.id, provider="openai"))
+    db.add(ApiUsage(user_id=user.id, provider="anthropic"))
     db.commit()
     db.refresh(scan)
     return scan
@@ -186,7 +186,7 @@ def create_message_scan(
     db.refresh(scan)
 
     scan_service.process_message_scan(db, scan, payload.message_text, payload.platform_hint)
-    db.add(ApiUsage(user_id=user.id, provider="openai"))
+    db.add(ApiUsage(user_id=user.id, provider="anthropic"))
     db.commit()
     db.refresh(scan)
     return scan
@@ -224,7 +224,7 @@ def create_email_scan(
         subject=payload.subject,
         body_text=payload.body_text,
     )
-    db.add(ApiUsage(user_id=user.id, provider="openai"))
+    db.add(ApiUsage(user_id=user.id, provider="anthropic"))
     db.commit()
     db.refresh(scan)
     return scan
@@ -271,7 +271,7 @@ def create_marketplace_scan(
     db.refresh(scan)
 
     scan_service.process_marketplace_scan(db, scan, payload.content_text, payload.platform_hint)
-    db.add(ApiUsage(user_id=user.id, provider="openai"))
+    db.add(ApiUsage(user_id=user.id, provider="anthropic"))
     db.commit()
     db.refresh(scan)
     return scan
@@ -293,7 +293,7 @@ def create_social_scan(
     db.refresh(scan)
 
     scan_service.process_social_scan(db, scan, payload.content_text, payload.platform)
-    db.add(ApiUsage(user_id=user.id, provider="openai"))
+    db.add(ApiUsage(user_id=user.id, provider="anthropic"))
     db.commit()
     db.refresh(scan)
     return scan

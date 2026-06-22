@@ -180,7 +180,7 @@ def process_image_scan(db: Session, scan: ScanHistory, image_bytes: bytes, stora
         "detected_brands": ocr_result["detected_brands"],
     }
 
-    # Try vision API first (GPT-4o sees the actual screenshot — most accurate).
+    # Try vision API first (Claude sees the actual screenshot — most accurate).
     # Fall back to text-based analysis if vision is unavailable.
     llm = ai_analyzer.analyze_image_with_vision(image_bytes, evidence)
     if llm is None:
