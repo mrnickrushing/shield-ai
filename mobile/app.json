@@ -2,6 +2,7 @@
   "expo": {
     "name": "Shield AI",
     "slug": "shield-ai",
+    "owner": "rushingtechnologies",
     "version": "0.2.0",
     "scheme": "shieldai",
     "orientation": "portrait",
