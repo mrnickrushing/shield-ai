@@ -128,7 +128,7 @@ def process_link_scan(db: Session, scan: ScanHistory, url: str) -> RiskReport:
     det_flags = list(dict.fromkeys(det_flags + ti_flags))
 
     llm = ai_analyzer.analyze(f"URL: {evidence['final_url']}", evidence, artifact_type="link")
-    report_data = risk_engine.combine(det_score, det_flags, "unknown", llm)
+    report_data = risk_engine.combine(det_score, det_flags, "unknown", llm, artifact_type="link")
 
     db.add(LinkScan(
         scan_id=scan.id,
@@ -149,9 +149,19 @@ def process_image_scan(db: Session, scan: ScanHistory, image_bytes: bytes, stora
 
     ocr_result = ocr.analyze_screenshot(image_bytes)
     text = ocr_result["ocr_text"]
+    ocr_failed = not ocr_result.get("ocr_available", True)
     scan.raw_input = text[:2000]
 
     text_score, text_flags, category = risk_engine.score_text_evidence(text)
+
+    # Brand impersonation: brand name + account-action language → deterministic signal
+    brand_score, brand_flags = risk_engine.score_brand_impersonation(
+        text, ocr_result["detected_brands"]
+    )
+    text_score = min(text_score + brand_score, 100)
+    text_flags = list(dict.fromkeys(text_flags + brand_flags))
+    if brand_score > 0 and category == "unknown":
+        category = "impersonation"
 
     ti_boost, ti_flags = threat_intel.check_patterns(db, text, "image")
     text_score = min(text_score + ti_boost, 100)
@@ -169,15 +179,24 @@ def process_image_scan(db: Session, scan: ScanHistory, image_bytes: bytes, stora
         "url": url_evidence,
         "detected_brands": ocr_result["detected_brands"],
     }
-    llm = ai_analyzer.analyze(text, {**evidence, "extracted_text": text[:2000]}, artifact_type="image")
-    report_data = risk_engine.combine(text_score, text_flags, category, llm)
+
+    # Try vision API first (Claude sees the actual screenshot — most accurate).
+    # Fall back to text-based analysis if vision is unavailable.
+    llm = ai_analyzer.analyze_image_with_vision(image_bytes, evidence)
+    if llm is None:
+        llm = ai_analyzer.analyze(text, {**evidence, "extracted_text": text[:2000]}, artifact_type="image")
+
+    report_data = risk_engine.combine(
+        text_score, text_flags, category, llm,
+        artifact_type="image", ocr_failed=ocr_failed,
+    )
 
     db.add(ImageScan(
         scan_id=scan.id,
         storage_key=storage_key,
         ocr_text=text,
         detected_brands=ocr_result["detected_brands"],
-        metadata_json={"char_count": ocr_result["char_count"]},
+        metadata_json={"char_count": ocr_result["char_count"], "ocr_available": not ocr_failed},
     ))
     return _finalize(db, scan, report_data, evidence)
 
@@ -216,7 +235,7 @@ def process_qr_scan(db: Session, scan: ScanHistory, qr_content: str) -> RiskRepo
     det_flags = list(dict.fromkeys(det_flags + ti_flags))
 
     llm = ai_analyzer.analyze(f"QR code content: {qr_content}", evidence, artifact_type="qr")
-    report_data = risk_engine.combine(det_score, det_flags, category, llm)
+    report_data = risk_engine.combine(det_score, det_flags, category, llm, artifact_type="qr")
 
     db.add(QRScan(
         scan_id=scan.id,
@@ -256,7 +275,7 @@ def process_message_scan(db: Session, scan: ScanHistory, message_text: str, plat
 
     full_evidence = {**msg_ev, "url": url_evidence}
     llm = ai_analyzer.analyze(message_text[:4000], full_evidence, artifact_type="message")
-    report_data = risk_engine.combine(det_score, det_flags, category, llm)
+    report_data = risk_engine.combine(det_score, det_flags, category, llm, artifact_type="message")
 
     db.add(MessageScan(
         scan_id=scan.id,
@@ -330,7 +349,7 @@ def process_email_scan(
         f"Reply-To: {reply_to_email or ''}\nBody:\n{body[:3000]}"
     )
     llm = ai_analyzer.analyze(content_for_llm, full_evidence, artifact_type="email")
-    report_data = risk_engine.combine(det_score, det_flags, category, llm)
+    report_data = risk_engine.combine(det_score, det_flags, category, llm, artifact_type="email")
 
     # Re-read parsed fields from email_ev signals in case raw_email was parsed
     sig = email_ev.get("signals", {})
@@ -376,7 +395,7 @@ def process_phone_scan(db: Session, scan: ScanHistory, phone_number: str) -> Ris
     det_flags = list(dict.fromkeys(det_flags + ti_flags))
 
     llm = ai_analyzer.analyze(f"Phone number: {phone_number}", phone_ev, artifact_type="phone")
-    report_data = risk_engine.combine(det_score, det_flags, category, llm)
+    report_data = risk_engine.combine(det_score, det_flags, category, llm, artifact_type="phone")
 
     db.add(PhoneScan(
         scan_id=scan.id,
@@ -438,7 +457,7 @@ def process_marketplace_scan(db: Session, scan: ScanHistory, content_text: str, 
         full_evidence,
         artifact_type="marketplace",
     )
-    report_data = risk_engine.combine(det_score, det_flags, category, llm)
+    report_data = risk_engine.combine(det_score, det_flags, category, llm, artifact_type="marketplace")
 
     db.add(MarketplaceScan(
         scan_id=scan.id,
@@ -494,7 +513,7 @@ def process_social_scan(db: Session, scan: ScanHistory, content_text: str, platf
         full_evidence,
         artifact_type="social",
     )
-    report_data = risk_engine.combine(det_score, det_flags, category, llm)
+    report_data = risk_engine.combine(det_score, det_flags, category, llm, artifact_type="social")
 
     db.add(SocialScan(
         scan_id=scan.id,

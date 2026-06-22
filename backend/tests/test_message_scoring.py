@@ -63,3 +63,45 @@ def test_benign_appointment_reminder_is_safe():
         "Reminder: your dentist appointment is tomorrow at 3pm. Reply C to confirm."
     )
     assert level in ("safe", "low")
+
+
+def test_toll_scam_smishing_is_at_least_suspicious():
+    score, level = _deterministic_score(
+        "E-ZPass: You have an unpaid toll balance. Pay the fee now to avoid "
+        "additional fines: http://ezpass-toll-pay.top"
+    )
+    assert level in ("suspicious", "high", "critical")
+
+
+def test_tech_support_scam_escalates():
+    score, level = _deterministic_score(
+        "SECURITY ALERT: Your computer is infected with a virus. Call Microsoft "
+        "support immediately and allow remote access via TeamViewer to fix it."
+    )
+    assert score >= 60
+    assert level in ("high", "critical")
+
+
+def test_family_emergency_scam_escalates():
+    score, level = _deterministic_score(
+        "Mom this is my new number, I lost my old phone. I'm in jail and need "
+        "bail money right away, please don't tell dad."
+    )
+    assert level in ("suspicious", "high", "critical")
+
+
+def test_bec_ceo_fraud_escalates():
+    score, level = _deterministic_score(
+        "Are you available right now? I need a favor, keep this between us. "
+        "Need you to buy gift cards urgent, I'll explain later.",
+        hint="email",
+    )
+    assert level in ("suspicious", "high", "critical")
+
+
+def test_bank_alert_smishing_is_at_least_suspicious():
+    score, level = _deterministic_score(
+        "Did you authorize a charge of $843.00 at Best Buy? Reply YES to "
+        "confirm or NO to cancel and lock your card."
+    )
+    assert level in ("suspicious", "high", "critical")

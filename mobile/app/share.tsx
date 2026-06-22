@@ -13,6 +13,7 @@ import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Text, View } from "react-native";
 
+import { Button, FadeIn, Surface } from "@/components/ui";
 import { ShieldAPI } from "@/lib/api";
 import { colors, spacing } from "@/theme/theme";
 
@@ -81,20 +82,19 @@ export default function ShareScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg, justifyContent: "center", alignItems: "center", padding: spacing.lg }}>
       {error ? (
-        <>
-          <Text style={{ color: colors.critical, textAlign: "center", marginBottom: spacing.md }}>{error}</Text>
-          <Text
-            onPress={() => router.replace("/")}
-            style={{ color: colors.primary }}
-          >
-            Go to app
-          </Text>
-        </>
+        <FadeIn>
+          <Surface accent={colors.critical} style={{ alignItems: "center" }}>
+            <Text style={{ color: colors.critical, textAlign: "center", marginBottom: spacing.md }}>{error}</Text>
+            <Button label="Go to app" onPress={() => router.replace("/")} />
+          </Surface>
+        </FadeIn>
       ) : (
-        <>
-          <ActivityIndicator color={colors.primaryBright} size="large" />
-          <Text style={{ color: colors.textMuted, marginTop: spacing.md }}>{status}</Text>
-        </>
+        <FadeIn>
+          <View style={{ alignItems: "center" }}>
+            <ActivityIndicator color={colors.primaryBright} size="large" />
+            <Text style={{ color: colors.textMuted, marginTop: spacing.md }}>{status}</Text>
+          </View>
+        </FadeIn>
       )}
     </View>
   );

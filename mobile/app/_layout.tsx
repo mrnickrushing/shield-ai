@@ -1,6 +1,6 @@
 import Constants from "expo-constants";
 import * as Notifications from "expo-notifications";
-import { useUpdates } from "expo-updates";
+import { reloadAsync, useUpdates } from "expo-updates";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -58,7 +58,7 @@ export default function RootLayout() {
   const { isUpdatePending } = useUpdates();
   useEffect(() => {
     if (!__DEV__ && isUpdatePending) {
-      import("expo-updates").then(({ reloadAsync }) => reloadAsync()).catch(() => {});
+      reloadAsync().catch(() => {});
     }
   }, [isUpdatePending]);
 

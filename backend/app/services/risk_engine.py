@@ -3,6 +3,10 @@
 Combines deterministic signals (weighted, explainable) with optional LLM
 output. The final score is a blend so the system never relies on prompting
 alone — a core Phase 1 safety principle.
+
+Blend weights are artifact-type-aware: URL/QR/phone favor deterministic
+signals (Safe Browsing is authoritative); image/message/social favor the LLM
+(OCR and keyword matching are error-prone, LLM reasoning is more reliable).
 """
 from __future__ import annotations
 
@@ -19,6 +23,8 @@ URGENCY_PATTERNS = [
     r"verify (your )?(account|identity|details|information)?", r"verify now",
     r"unusual activity", r"suspicious activity", r"confirm your identity",
     r"last warning", r"lose access", r"avoid (suspension|deactivation)",
+    r"legal action", r"lawsuit", r"court order", r"warrant.*(arrest|issued)",
+    r"failure to (respond|comply)", r"data loss", r"permanently delet",
 ]
 CREDENTIAL_PATTERNS = [
     r"enter your password", r"log ?in to (confirm|verify)", r"sign ?in to (confirm|verify)",
@@ -26,11 +32,18 @@ CREDENTIAL_PATTERNS = [
     r"social security", r"\bssn\b", r"bank(ing)? (details|account)",
     r"card (number|details)", r"one[- ]time (code|password)",
     r"\botp\b", r"seed phrase", r"private key", r"wallet recovery",
-    r"verification code", r"security code",
+    r"verification code", r"security code", r"renew your subscription",
+    r"update your (billing|account|subscription)",
 ]
 PAYMENT_SCAM_PATTERNS = [
     r"gift card", r"google play card", r"wire transfer", r"bitcoin", r"crypto",
     r"zelle", r"venmo", r"cash app", r"western union", r"refund of \$",
+    r"moneygram", r"apple pay.*(friend|stranger)", r"paypal.*friends and family",
+]
+# Fake virus alert / remote-access tech-support scam language.
+TECH_SUPPORT_PATTERNS = [
+    r"computer.*(infected|compromised)", r"virus.*detected", r"security alert.*windows",
+    r"call.*(microsoft|apple|amazon).*support", r"remote access", r"teamviewer", r"anydesk",
 ]
 
 # (signal_key, points, human-readable flag)
@@ -52,8 +65,35 @@ THREAT_CATEGORIES = {
     "impersonation": "Brand Impersonation",
     "malware": "Malicious Site",
     "social_engineering": "Social Engineering",
+    "tech_support_scam": "Tech Support Scam",
     "unknown": "Unclassified",
 }
+
+# Blend weights (deterministic_weight, llm_weight) by artifact type.
+# For signals where deterministic is authoritative (URLs, Safe Browsing) we
+# give it more weight. For artifacts where OCR / keyword matching is unreliable
+# (images, chat messages, social) we trust the LLM more.
+_BLEND_WEIGHTS: dict[str, tuple[float, float]] = {
+    "link":        (0.60, 0.40),
+    "qr":          (0.60, 0.40),
+    "phone":       (0.65, 0.35),
+    "email":       (0.45, 0.55),
+    "message":     (0.35, 0.65),
+    "image":       (0.25, 0.75),
+    "marketplace": (0.40, 0.60),
+    "social":      (0.35, 0.65),
+}
+_DEFAULT_BLEND = (0.45, 0.55)
+
+# Brand impersonation: keywords indicating the message is taking action on
+# an account at a well-known brand. Combined with a brand detection, this is
+# a strong impersonation signal even without a URL present.
+_ACCOUNT_ACTION_RE = re.compile(
+    r"(suspend|lock|clos|disabl|restrict|freez|limit|verif|confirm|updat"
+    r"|unauthori|unusual|suspicious|secur|alert|notice|action required"
+    r"|account|password|sign.?in|log.?in)",
+    re.IGNORECASE,
+)
 
 
 def _match_any(text: str, patterns: list[str]) -> list[str]:
@@ -77,6 +117,21 @@ def score_url_evidence(ev: dict) -> tuple[int, list[str]]:
                 msg = f"Domain imitates '{val}' (possible typosquatting)."
             flags.append(msg)
     return score, flags
+
+
+def score_brand_impersonation(text: str, detected_brands: list[str]) -> tuple[int, list[str]]:
+    """Detect brand impersonation: a well-known brand is named alongside
+    account-action language. This is a strong deterministic signal even when
+    no URL or Safe Browsing hit is present."""
+    if not detected_brands:
+        return 0, []
+    if _ACCOUNT_ACTION_RE.search(text or ""):
+        brand_list = ", ".join(b.title() for b in detected_brands)
+        return 40, [
+            f"Mentions {brand_list} alongside account-action language — "
+            "possible brand impersonation or phishing."
+        ]
+    return 0, []
 
 
 # A legitimately-delivered one-time code ("your code is 123456") is NOT a
@@ -104,9 +159,9 @@ def score_text_evidence(text: str) -> tuple[int, list[str], str]:
     urgency = _match_any(text, URGENCY_PATTERNS)
     creds = _match_any(text, CREDENTIAL_PATTERNS)
     payment = _match_any(text, PAYMENT_SCAM_PATTERNS)
+    tech_support = _match_any(text, TECH_SUPPORT_PATTERNS)
 
     if benign_code_delivery:
-        # Looks like a real delivered code with no phishing ask — don't score.
         return 0, [], "unknown"
 
     if urgency:
@@ -121,19 +176,32 @@ def score_text_evidence(text: str) -> tuple[int, list[str], str]:
         score += 30
         flags.append("Asks for payment via untraceable methods (gift cards, crypto, wire).")
         category = "payment_fraud"
+    if tech_support:
+        score += 35
+        flags.append("Matches tech-support scam patterns (fake virus alert, remote-access request).")
+        category = "tech_support_scam"
+
+    # Compound boost: urgency + credential request together is a stronger signal
+    if urgency and creds:
+        score += 15
+        flags.append("Combines urgency with a credential request — classic phishing pattern.")
+
     return score, flags, category
 
 
 # Message-level signal weights (from message_analyzer.analyze_message signals).
-# These give the deterministic engine real teeth on pasted SMS/chat content,
-# independent of whether an embedded URL is in a threat database yet.
 MESSAGE_SIGNAL_WEIGHTS = [
     ("authority_impersonation", 40, "Impersonates a government agency, bank, or official authority."),
+    ("tech_support_scam_signals", 35, "Matches tech-support scam patterns (fake virus alert, remote-access request)."),
+    ("family_emergency_signals", 35, "Matches family-emergency / 'grandparent scam' patterns demanding urgent money."),
+    ("bec_signals", 35, "Matches business email compromise / CEO-fraud pretexting patterns."),
     ("delivery_scam_signals", 30, "Matches delivery / package-fee scam patterns."),
     ("prize_scam_signals", 30, "Claims you won a prize or reward (advance-fee pattern)."),
     ("romance_scam_signals", 30, "Matches romance / investment scam patterns."),
     ("job_scam_signals", 25, "Contains job / quick-money scam indicators."),
     ("sms_with_link", 25, "Unsolicited SMS containing a clickable link (common smishing tactic)."),
+    ("toll_scam_signals", 30, "Matches fake unpaid-toll smishing patterns (E-ZPass/FasTrak/SunPass impersonation)."),
+    ("bank_alert_smishing_signals", 30, "Mimics a bank fraud alert to bait a reply, a common smishing setup."),
     ("has_urgency", 15, "Uses urgency or time pressure to force a quick decision."),
 ]
 
@@ -149,13 +217,13 @@ def score_message_signals(signals: dict) -> tuple[int, list[str]]:
 
 
 def level_for_score(score: int) -> RiskLevel:
-    if score >= 80:
+    if score >= 75:
         return RiskLevel.critical
-    if score >= 60:
+    if score >= 55:
         return RiskLevel.high
-    if score >= 35:
+    if score >= 30:
         return RiskLevel.suspicious
-    if score >= 15:
+    if score >= 12:
         return RiskLevel.low
     return RiskLevel.safe
 
@@ -170,6 +238,8 @@ def default_actions(level: RiskLevel, category: str) -> list[str]:
             base.append("Never pay with gift cards, crypto, or wire transfers on demand.")
         if category in ("credential_theft", "impersonation"):
             base.append("Contact the company directly using a number from their official website.")
+        if category == "tech_support_scam":
+            base.append("Never give a stranger remote access to your device. Hang up and call the real company's official support line yourself.")
         base.append("Delete the message and report it to the platform it came from.")
         return base
     if level == RiskLevel.suspicious:
@@ -191,24 +261,68 @@ def combine(
     deterministic_flags: list[str],
     category: str,
     llm: dict | None,
+    artifact_type: str = "unknown",
+    ocr_failed: bool = False,
 ) -> dict:
-    """Blend deterministic score with optional LLM assessment."""
+    """Blend deterministic score with optional LLM assessment.
+
+    Weights are artifact-type-aware — see _BLEND_WEIGHTS. A safety floor
+    prevents the LLM's clear scam signal from being buried by a low
+    deterministic score when keyword matching failed.
+    """
     det = min(deterministic_score, 100)
     flags = list(dict.fromkeys(deterministic_flags))
     confidence = 0.6 if det > 0 else 0.4
     explanation = ""
     final = det
 
+    if ocr_failed:
+        flags.append("Image text could not be fully extracted — visual analysis may be incomplete.")
+        confidence = min(confidence, 0.4)
+
     if llm:
         llm_score = int(llm.get("risk_score", det))
-        # Weighted blend: deterministic gets priority, LLM nudges + explains.
-        final = round(0.6 * det + 0.4 * llm_score)
+        det_w, llm_w = _BLEND_WEIGHTS.get(artifact_type, _DEFAULT_BLEND)
+        final = round(det_w * det + llm_w * llm_score)
+
+        # Safety floor: if the LLM is highly confident about a scam but the
+        # deterministic engine missed it (keyword matching is brittle), don't
+        # let the blend bury a genuine threat below "suspicious".
+        llm_conf = float(llm.get("confidence", 0))
+        if llm_score >= 70 and llm_conf >= 0.65 and final < 35:
+            final = 35
+        # Stronger floor: LLM says critical-level threat at high confidence
+        if llm_score >= 85 and llm_conf >= 0.75 and final < 55:
+            final = 55
+
         category = llm.get("threat_category", category) or category
         confidence = float(llm.get("confidence", confidence))
+        if ocr_failed:
+            confidence = min(confidence, 0.5)
         explanation = llm.get("explanation", "")
         for f in llm.get("red_flags", []):
             if f not in flags:
                 flags.append(f)
+    else:
+        # LLM unavailable — note degraded analysis so user knows score may be low
+        if det == 0:
+            explanation = (
+                "Automated checks found no clear signals, but full AI analysis was unavailable. "
+                "If anything about this feels off, treat it as suspicious."
+            )
+            confidence = 0.2
+        else:
+            explanation = (
+                "Assessment based on automated security checks. "
+                "Full AI analysis was unavailable — review the red flags below before acting."
+            )
+            confidence = min(confidence, 0.5)
+            # Safety floor: when AI analysis didn't run, deterministic keyword
+            # matching is the only signal we have, and it's brittle (OCR noise,
+            # phrasing variation). Don't let a sparse match alone produce a
+            # falsely reassuring "looks mostly okay" verdict — at least one
+            # real flag with no AI corroboration should read as "suspicious".
+            final = max(final, 30)
 
     final = max(0, min(final, 100))
     level = level_for_score(final)

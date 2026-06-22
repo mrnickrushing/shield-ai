@@ -5,8 +5,9 @@ import React from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { Eyebrow, FadeIn, GlowOrb, Surface } from "@/components/ui";
 import { ShieldAPI } from "@/lib/api";
-import { colors, radius, shadow, spacing } from "@/theme/theme";
+import { colors, radius, shadow, spacing, withAlpha } from "@/theme/theme";
 
 type FeatureCardProps = {
   icon: keyof typeof Ionicons.glyphMap;
@@ -60,22 +61,6 @@ const PRIMARY_LANES: ProtectLane[] = [
   },
 ];
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <Text
-      style={{
-        color: colors.textDim,
-        fontSize: 11,
-        fontWeight: "800",
-        letterSpacing: 1.2,
-        marginBottom: spacing.sm,
-      }}
-    >
-      {children}
-    </Text>
-  );
-}
-
 function FeatureCard({
   icon,
   color,
@@ -106,9 +91,9 @@ function FeatureCard({
     >
       <View
         style={{
-          backgroundColor: `${color}18`,
+          backgroundColor: withAlpha(color, "18"),
           borderBottomWidth: 1,
-          borderBottomColor: `${color}30`,
+          borderBottomColor: withAlpha(color, "30"),
           padding: spacing.md,
           height: 68,
           flexDirection: "row",
@@ -121,7 +106,7 @@ function FeatureCard({
             width: 40,
             height: 40,
             borderRadius: radius.md,
-            backgroundColor: `${color}28`,
+            backgroundColor: withAlpha(color, "28"),
             alignItems: "center",
             justifyContent: "center",
           }}
@@ -132,7 +117,7 @@ function FeatureCard({
           {tag ? (
             <View
               style={{
-                backgroundColor: `${color}22`,
+                backgroundColor: withAlpha(color, "22"),
                 borderRadius: radius.pill,
                 paddingHorizontal: spacing.sm,
                 paddingVertical: 3,
@@ -211,144 +196,133 @@ export default function ProtectScreen() {
           paddingBottom: spacing.xxl,
         }}
       >
-        <View
-          style={{
-            backgroundColor: colors.surface,
-            borderRadius: 24,
-            borderWidth: 1,
-            borderColor: `${colors.primaryBright}33`,
-            padding: spacing.lg,
-            overflow: "hidden",
-            marginBottom: spacing.lg,
-          }}
-        >
-          <View
-            style={{
-              position: "absolute",
-              width: 190,
-              height: 190,
-              borderRadius: 95,
-              backgroundColor: `${colors.primaryBright}14`,
-              top: -60,
-              right: -45,
-            }}
-          />
-          <View
-            style={{
-              alignSelf: "flex-start",
-              backgroundColor: `${colors.primaryBright}1f`,
-              borderRadius: radius.pill,
-              paddingHorizontal: spacing.sm,
-              paddingVertical: 6,
-              marginBottom: spacing.md,
-            }}
-          >
-            <Text style={{ color: colors.primaryBright, fontSize: 12, fontWeight: "800", letterSpacing: 1 }}>
-              DEFENSE GRID
-            </Text>
-          </View>
+        <FadeIn>
+          <Surface accent={colors.primaryBright} glow={withAlpha(colors.primary, "30")} style={{ marginBottom: spacing.lg, position: "relative" }}>
+            <GlowOrb color={colors.primaryBright} size={220} opacity={0.28} style={{ top: -70, right: -50 }} />
 
-          <Text style={{ color: colors.text, fontSize: 29, fontWeight: "900", letterSpacing: -1, marginBottom: 8 }}>
-            Put a buffer between you and the next scam.
-          </Text>
-          <Text style={{ color: colors.textMuted, fontSize: 14, lineHeight: 22, marginBottom: spacing.lg }}>
-            These tools are your proactive layer: inspect risky links, protect family, monitor identity exposure, and sharpen your scam radar before pressure hits.
-          </Text>
-
-          <View
-            style={{
-              backgroundColor: colors.bg,
-              borderWidth: 1,
-              borderColor: `${colors.primaryBright}2a`,
-              borderRadius: radius.lg,
-              padding: spacing.md,
-            }}
-          >
-            <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, marginBottom: 6 }}>
-              <View
-                style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 18,
-                  backgroundColor: `${colors.primaryBright}22`,
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <Ionicons name="shield-half-outline" size={18} color={colors.primaryBright} />
-              </View>
-              <Text style={{ color: colors.text, fontSize: 17, fontWeight: "800", flex: 1 }}>
-                Your response tools are ready.
-              </Text>
-            </View>
-            <Text style={{ color: colors.textMuted, fontSize: 13, lineHeight: 20 }}>
-              {unreadAlerts > 0
-                ? `You currently have ${unreadAlerts} unread identity alert${unreadAlerts === 1 ? "" : "s"}. Start there, then harden the rest of your routine.`
-                : "No unread identity alerts right now. This is the place to pressure-test risky situations before they turn into cleanup work."}
-            </Text>
-          </View>
-        </View>
-
-        <SectionLabel>START HERE</SectionLabel>
-        <View style={{ marginBottom: spacing.lg }}>
-          <FeatureCard
-            icon="shield-checkmark-outline"
-            color={colors.primaryBright}
-            title="Identity Protection"
-            body="Check breach exposure, review alerts, and get the next move when your identity posture changes."
-            badge={unreadAlerts}
-            tag={unreadAlerts > 0 ? "NEEDS REVIEW" : "MONITORING"}
-            onPress={() => router.push("/identity")}
-            wide
-          />
-        </View>
-
-        <SectionLabel>PROACTIVE TOOLS</SectionLabel>
-        <View
-          style={{
-            flexDirection: "row",
-            flexWrap: "wrap",
-            marginHorizontal: -6,
-            marginBottom: spacing.lg,
-          }}
-        >
-          {primaryLanes.map((lane) => (
             <View
-              key={lane.id}
               style={{
-                width: "50%",
-                paddingHorizontal: 6,
+                alignSelf: "flex-start",
+                backgroundColor: withAlpha(colors.primaryBright, "1f"),
+                borderRadius: radius.pill,
+                paddingHorizontal: spacing.sm,
+                paddingVertical: 6,
                 marginBottom: spacing.md,
               }}
             >
-              <FeatureCard {...lane} compact />
+              <Text style={{ color: colors.primaryBright, fontSize: 12, fontWeight: "800", letterSpacing: 1 }}>
+                DEFENSE GRID
+              </Text>
             </View>
-          ))}
-        </View>
 
-        <SectionLabel>STAY SHARP</SectionLabel>
-        <View style={{ gap: spacing.md }}>
-          <FeatureCard
-            icon="globe-outline"
-            color={colors.accent}
-            title="Community Intel"
-            body="See the scam patterns people are reporting so you recognize the playbook faster."
-            tag="LIVE"
-            onPress={() => router.push("/community")}
-            wide
-          />
-          <FeatureCard
-            icon="book-outline"
-            color={colors.safe}
-            title="Education Center"
-            body="Short lessons that build pattern recognition before risky requests start feeling urgent."
-            onPress={() => router.push("/education")}
-            wide
-          />
-        </View>
+            <Text style={{ color: colors.text, fontSize: 29, fontWeight: "900", letterSpacing: -1, marginBottom: 8 }}>
+              Put a buffer between you and the next scam.
+            </Text>
+            <Text style={{ color: colors.textMuted, fontSize: 14, lineHeight: 22, marginBottom: spacing.lg }}>
+              These tools are your proactive layer: inspect risky links, protect family, monitor identity exposure, and sharpen your scam radar before pressure hits.
+            </Text>
 
-        <View style={{ marginTop: spacing.lg }}>
-          <SectionLabel>SHIELD LABS</SectionLabel>
+            <View
+              style={{
+                backgroundColor: colors.bg,
+                borderWidth: 1,
+                borderColor: withAlpha(colors.primaryBright, "2a"),
+                borderRadius: radius.lg,
+                padding: spacing.md,
+              }}
+            >
+              <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, marginBottom: 6 }}>
+                <View
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 18,
+                    backgroundColor: withAlpha(colors.primaryBright, "22"),
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Ionicons name="shield-half-outline" size={18} color={colors.primaryBright} />
+                </View>
+                <Text style={{ color: colors.text, fontSize: 17, fontWeight: "800", flex: 1 }}>
+                  Your response tools are ready.
+                </Text>
+              </View>
+              <Text style={{ color: colors.textMuted, fontSize: 13, lineHeight: 20 }}>
+                {unreadAlerts > 0
+                  ? `You currently have ${unreadAlerts} unread identity alert${unreadAlerts === 1 ? "" : "s"}. Start there, then harden the rest of your routine.`
+                  : "No unread identity alerts right now. This is the place to pressure-test risky situations before they turn into cleanup work."}
+              </Text>
+            </View>
+          </Surface>
+        </FadeIn>
+
+        <FadeIn delay={60}>
+          <Eyebrow style={{ marginBottom: spacing.sm }}>START HERE</Eyebrow>
+          <View style={{ marginBottom: spacing.lg }}>
+            <FeatureCard
+              icon="shield-checkmark-outline"
+              color={colors.primaryBright}
+              title="Identity Protection"
+              body="Check breach exposure, review alerts, and get the next move when your identity posture changes."
+              badge={unreadAlerts}
+              tag={unreadAlerts > 0 ? "NEEDS REVIEW" : "MONITORING"}
+              onPress={() => router.push("/identity")}
+              wide
+            />
+          </View>
+        </FadeIn>
+
+        <FadeIn delay={100}>
+          <Eyebrow style={{ marginBottom: spacing.sm }}>PROACTIVE TOOLS</Eyebrow>
+          <View
+            style={{
+              flexDirection: "row",
+              flexWrap: "wrap",
+              marginHorizontal: -6,
+              marginBottom: spacing.lg,
+            }}
+          >
+            {primaryLanes.map((lane) => (
+              <View
+                key={lane.id}
+                style={{
+                  width: "50%",
+                  paddingHorizontal: 6,
+                  marginBottom: spacing.md,
+                }}
+              >
+                <FeatureCard {...lane} compact />
+              </View>
+            ))}
+          </View>
+        </FadeIn>
+
+        <FadeIn delay={140}>
+          <Eyebrow style={{ marginBottom: spacing.sm }}>STAY SHARP</Eyebrow>
+          <View style={{ gap: spacing.md }}>
+            <FeatureCard
+              icon="globe-outline"
+              color={colors.accent}
+              title="Community Intel"
+              body="See the scam patterns people are reporting so you recognize the playbook faster."
+              tag="LIVE"
+              onPress={() => router.push("/community")}
+              wide
+            />
+            <FeatureCard
+              icon="book-outline"
+              color={colors.safe}
+              title="Education Center"
+              body="Short lessons that build pattern recognition before risky requests start feeling urgent."
+              onPress={() => router.push("/education")}
+              wide
+            />
+          </View>
+        </FadeIn>
+
+        <FadeIn delay={180}>
+          <Eyebrow style={{ marginBottom: spacing.sm }}>SHIELD LABS</Eyebrow>
           <FeatureCard
             icon="flask-outline"
             color={colors.primaryBright}
@@ -358,7 +332,7 @@ export default function ProtectScreen() {
             onPress={() => router.push("/labs")}
             wide
           />
-        </View>
+        </FadeIn>
       </ScrollView>
     </View>
   );

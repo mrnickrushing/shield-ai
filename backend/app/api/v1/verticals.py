@@ -23,16 +23,20 @@ from app.verticals import get_vertical, list_verticals, run_vertical
 router = APIRouter(prefix="/verticals", tags=["verticals"])
 
 
-def _check_vertical_quota(db: Session, user: User) -> None:
-    """Free accounts get a bounded number of vertical analyses per day.
+def _consume_vertical_quota(db: Session, user: User) -> None:
+    """Atomically enforce + record one free-tier vertical analysis per day.
 
     Metered on its own ApiUsage bucket (provider="vertical") so it needs no new
-    table; Premium bypasses. This can be unified with the /scans daily allowance
-    once vertical scans persist to scan_history.
+    table; Premium bypasses. The user row is locked for the check+insert so a
+    concurrent burst can't both pass the check and exceed FREE_TIER_DAILY_SCANS
+    (SELECT ... FOR UPDATE is a harmless no-op on SQLite for the test suite).
+    This can unify with the /scans allowance once vertical scans persist.
     """
     if user.is_premium:
         return
     start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    # Serialize concurrent vertical scans for this user before counting usage.
+    db.query(User).filter(User.id == user.id).with_for_update().one()
     used = (
         db.query(ApiUsage)
         .filter(
@@ -43,10 +47,13 @@ def _check_vertical_quota(db: Session, user: User) -> None:
         .count()
     )
     if used >= settings.FREE_TIER_DAILY_SCANS:
+        db.rollback()
         raise HTTPException(
             status.HTTP_429_TOO_MANY_REQUESTS,
             "Daily free scan limit reached. Upgrade to Premium for unlimited scans.",
         )
+    db.add(ApiUsage(user_id=user.id, provider="vertical"))
+    db.commit()
 
 
 @router.get("", response_model=list[VerticalInfo])
@@ -78,8 +85,5 @@ def scan(
     spec = get_vertical(key)
     if not spec:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"Unknown vertical: {key}")
-    _check_vertical_quota(db, user)
-    verdict = run_vertical(spec, payload.input, payload.context)
-    db.add(ApiUsage(user_id=user.id, provider="vertical"))
-    db.commit()
-    return verdict
+    _consume_vertical_quota(db, user)
+    return run_vertical(spec, payload.input, payload.context)

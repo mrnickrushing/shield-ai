@@ -9,6 +9,9 @@ _MONEY = re.compile(r"\$\s?(\d[\d,]*(?:\.\d{2})?)")
 _CPT = re.compile(r"\b\d{5}\b")
 _OON = re.compile(r"out[- ]of[- ]network|balance bill|not covered|non[- ]covered", re.I)
 _DUP_HINT = re.compile(r"duplicate|billed twice|same (charge|service)", re.I)
+_TOTAL_AMOUNT = re.compile(
+    r"(?im)\b(?:total|amount due|balance due)\b[^\n$]{0,30}\$\s?(\d[\d,]*(?:\.\d{2})?)"
+)
 
 
 def _amounts(text: str) -> list[float]:
@@ -44,10 +47,16 @@ def analyze(text: str, ctx: dict) -> VerticalResult:
         if category == "unknown":
             category = "balance_billing"
 
-    # Simple math check: treat the largest amount as the stated total.
-    if len(amounts) >= 3:
-        total = max(amounts)
-        rest = sum(a for a in amounts if a != total)
+    # Math check anchored to an explicit "total / amount due / balance due" line.
+    # Without a stated total, a normal itemized bill would always look like an
+    # overcharge (line items naturally sum to more than the largest single line).
+    stated_totals = [float(v.replace(",", "")) for v in _TOTAL_AMOUNT.findall(text)]
+    if stated_totals and len(amounts) >= 2:
+        total = max(stated_totals)
+        remaining = list(amounts)
+        if total in remaining:
+            remaining.remove(total)
+        rest = sum(remaining)
         if total and rest > total and (rest - total) / total > 0.05:
             score += 20
             flags.append("Line items appear to sum to more than the stated total (possible math error).")

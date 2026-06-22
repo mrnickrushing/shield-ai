@@ -79,6 +79,6 @@ SPEC = VerticalSpec(
         "impersonation of banks, agencies, or family members. Emphasize independent call-back "
         "verification over anything said on the call."
     ),
-    categories=("spam", "scam_likely", "impersonation", "social_engineering", "unknown"),
+    categories=("spam", "scam_likely", "impersonation", "payment_fraud", "social_engineering", "unknown"),
     input_multiline=False,
 )

@@ -27,12 +27,16 @@ export default function VerticalScreen() {
   const info: VerticalInfo | undefined = catalog?.find((v) => v.key === key);
 
   const mutation = useMutation({
-    mutationFn: () => ShieldAPI.scanVertical(key!, input.trim()),
+    mutationFn: () => {
+      if (!key) throw new Error("Vertical unavailable");
+      return ShieldAPI.scanVertical(key, input.trim());
+    },
   });
 
   const accent = info?.accent ?? colors.primaryBright;
   const multiline = info?.input_multiline ?? true;
   const verdict = mutation.data;
+  const canScan = Boolean(key && input.trim()) && !mutation.isPending;
 
   return (
     <ScrollView
@@ -71,10 +75,10 @@ export default function VerticalScreen() {
       />
 
       <Pressable
-        disabled={!input.trim() || mutation.isPending}
+        disabled={!canScan}
         onPress={() => mutation.mutate()}
         style={{
-          backgroundColor: input.trim() ? accent : colors.surfaceActive,
+          backgroundColor: canScan ? accent : colors.surfaceActive,
           borderRadius: radius.md,
           padding: spacing.md,
           alignItems: "center",
