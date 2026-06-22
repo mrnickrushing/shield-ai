@@ -6,6 +6,7 @@ import { FlatList, Pressable, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ScanCard } from "@/components/ScanCard";
+import { Chip, FadeIn } from "@/components/ui";
 import { ShieldAPI, type ScanType } from "@/lib/api";
 import { colors, radius, spacing } from "@/theme/theme";
 
@@ -29,43 +30,6 @@ const RISK_FILTERS: { value: string; label: string; color: string }[] = [
   { value: "high",       label: "High",       color: colors.high },
   { value: "critical",   label: "Critical",   color: colors.critical },
 ];
-
-function Chip({
-  label,
-  active,
-  color,
-  onPress,
-}: {
-  label: string;
-  active: boolean;
-  color?: string;
-  onPress: () => void;
-}) {
-  const c = color ?? colors.primaryBright;
-  return (
-    <Pressable
-      onPress={onPress}
-      style={{
-        paddingHorizontal: spacing.md,
-        paddingVertical: 7,
-        borderRadius: radius.pill,
-        backgroundColor: active ? c + "22" : colors.surface,
-        borderColor: active ? c : colors.border,
-        borderWidth: 1,
-      }}
-    >
-      <Text
-        style={{
-          color: active ? c : colors.textMuted,
-          fontWeight: "700",
-          fontSize: 12,
-        }}
-      >
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
 
 export default function History() {
   const router = useRouter();
@@ -161,6 +125,7 @@ export default function History() {
           <Chip
             label={item.label}
             active={typeFilter === item.value}
+            size="sm"
             onPress={() => setTypeFilter(item.value)}
           />
         )}
@@ -183,6 +148,7 @@ export default function History() {
             label={item.label}
             active={riskFilter === item.value}
             color={item.color}
+            size="sm"
             onPress={() => setRiskFilter(item.value)}
           />
         )}
@@ -213,11 +179,13 @@ export default function History() {
         data={filtered}
         keyExtractor={(s) => s.id}
         contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl }}
-        renderItem={({ item }) => (
-          <ScanCard
-            scan={item}
-            onPress={() => router.push(`/result?id=${item.id}` as any)}
-          />
+        renderItem={({ item, index }) => (
+          <FadeIn delay={Math.min(index, 6) * 40}>
+            <ScanCard
+              scan={item}
+              onPress={() => router.push(`/result?id=${item.id}` as any)}
+            />
+          </FadeIn>
         )}
         onRefresh={refetch}
         refreshing={isRefetching}

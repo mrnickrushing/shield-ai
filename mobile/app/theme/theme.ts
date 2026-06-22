@@ -46,6 +46,7 @@ export const radius = {
   md: 12,
   lg: 18,
   xl: 24,
+  xxl: 30,
   pill: 999,
 };
 
@@ -64,4 +65,69 @@ export const shadow = {
     shadowRadius: 8,
     elevation: 6,
   },
+  glow: (color: string) => ({
+    shadowColor: color,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.45,
+    shadowRadius: 18,
+    elevation: 10,
+  }),
 };
+
+/** Two-stop gradient pairs, light -> deep, for SVG LinearGradient fills. */
+export const gradients = {
+  primary: [colors.primaryBright, colors.primary] as const,
+  accent: [colors.accent, colors.primary] as const,
+  safe: [colors.safe, colors.teal] as const,
+  warn: [colors.suspicious, colors.high] as const,
+  danger: [colors.high, colors.critical] as const,
+  purple: [colors.purple, colors.primary] as const,
+  dusk: [colors.surfaceHigh, colors.bg] as const,
+};
+
+export const motion = {
+  fast: 160,
+  base: 260,
+  slow: 420,
+  lazy: 700,
+};
+
+/** Shared text style presets so screens stop redefining the same font rules. */
+export const type = {
+  eyebrow: {
+    fontSize: 11,
+    fontWeight: "800" as const,
+    letterSpacing: 1.4,
+    textTransform: "uppercase" as const,
+  },
+  display: {
+    fontSize: 30,
+    fontWeight: "900" as const,
+    letterSpacing: -1,
+    color: colors.text,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: "800" as const,
+    letterSpacing: -0.4,
+    color: colors.text,
+  },
+  subtitle: {
+    fontSize: 15,
+    fontWeight: "700" as const,
+    color: colors.text,
+  },
+  body: {
+    fontSize: 14,
+    lineHeight: 21,
+    color: colors.textMuted,
+  },
+  caption: {
+    fontSize: 12,
+    color: colors.textMuted,
+  },
+};
+
+export function withAlpha(hex: string, alphaHex: string) {
+  return `${hex}${alphaHex}`;
+}
