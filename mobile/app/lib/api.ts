@@ -201,6 +201,33 @@ export type EmailScanPayload = {
   body_text?: string;
 };
 
+// Shield Labs — portfolio verticals on the shared Verdict Engine
+export type VerticalInfo = {
+  key: string;
+  name: string;
+  tagline: string;
+  accent: string;
+  icon: string;
+  input_label: string;
+  input_placeholder: string;
+  input_multiline: boolean;
+};
+
+export type Verdict = {
+  vertical: string;
+  vertical_name: string;
+  risk_score: number;
+  risk_level: "safe" | "low" | "suspicious" | "high" | "critical";
+  threat_category: string;
+  confidence: number;
+  explanation: string;
+  red_flags: string[];
+  recommended_actions: string[];
+  evidence: Record<string, unknown>;
+  output_title: string;
+  output_artifact: string;
+};
+
 // ---------------------------------------------------------------------------
 // API surface
 // ---------------------------------------------------------------------------
@@ -235,6 +262,11 @@ export const ShieldAPI = {
   getScan: (id: string) => api.get<Scan>(`/scans/${id}`).then((r) => r.data),
   feedback: (id: string, feedback: "helpful" | "false_positive") =>
     api.post(`/scans/${id}/feedback`, { feedback }),
+
+  // Shield Labs — portfolio verticals
+  listVerticals: () => api.get<VerticalInfo[]>("/verticals").then((r) => r.data),
+  scanVertical: (key: string, input: string, context: Record<string, unknown> = {}) =>
+    api.post<Verdict>(`/verticals/${key}/scan`, { input, context }).then((r) => r.data),
 
   // Notifications
   registerDevice: (push_token: string, platform: "ios" | "android") =>

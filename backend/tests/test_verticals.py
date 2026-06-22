@@ -1,0 +1,234 @@
+"""Vertical apps — scaffold tests (unit + endpoint).
+
+Verifies the shared Verdict Engine runs each vertical end-to-end without an LLM
+key (deterministic fallback), and that the catalog + scan endpoints are wired and
+auth-gated like the rest of the API.
+"""
+import os
+
+os.environ["DATABASE_URL"] = "sqlite+pysqlite:///:memory:"
+os.environ["ENVIRONMENT"] = "development"
+
+import uuid
+
+import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
+
+from app.db.session import Base, get_db
+from app.main import app
+
+engine = create_engine(
+    "sqlite+pysqlite:///:memory:",
+    connect_args={"check_same_thread": False},
+    poolclass=StaticPool,
+)
+TestingSession = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+Base.metadata.create_all(bind=engine)
+
+
+def _override_db():
+    db = TestingSession()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+@pytest.fixture(autouse=True)
+def _use_db():
+    """Point the app at this module's in-memory DB only for these tests."""
+    prev = app.dependency_overrides.get(get_db)
+    app.dependency_overrides[get_db] = _override_db
+    yield
+    if prev is not None:
+        app.dependency_overrides[get_db] = prev
+    else:
+        app.dependency_overrides.pop(get_db, None)
+
+
+client = TestClient(app)
+
+
+def _auth_headers() -> dict:
+    email = f"vtest+{uuid.uuid4().hex}@example.com"
+    r = client.post(
+        "/api/v1/auth/register",
+        json={"email": email, "password": "supersecret1", "display_name": "V"},
+    )
+    return {"Authorization": f"Bearer {r.json()['access_token']}"}
+
+
+# ---------------------------------------------------------------------------
+# Unit tests — analyzers + engine (no network, no LLM key)
+# ---------------------------------------------------------------------------
+
+def test_registry_has_all_six_verticals():
+    from app.verticals import list_verticals
+
+    keys = {s.key for s in list_verticals()}
+    assert keys == {"medbill", "contract", "job", "call", "family", "recovery"}
+
+
+def test_run_vertical_medbill_flags_duplicate_charge():
+    from app.verticals import get_vertical, run_vertical
+
+    spec = get_vertical("medbill")
+    report = run_vertical(spec, "Office visit $250.00\nLab panel $80.00\nOffice visit $250.00", {})
+    assert report["vertical"] == "medbill"
+    assert report["risk_score"] >= 30
+    assert report["output_artifact"]  # a draft dispute letter
+    assert any("duplicate" in f.lower() for f in report["red_flags"])
+
+
+def test_run_vertical_job_flags_fake_check():
+    from app.verticals import get_vertical, run_vertical
+
+    spec = get_vertical("job")
+    report = run_vertical(
+        spec,
+        "Congrats, you're hired! We'll mail a cashier's check — deposit it and wire back the difference.",
+        {},
+    )
+    assert report["risk_score"] >= 35
+    assert report["recommended_actions"]
+
+
+def test_run_vertical_contract_flags_auto_renewal():
+    from app.verticals import get_vertical, run_vertical
+
+    spec = get_vertical("contract")
+    report = run_vertical(spec, "This subscription will automatically renew each year unless cancelled.", {})
+    assert "auto_renewal" in report["evidence"]["clauses_found"]
+
+
+# ---------------------------------------------------------------------------
+# Endpoint tests
+# ---------------------------------------------------------------------------
+
+def test_catalog_requires_auth():
+    r = client.get("/api/v1/verticals")
+    assert r.status_code in (401, 403)
+
+
+def test_catalog_lists_six(_=None):
+    r = client.get("/api/v1/verticals", headers=_auth_headers())
+    assert r.status_code == 200, r.text
+    data = r.json()
+    assert len(data) == 6
+    assert {d["key"] for d in data} == {"medbill", "contract", "job", "call", "family", "recovery"}
+    assert all(d["name"] and d["tagline"] and d["icon"] for d in data)
+
+
+def test_vertical_scan_requires_auth():
+    r = client.post("/api/v1/verticals/medbill/scan", json={"input": "test"})
+    assert r.status_code in (401, 403)
+
+
+def test_unknown_vertical_returns_404():
+    r = client.post(
+        "/api/v1/verticals/nope/scan",
+        json={"input": "anything"},
+        headers=_auth_headers(),
+    )
+    assert r.status_code == 404
+
+
+def test_medbill_scan_endpoint_full_flow():
+    r = client.post(
+        "/api/v1/verticals/medbill/scan",
+        json={"input": "Office visit $250.00\nLab $80.00\nOffice visit $250.00\nout-of-network"},
+        headers=_auth_headers(),
+    )
+    assert r.status_code == 200, r.text
+    data = r.json()
+    assert data["vertical"] == "medbill"
+    assert data["vertical_name"] == "MedBill Shield"
+    assert data["risk_score"] >= 30
+    assert data["output_title"] == "Draft dispute letter"
+    assert data["output_artifact"]
+
+
+def test_recovery_scan_endpoint_returns_action_pack():
+    r = client.post(
+        "/api/v1/verticals/recovery/scan",
+        json={"input": "I sent $800 in gift cards to someone claiming to be the IRS", "context": {"amount": 800}},
+        headers=_auth_headers(),
+    )
+    assert r.status_code == 200, r.text
+    data = r.json()
+    assert data["vertical"] == "recovery"
+    assert "ACTION PACK" in data["output_artifact"]
+    assert any("gift" in f.lower() for f in data["red_flags"])
+
+
+def test_empty_input_rejected():
+    r = client.post(
+        "/api/v1/verticals/job/scan",
+        json={"input": ""},
+        headers=_auth_headers(),
+    )
+    assert r.status_code == 422
+
+
+def _user_id(headers: dict) -> str:
+    return client.get("/api/v1/auth/me", headers=headers).json()["id"]
+
+
+def test_vertical_scan_enforces_free_quota():
+    from app.core.config import settings
+    from app.models.models import ApiUsage
+
+    headers = _auth_headers()
+    uid = _user_id(headers)
+    # Pre-fill today's vertical usage up to the free limit.
+    db = TestingSession()
+    try:
+        for _ in range(settings.FREE_TIER_DAILY_SCANS):
+            db.add(ApiUsage(user_id=uid, provider="vertical"))
+        db.commit()
+    finally:
+        db.close()
+
+    r = client.post("/api/v1/verticals/job/scan", json={"input": "hello"}, headers=headers)
+    assert r.status_code == 429
+
+
+def test_vertical_scan_premium_bypasses_quota():
+    from app.core.config import settings
+    from app.models.models import ApiUsage, User
+
+    headers = _auth_headers()
+    uid = _user_id(headers)
+    db = TestingSession()
+    try:
+        db.get(User, uid).is_premium = True
+        for _ in range(settings.FREE_TIER_DAILY_SCANS + 2):
+            db.add(ApiUsage(user_id=uid, provider="vertical"))
+        db.commit()
+    finally:
+        db.close()
+
+    r = client.post("/api/v1/verticals/job/scan", json={"input": "hello"}, headers=headers)
+    assert r.status_code == 200
+
+
+def test_vertical_scan_records_usage():
+    from app.models.models import ApiUsage
+
+    headers = _auth_headers()
+    uid = _user_id(headers)
+    client.post("/api/v1/verticals/medbill/scan", json={"input": "Office visit $250.00"}, headers=headers)
+
+    db = TestingSession()
+    try:
+        count = (
+            db.query(ApiUsage)
+            .filter(ApiUsage.user_id == uid, ApiUsage.provider == "vertical")
+            .count()
+        )
+    finally:
+        db.close()
+    assert count == 1

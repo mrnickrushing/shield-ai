@@ -127,6 +127,41 @@ class DeviceRegister(BaseModel):
     platform: str = Field(pattern="^(ios|android)$")
 
 
+# ---------------------------------------------------------------------------
+# Verticals — portfolio apps on the shared Verdict Engine
+# ---------------------------------------------------------------------------
+
+class VerticalScanRequest(BaseModel):
+    input: str = Field(min_length=1, max_length=20000)
+    context: dict = {}
+
+
+class VerticalInfo(BaseModel):
+    key: str
+    name: str
+    tagline: str
+    accent: str
+    icon: str
+    input_label: str
+    input_placeholder: str
+    input_multiline: bool
+
+
+class VerdictOut(BaseModel):
+    vertical: str
+    vertical_name: str
+    risk_score: int
+    risk_level: str
+    threat_category: str
+    confidence: float
+    explanation: str
+    red_flags: list[str]
+    recommended_actions: list[str]
+    evidence: dict
+    output_title: str = ""
+    output_artifact: str = ""
+
+
 class NotificationOut(BaseModel):
     id: str
     title: str

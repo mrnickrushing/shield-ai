@@ -320,6 +320,19 @@ export default function ProtectScreen() {
             />
           </View>
         </FadeIn>
+
+        <FadeIn delay={180}>
+          <Eyebrow style={{ marginBottom: spacing.sm }}>SHIELD LABS</Eyebrow>
+          <FeatureCard
+            icon="flask-outline"
+            color={colors.primaryBright}
+            title="Shield Labs"
+            body="New decision assistants on the same engine: medical bills, contracts, job offers, calls, family, and recovery."
+            tag="NEW"
+            onPress={() => router.push("/labs")}
+            wide
+          />
+        </FadeIn>
       </ScrollView>
     </View>
   );
