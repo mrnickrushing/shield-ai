@@ -257,7 +257,10 @@ export default function ScanScreen() {
     try {
       navigate(await ShieldAPI.scanImage(res.assets[0].base64));
     } catch (e: any) {
-      setError(e?.response?.data?.detail ?? "Scan failed.");
+      setError(
+        e?.response?.data?.detail ??
+          (e?.code === "ECONNABORTED" ? "Scan timed out — please try again." : "Scan failed.")
+      );
     } finally {
       setLoading(false);
     }
