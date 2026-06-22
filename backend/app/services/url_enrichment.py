@@ -28,6 +28,7 @@ SENSITIVE_BRANDS = [
     "paypal", "apple", "icloud", "microsoft", "amazon", "netflix", "chase",
     "wellsfargo", "bankofamerica", "coinbase", "binance", "usps", "fedex",
     "ups", "dhl", "irs", "facebook", "instagram", "google", "outlook",
+    "mcafee", "norton", "lifelock", "webroot", "malwarebytes", "geek squad",
 ]
 
 
