@@ -12,7 +12,17 @@ workflows:
       node: "18"
 
     triggering:
-      events: []
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+          source: true
+
+    when:
+      changeset:
+        includes:
+          - mobile/
 
     scripts:
       - name: Install JS dependencies
