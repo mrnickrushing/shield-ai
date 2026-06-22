@@ -12,7 +12,17 @@ workflows:
       node: "18"
 
     triggering:
-      events: []
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+          source: true
+
+    when:
+      changeset:
+        includes:
+          - mobile/
 
     scripts:
       - name: Install JS dependencies
@@ -22,6 +32,15 @@ workflows:
       - name: Publish OTA update to production channel
         working_directory: mobile
         script: |
+          # codemagic.yaml is always part of the changeset (Codemagic includes it
+          # by default), so a config-only edit still triggers this workflow even
+          # though `when.changeset.includes: [mobile/]` matched nothing real.
+          # Bail out here unless mobile/ actually changed in this push.
+          if ! git diff --name-only HEAD~1 HEAD | grep -q '^mobile/'; then
+            echo "No mobile/ changes in this push — skipping OTA publish."
+            exit 0
+          fi
+
           APP_VERSION=$(node -e "console.log(require('./app.json').expo.version)")
           npx eas-cli update \
             --channel production \
