@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams } from "expo-router";
 import React, { useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Share, Text, TextInput, View } from "react-native";
@@ -27,11 +28,23 @@ export default function VerticalScreen() {
   const info: VerticalInfo | undefined = catalog?.find((v) => v.key === key);
 
   const mutation = useMutation({
-    mutationFn: () => {
+    mutationFn: (vars: { text?: string; file?: string }) => {
       if (!key) throw new Error("Vertical unavailable");
-      return ShieldAPI.scanVertical(key, input.trim());
+      return vars.file
+        ? ShieldAPI.scanVerticalFile(key, vars.file)
+        : ShieldAPI.scanVertical(key, (vars.text ?? "").trim());
     },
   });
+
+  async function pickAndScan() {
+    try {
+      const res = await ImagePicker.launchImageLibraryAsync({ base64: true, quality: 0.7 });
+      if (res.canceled || !res.assets[0]?.base64) return;
+      mutation.mutate({ file: res.assets[0].base64 });
+    } catch {
+      /* picker cancelled or unavailable */
+    }
+  }
 
   const accent = info?.accent ?? colors.primaryBright;
   const multiline = info?.input_multiline ?? true;
@@ -76,7 +89,7 @@ export default function VerticalScreen() {
 
       <Pressable
         disabled={!canScan}
-        onPress={() => mutation.mutate()}
+        onPress={() => mutation.mutate({ text: input })}
         style={{
           backgroundColor: canScan ? accent : colors.surfaceActive,
           borderRadius: radius.md,
@@ -97,6 +110,30 @@ export default function VerticalScreen() {
           {mutation.isPending ? "Analyzing..." : "Analyze"}
         </Text>
       </Pressable>
+
+      {info?.accepts_files ? (
+        <Pressable
+          disabled={mutation.isPending}
+          onPress={pickAndScan}
+          style={{
+            marginTop: spacing.sm,
+            backgroundColor: colors.surface,
+            borderRadius: radius.md,
+            padding: spacing.md,
+            alignItems: "center",
+            flexDirection: "row",
+            justifyContent: "center",
+            gap: spacing.sm,
+            borderWidth: 1,
+            borderColor: colors.border,
+          }}
+        >
+          <Ionicons name="camera-outline" size={18} color={accent} />
+          <Text style={{ color: accent, fontWeight: "800", fontSize: 14 }}>
+            Or snap a photo of your bill
+          </Text>
+        </Pressable>
+      ) : null}
 
       {mutation.isError ? (
         <Text style={{ color: colors.critical, marginTop: spacing.md }}>Something went wrong. Please try again.</Text>

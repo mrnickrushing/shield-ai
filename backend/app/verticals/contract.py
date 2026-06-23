@@ -76,4 +76,5 @@ SPEC = VerticalSpec(
         "give legal advice."
     ),
     categories=("auto_renewal", "arbitration_waiver", "non_compete", "early_termination", "junk_fees", "liability", "unknown"),
+    accepts_files=True,
 )
