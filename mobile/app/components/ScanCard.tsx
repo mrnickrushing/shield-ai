@@ -25,6 +25,7 @@ const SCAN_TYPE_META: Record<string, { icon: keyof typeof Ionicons.glyphMap; lab
   phone:       { icon: "call-outline",       label: "Phone",       color: colors.suspicious },
   marketplace: { icon: "storefront-outline", label: "Marketplace", color: colors.low },
   social:      { icon: "people-outline",     label: "Social",      color: colors.purple },
+  vertical:    { icon: "flask-outline",      label: "Shield Labs", color: colors.primaryBright },
 };
 
 const RISK_COLOR: Record<string, string> = {
@@ -41,7 +42,7 @@ export function ScanCard({ scan, onPress }: { scan: Scan; onPress: () => void })
     label: scan.scan_type,
     color: colors.primaryBright,
   };
-  const showInput = ["link", "qr", "phone"].includes(scan.scan_type);
+  const showInput = ["link", "qr", "phone", "vertical"].includes(scan.scan_type);
   const riskLevel = scan.report?.risk_level;
   const accentColor = riskLevel ? (RISK_COLOR[riskLevel] ?? meta.color) : meta.color;
 
