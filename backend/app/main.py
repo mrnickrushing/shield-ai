@@ -15,7 +15,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title=settings.APP_NAME,
-    version="0.5.0",
+    version="0.6.0",
     description="AI-powered scam, phishing, and fraud detection assistant.",
     lifespan=lifespan,
 )
@@ -43,7 +43,7 @@ app.include_router(admin.router, prefix=settings.API_V1_PREFIX)
 
 @app.get("/health", tags=["system"])
 def health():
-    return {"status": "ok", "app": settings.APP_NAME, "version": "0.5.0"}
+    return {"status": "ok", "app": settings.APP_NAME, "version": "0.6.0"}
 
 
 @app.get("/", tags=["system"])
