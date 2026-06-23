@@ -213,6 +213,7 @@ export type VerticalInfo = {
   input_label: string;
   input_placeholder: string;
   input_multiline: boolean;
+  accepts_files: boolean;
 };
 
 export type Verdict = {
@@ -269,6 +270,8 @@ export const ShieldAPI = {
   listVerticals: () => api.get<VerticalInfo[]>("/verticals").then((r) => r.data),
   scanVertical: (key: string, input: string, context: Record<string, unknown> = {}) =>
     api.post<Verdict>(`/verticals/${key}/scan`, { input, context }).then((r) => r.data),
+  scanVerticalFile: (key: string, file_base64: string, context: Record<string, unknown> = {}) =>
+    api.post<Verdict>(`/verticals/${key}/scan`, { file_base64, context }).then((r) => r.data),
 
   // Notifications
   registerDevice: (push_token: string, platform: "ios" | "android") =>

@@ -264,4 +264,5 @@ SPEC = VerticalSpec(
         "Explain plainly what to question. Do not give medical advice."
     ),
     categories=("duplicate_charge", "upcoding", "unbundling", "balance_billing", "math_error", "unknown"),
+    accepts_files=True,
 )

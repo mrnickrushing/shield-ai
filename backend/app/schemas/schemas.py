@@ -1,7 +1,7 @@
 """Pydantic request/response schemas for Phase 1 + Phase 2 + Phase 4."""
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, model_validator
 
 
 class UserRegister(BaseModel):
@@ -133,8 +133,15 @@ class DeviceRegister(BaseModel):
 # ---------------------------------------------------------------------------
 
 class VerticalScanRequest(BaseModel):
-    input: str = Field(min_length=1, max_length=20000)
+    input: str = Field(default="", max_length=20000)
+    file_base64: str | None = None  # photo or PDF of a document (verticals that accept files)
     context: dict = {}
+
+    @model_validator(mode="after")
+    def _require_input_or_file(self):
+        if not (self.input.strip() or self.file_base64):
+            raise ValueError("Provide either input text or a file.")
+        return self
 
 
 class VerticalInfo(BaseModel):
@@ -146,6 +153,7 @@ class VerticalInfo(BaseModel):
     input_label: str
     input_placeholder: str
     input_multiline: bool
+    accepts_files: bool = False
 
 
 class VerdictOut(BaseModel):

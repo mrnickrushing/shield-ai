@@ -51,6 +51,7 @@ class VerticalSpec:
     system_hint: str
     categories: tuple[str, ...] = ()
     input_multiline: bool = True
+    accepts_files: bool = False
 
 
 def run_vertical(spec: VerticalSpec, input_text: str, context: dict | None = None) -> dict:

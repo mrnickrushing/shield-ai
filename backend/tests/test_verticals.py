@@ -9,6 +9,7 @@ import os
 os.environ["DATABASE_URL"] = "sqlite+pysqlite:///:memory:"
 os.environ["ENVIRONMENT"] = "development"
 
+import base64
 import uuid
 
 import pytest
@@ -234,3 +235,77 @@ def test_vertical_scan_persisted_to_history():
     assert s["report"]["risk_score"] >= 30
     # The vertical extras (e.g. the dispute letter) survive in the persisted evidence.
     assert s["report"]["evidence"]["_vertical"]["output_artifact"]
+
+
+# ---------------------------------------------------------------------------
+# File ingestion (photo / PDF)
+# ---------------------------------------------------------------------------
+
+def _make_pdf(text: str) -> bytes:
+    """Build a minimal one-page PDF whose content stream prints `text`."""
+    stream = b"BT /F1 12 Tf 72 720 Td (" + text.encode("latin-1") + b") Tj ET"
+    objs = [
+        b"<</Type/Catalog/Pages 2 0 R>>",
+        b"<</Type/Pages/Kids[3 0 R]/Count 1>>",
+        b"<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]/Contents 4 0 R"
+        b"/Resources<</Font<</F1 5 0 R>>>>>>",
+        b"<</Length " + str(len(stream)).encode() + b">>stream\n" + stream + b"\nendstream",
+        b"<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>",
+    ]
+    pdf = b"%PDF-1.4\n"
+    offsets = []
+    for i, body in enumerate(objs, start=1):
+        offsets.append(len(pdf))
+        pdf += str(i).encode() + b" 0 obj\n" + body + b"\nendobj\n"
+    xref_pos = len(pdf)
+    pdf += b"xref\n0 " + str(len(objs) + 1).encode() + b"\n0000000000 65535 f \n"
+    for off in offsets:
+        pdf += ("%010d 00000 n \n" % off).encode()
+    pdf += b"trailer\n<</Size " + str(len(objs) + 1).encode() + b"/Root 1 0 R>>\n"
+    pdf += b"startxref\n" + str(xref_pos).encode() + b"\n%%EOF"
+    return pdf
+
+
+def test_document_extracts_pdf_text():
+    from app.services import document
+
+    out = document.extract_text(_make_pdf("Office visit 99213 $250.00 out-of-network"))
+    assert out["kind"] == "pdf"
+    assert out["ok"] is True
+    assert "99213" in out["text"]
+
+
+def test_catalog_exposes_accepts_files():
+    by_key = {d["key"]: d for d in client.get("/api/v1/verticals", headers=_auth_headers()).json()}
+    assert by_key["medbill"]["accepts_files"] is True
+    assert by_key["contract"]["accepts_files"] is True
+    assert by_key["recovery"]["accepts_files"] is False
+
+
+def test_medbill_scan_accepts_pdf_upload():
+    pdf_b64 = base64.b64encode(_make_pdf("Office visit 99213 $250.00 out-of-network")).decode()
+    r = client.post(
+        "/api/v1/verticals/medbill/scan",
+        json={"file_base64": pdf_b64},
+        headers=_auth_headers(),
+    )
+    assert r.status_code == 200, r.text
+    data = r.json()
+    assert data["vertical"] == "medbill"
+    # The text extracted from the PDF reached the analyzer.
+    assert any("out-of-network" in f.lower() for f in data["red_flags"])
+
+
+def test_file_upload_rejected_for_non_file_vertical():
+    pdf_b64 = base64.b64encode(_make_pdf("anything")).decode()
+    r = client.post(
+        "/api/v1/verticals/recovery/scan",
+        json={"file_base64": pdf_b64},
+        headers=_auth_headers(),
+    )
+    assert r.status_code == 400
+
+
+def test_scan_requires_input_or_file():
+    r = client.post("/api/v1/verticals/medbill/scan", json={}, headers=_auth_headers())
+    assert r.status_code == 422
