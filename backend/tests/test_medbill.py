@@ -73,3 +73,37 @@ def test_dispute_letter_includes_out_of_network_concern():
 def test_dispute_letter_includes_math_error_concern():
     res = medbill.analyze("Office visit $300.00\nLab $300.00\nTotal due $400.00", {})
     assert "stated total" in res.output_artifact.lower()
+
+
+def test_charge_far_above_reference_is_flagged():
+    # CBC (85025) reference is ~$11; $110 is ~10x — flag it.
+    res = medbill.analyze("CBC panel 85025 $110.00", {})
+    assert any("reference" in f.lower() for f in res.flags)
+    li = res.evidence["line_items"][0]
+    assert li["status"] == "over_reference"
+    assert li["reference"] == 11
+    assert li["multiple"] >= 5
+    assert res.evidence["over_reference_count"] == 1
+    assert "reference" in res.output_artifact.lower()
+
+
+def test_charge_modestly_above_reference_is_not_flagged():
+    # ~2x Medicare is normal hospital markup — must not be flagged.
+    res = medbill.analyze("CBC panel 85025 $22.00", {})
+    assert not any("reference" in f.lower() for f in res.flags)
+    assert res.evidence["line_items"][0]["status"] == "ok"
+    assert res.evidence["over_reference_count"] == 0
+
+
+def test_unknown_code_is_not_benchmarked():
+    res = medbill.analyze("Mystery service 12345 $9,000.00", {})
+    assert res.evidence["over_reference_count"] == 0
+
+
+def test_duplicate_takes_precedence_over_reference():
+    # A duplicated high charge should be marked duplicate (a harder error),
+    # not merely "over reference".
+    res = medbill.analyze("CT head 70450 $1,000.00\nCT head 70450 $1,000.00", {})
+    statuses = [li["status"] for li in res.evidence["line_items"]]
+    assert "duplicate" in statuses
+    assert res.evidence["estimated_overcharge"] == 1000.0

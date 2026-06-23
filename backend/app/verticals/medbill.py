@@ -16,6 +16,12 @@ import re
 from dataclasses import dataclass
 
 from app.verticals.base import VerticalResult, VerticalSpec
+from app.verticals.medbill_reference import REFERENCE_NOTE, lookup
+
+# Only flag a charge as "high vs reference" at a large multiple, so the rough
+# reference prices can't produce false alarms (providers legitimately bill above
+# Medicare; a 5x+ charge is a fair thing to question).
+OVER_REFERENCE_MULTIPLE = 5.0
 
 _MONEY = re.compile(r"\$\s?(\d[\d,]*(?:\.\d{2})?)")
 # CPT (5 digits) or HCPCS (letter + 4 digits).
@@ -54,8 +60,10 @@ class LineItem:
     description: str
     code: str
     amount: float
-    status: str = "ok"  # ok | duplicate
+    status: str = "ok"  # ok | duplicate | over_reference
     reason: str = ""
+    reference: float | None = None
+    multiple: float | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -64,6 +72,8 @@ class LineItem:
             "amount": self.amount,
             "status": self.status,
             "reason": self.reason,
+            "reference": self.reference,
+            "multiple": self.multiple,
         }
 
 
@@ -139,6 +149,25 @@ def analyze(text: str, ctx: dict) -> VerticalResult:
             if category == "unknown":
                 category = "math_error"
 
+    # Price benchmark: flag coded charges that run far above a reference rate.
+    over_reference: list[LineItem] = []
+    for it in items:
+        if it.status != "ok" or not it.code or it.amount <= 0:
+            continue
+        ref = lookup(it.code)
+        if ref and it.amount >= ref * OVER_REFERENCE_MULTIPLE:
+            it.status = "over_reference"
+            it.reference = ref
+            it.multiple = round(it.amount / ref, 1)
+            it.reason = f"Charged about {it.multiple:.0f}× a typical Medicare reference (~${ref:,.0f})"
+            over_reference.append(it)
+    if over_reference:
+        score += 10
+        flags.append(
+            "Some charges are far above typical reference rates — ask the provider for the "
+            f"cash/self-pay or negotiated rate. {REFERENCE_NOTE}"
+        )
+
     coded = [it for it in items if it.code]
     if coded and not flags:
         flags.append(f"Detected {len(coded)} coded line item(s) to verify against your EOB.")
@@ -150,6 +179,8 @@ def analyze(text: str, ctx: dict) -> VerticalResult:
         "estimated_overcharge": round(overcharge, 2),
         "stated_total": round(max(stated_totals), 2) if stated_totals else None,
         "codes": [it.code for it in coded][:30],
+        "over_reference_count": len(over_reference),
+        "reference_note": REFERENCE_NOTE,
     }
     next_steps = [
         "Request a fully itemized bill (every line, code, and price) from the provider.",
