@@ -1,12 +1,10 @@
-"""Vertical apps — portfolio scaffold built on the shared Verdict Engine.
+"""Vertical apps — Shield Labs portfolio on the shared Verdict Engine.
 
 Each vertical reuses the core pipeline (deterministic rule pack + LLM
 interpretation + blended verdict) for a new high-stakes domain. Verdicts are
-returned in-memory; persistence/quota integration lands when a vertical is
-deepened past the skeleton.
+persisted to scan_history / risk_reports just like normal scans, so they appear
+in History and count toward the same daily quota.
 """
-from datetime import datetime, timezone
-
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -14,46 +12,14 @@ from app.api.deps import (
     get_user_from_api_key_or_jwt as get_user,
     get_user_from_api_key_or_jwt_write as get_user_write,
 )
-from app.core.config import settings
 from app.db.session import get_db
-from app.models.models import ApiUsage, User
+from app.models.models import ScanHistory, ScanStatus, ScanType, User
 from app.schemas.schemas import VerdictOut, VerticalInfo, VerticalScanRequest
+from app.services import scan_service
+from app.services.quota import check_daily_scan_quota
 from app.verticals import get_vertical, list_verticals, run_vertical
 
 router = APIRouter(prefix="/verticals", tags=["verticals"])
-
-
-def _consume_vertical_quota(db: Session, user: User) -> None:
-    """Atomically enforce + record one free-tier vertical analysis per day.
-
-    Metered on its own ApiUsage bucket (provider="vertical") so it needs no new
-    table; Premium bypasses. The user row is locked for the check+insert so a
-    concurrent burst can't both pass the check and exceed FREE_TIER_DAILY_SCANS
-    (SELECT ... FOR UPDATE is a harmless no-op on SQLite for the test suite).
-    This can unify with the /scans allowance once vertical scans persist.
-    """
-    if user.is_premium:
-        return
-    start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-    # Serialize concurrent vertical scans for this user before counting usage.
-    db.query(User).filter(User.id == user.id).with_for_update().one()
-    used = (
-        db.query(ApiUsage)
-        .filter(
-            ApiUsage.user_id == user.id,
-            ApiUsage.provider == "vertical",
-            ApiUsage.created_at >= start,
-        )
-        .count()
-    )
-    if used >= settings.FREE_TIER_DAILY_SCANS:
-        db.rollback()
-        raise HTTPException(
-            status.HTTP_429_TOO_MANY_REQUESTS,
-            "Daily free scan limit reached. Upgrade to Premium for unlimited scans.",
-        )
-    db.add(ApiUsage(user_id=user.id, provider="vertical"))
-    db.commit()
 
 
 @router.get("", response_model=list[VerticalInfo])
@@ -81,9 +47,34 @@ def scan(
     db: Session = Depends(get_db),
     user: User = Depends(get_user_write),
 ):
-    """Run a single vertical's analyzer + verdict pipeline on user-provided input."""
+    """Run a vertical's analyzer + verdict pipeline, persisting it to history."""
     spec = get_vertical(key)
     if not spec:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"Unknown vertical: {key}")
-    _consume_vertical_quota(db, user)
-    return run_vertical(spec, payload.input, payload.context)
+
+    check_daily_scan_quota(db, user)
+
+    scan_row = ScanHistory(
+        user_id=user.id,
+        scan_type=ScanType.vertical,
+        vertical_key=key,
+        raw_input=payload.input[:500],
+        status=ScanStatus.pending,
+    )
+    db.add(scan_row)
+    db.commit()
+    db.refresh(scan_row)
+
+    verdict = run_vertical(spec, payload.input, payload.context)
+
+    # Keep the vertical-specific extras with the persisted evidence so the verdict
+    # can be reconstructed from history; the response still returns them top-level.
+    evidence = dict(verdict.get("evidence") or {})
+    evidence["_vertical"] = {
+        "vertical": verdict.get("vertical"),
+        "vertical_name": verdict.get("vertical_name"),
+        "output_title": verdict.get("output_title"),
+        "output_artifact": verdict.get("output_artifact"),
+    }
+    scan_service._finalize(db, scan_row, verdict, evidence)
+    return verdict

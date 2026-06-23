@@ -179,15 +179,15 @@ def _user_id(headers: dict) -> str:
 
 def test_vertical_scan_enforces_free_quota():
     from app.core.config import settings
-    from app.models.models import ApiUsage
+    from app.models.models import ScanHistory, ScanType
 
     headers = _auth_headers()
     uid = _user_id(headers)
-    # Pre-fill today's vertical usage up to the free limit.
+    # Pre-fill today's scans up to the shared free limit.
     db = TestingSession()
     try:
         for _ in range(settings.FREE_TIER_DAILY_SCANS):
-            db.add(ApiUsage(user_id=uid, provider="vertical"))
+            db.add(ScanHistory(user_id=uid, scan_type=ScanType.vertical))
         db.commit()
     finally:
         db.close()
@@ -198,7 +198,7 @@ def test_vertical_scan_enforces_free_quota():
 
 def test_vertical_scan_premium_bypasses_quota():
     from app.core.config import settings
-    from app.models.models import ApiUsage, User
+    from app.models.models import ScanHistory, ScanType, User
 
     headers = _auth_headers()
     uid = _user_id(headers)
@@ -206,7 +206,7 @@ def test_vertical_scan_premium_bypasses_quota():
     try:
         db.get(User, uid).is_premium = True
         for _ in range(settings.FREE_TIER_DAILY_SCANS + 2):
-            db.add(ApiUsage(user_id=uid, provider="vertical"))
+            db.add(ScanHistory(user_id=uid, scan_type=ScanType.vertical))
         db.commit()
     finally:
         db.close()
@@ -215,20 +215,22 @@ def test_vertical_scan_premium_bypasses_quota():
     assert r.status_code == 200
 
 
-def test_vertical_scan_records_usage():
-    from app.models.models import ApiUsage
-
+def test_vertical_scan_persisted_to_history():
     headers = _auth_headers()
-    uid = _user_id(headers)
-    client.post("/api/v1/verticals/medbill/scan", json={"input": "Office visit $250.00"}, headers=headers)
+    r = client.post(
+        "/api/v1/verticals/medbill/scan",
+        json={"input": "Office visit 99213 $250.00\nOffice visit 99213 $250.00"},
+        headers=headers,
+    )
+    assert r.status_code == 200, r.text
 
-    db = TestingSession()
-    try:
-        count = (
-            db.query(ApiUsage)
-            .filter(ApiUsage.user_id == uid, ApiUsage.provider == "vertical")
-            .count()
-        )
-    finally:
-        db.close()
-    assert count == 1
+    scans = client.get("/api/v1/scans", headers=headers).json()
+    vertical_scans = [s for s in scans if s["scan_type"] == "vertical"]
+    assert len(vertical_scans) == 1
+    s = vertical_scans[0]
+    assert s["vertical_key"] == "medbill"
+    assert s["status"] == "completed"
+    assert s["report"] is not None
+    assert s["report"]["risk_score"] >= 30
+    # The vertical extras (e.g. the dispute letter) survive in the persisted evidence.
+    assert s["report"]["evidence"]["_vertical"]["output_artifact"]

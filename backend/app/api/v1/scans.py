@@ -35,21 +35,10 @@ router = APIRouter(prefix="/scans", tags=["scans"])
 
 
 def _check_quota(db: Session, user: User) -> None:
-    if user.is_premium:
-        return
-    from app.core.config import settings
+    # Shared daily allowance (also enforced on Shield Labs vertical scans).
+    from app.services.quota import check_daily_scan_quota
 
-    start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-    used = (
-        db.query(ScanHistory)
-        .filter(ScanHistory.user_id == user.id, ScanHistory.created_at >= start)
-        .count()
-    )
-    if used >= settings.FREE_TIER_DAILY_SCANS:
-        raise HTTPException(
-            status.HTTP_429_TOO_MANY_REQUESTS,
-            "Daily free scan limit reached. Upgrade to Premium for unlimited scans.",
-        )
+    check_daily_scan_quota(db, user)
 
 
 @router.post("/link", response_model=ScanOut, status_code=status.HTTP_201_CREATED)

@@ -76,6 +76,7 @@ class RiskReportOut(BaseModel):
 class ScanOut(BaseModel):
     id: str
     scan_type: str
+    vertical_key: str | None = None
     status: str
     raw_input: str
     created_at: datetime

@@ -72,11 +72,13 @@ export type ScanType =
   | "email"
   | "phone"
   | "marketplace"
-  | "social";
+  | "social"
+  | "vertical";
 
 export type Scan = {
   id: string;
   scan_type: ScanType;
+  vertical_key?: string | null;
   status: string;
   raw_input: string;
   created_at: string;
