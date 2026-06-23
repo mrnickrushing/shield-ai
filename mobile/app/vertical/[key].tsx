@@ -153,6 +153,8 @@ function VerdictView({ verdict, accent }: { verdict: Verdict; accent: string }) 
         </Section>
       ) : null}
 
+      <ItemizedBreakdown verdict={verdict} />
+
       <Section title="What to do next">
         {verdict.recommended_actions.map((s, i) => (
           <Row key={i} icon="checkmark-circle-outline" accent={accent} text={s} />
@@ -185,6 +187,100 @@ function VerdictView({ verdict, accent }: { verdict: Verdict; accent: string }) 
         </Section>
       ) : null}
     </View>
+  );
+}
+
+type LineItem = {
+  description?: string;
+  code?: string;
+  amount?: number;
+  status?: string;
+  reason?: string;
+  reference?: number | null;
+  multiple?: number | null;
+};
+
+const STATUS_STYLE: Record<string, { label: string; color: string }> = {
+  duplicate: { label: "DUPLICATE", color: colors.critical },
+  over_reference: { label: "ABOVE TYPICAL", color: colors.suspicious },
+};
+
+function money(n: number) {
+  return `$${n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`;
+}
+
+function ItemizedBreakdown({ verdict }: { verdict: Verdict }) {
+  const ev = (verdict.evidence ?? {}) as Record<string, any>;
+  const items: LineItem[] = Array.isArray(ev.line_items) ? ev.line_items : [];
+  if (!items.length) return null;
+
+  const total = Number(ev.estimated_total) || 0;
+  const overcharge = Number(ev.estimated_overcharge) || 0;
+  const hasOverReference = items.some((li) => li.status === "over_reference");
+
+  return (
+    <Section title="Itemized breakdown">
+      <View style={{ backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, paddingHorizontal: spacing.md }}>
+        {items.map((li, i) => {
+          const tint = STATUS_STYLE[li.status ?? "ok"];
+          return (
+            <View
+              key={i}
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                paddingVertical: spacing.sm,
+                borderTopWidth: i === 0 ? 0 : 1,
+                borderTopColor: colors.border,
+              }}
+            >
+              <View style={{ flex: 1, paddingRight: spacing.sm }}>
+                <Text style={{ color: colors.text, fontSize: 14, fontWeight: "600" }} numberOfLines={2}>
+                  {li.description || "Line item"}
+                </Text>
+                {li.code ? (
+                  <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 1 }}>Code {li.code}</Text>
+                ) : null}
+                {tint && li.reason ? (
+                  <Text style={{ color: tint.color, fontSize: 12, marginTop: 3, lineHeight: 16 }}>{li.reason}</Text>
+                ) : null}
+              </View>
+              <View style={{ alignItems: "flex-end" }}>
+                <Text style={{ color: colors.text, fontSize: 14, fontWeight: "800" }}>{money(Number(li.amount) || 0)}</Text>
+                {tint ? (
+                  <View
+                    style={{
+                      marginTop: 4,
+                      backgroundColor: `${tint.color}1f`,
+                      borderRadius: radius.pill,
+                      paddingHorizontal: spacing.sm,
+                      paddingVertical: 2,
+                    }}
+                  >
+                    <Text style={{ color: tint.color, fontSize: 9, fontWeight: "800", letterSpacing: 0.5 }}>{tint.label}</Text>
+                  </View>
+                ) : null}
+              </View>
+            </View>
+          );
+        })}
+      </View>
+
+      <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: spacing.sm, paddingHorizontal: spacing.xs }}>
+        <Text style={{ color: colors.textMuted, fontSize: 13 }}>Estimated total</Text>
+        <Text style={{ color: colors.text, fontSize: 13, fontWeight: "800" }}>{money(total)}</Text>
+      </View>
+      {overcharge > 0 ? (
+        <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 4, paddingHorizontal: spacing.xs }}>
+          <Text style={{ color: colors.critical, fontSize: 13, fontWeight: "700" }}>Likely overcharge</Text>
+          <Text style={{ color: colors.critical, fontSize: 13, fontWeight: "800" }}>{money(overcharge)}</Text>
+        </View>
+      ) : null}
+      {hasOverReference && typeof ev.reference_note === "string" ? (
+        <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: spacing.sm, lineHeight: 16 }}>{ev.reference_note}</Text>
+      ) : null}
+    </Section>
   );
 }
 
