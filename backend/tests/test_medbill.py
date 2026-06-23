@@ -101,9 +101,11 @@ def test_unknown_code_is_not_benchmarked():
 
 
 def test_duplicate_takes_precedence_over_reference():
-    # A duplicated high charge should be marked duplicate (a harder error),
-    # not merely "over reference".
+    # A duplicated high charge should be reported as a duplicate (a harder error),
+    # and NOT also flagged "over_reference" on the first copy.
     res = medbill.analyze("CT head 70450 $1,000.00\nCT head 70450 $1,000.00", {})
     statuses = [li["status"] for li in res.evidence["line_items"]]
     assert "duplicate" in statuses
+    assert "over_reference" not in statuses
+    assert res.evidence["over_reference_count"] == 0
     assert res.evidence["estimated_overcharge"] == 1000.0
