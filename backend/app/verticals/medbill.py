@@ -115,14 +115,24 @@ def analyze(text: str, ctx: dict) -> VerticalResult:
     # likely overcharge.
     counts: dict[tuple, int] = {}
     for it in items:
-        key = (it.code or it.description.lower(), it.amount)
-        counts[key] = counts.get(key, 0) + 1
-        if counts[key] >= 2 and it.amount > 0:
-            it.status = "duplicate"
-            it.reason = "Duplicate charge"
-            overcharge += it.amount
+        if it.amount > 0:
+            key = (it.code or it.description.lower(), it.amount)
+            counts[key] = counts.get(key, 0) + 1
+    dup_keys = {k for k, n in counts.items() if n >= 2}
 
-    if any(it.status == "duplicate" for it in items) or _DUP_HINT.search(text):
+    seen: dict[tuple, int] = {}
+    for it in items:
+        if it.amount <= 0:
+            continue
+        key = (it.code or it.description.lower(), it.amount)
+        if key in dup_keys:
+            seen[key] = seen.get(key, 0) + 1
+            if seen[key] >= 2:  # mark only the extra copies; keeps the dispute letter clean
+                it.status = "duplicate"
+                it.reason = "Duplicate charge"
+                overcharge += it.amount
+
+    if dup_keys or _DUP_HINT.search(text):
         score += 30
         flags.append("Possible duplicate charge — the same line appears more than once.")
         category = "duplicate_charge"
@@ -154,12 +164,15 @@ def analyze(text: str, ctx: dict) -> VerticalResult:
     for it in items:
         if it.status != "ok" or not it.code or it.amount <= 0:
             continue
+        key = (it.code or it.description.lower(), it.amount)
+        if key in dup_keys:
+            continue  # a duplicated charge is reported as a duplicate, not over-reference
         ref = lookup(it.code)
         if ref and it.amount >= ref * OVER_REFERENCE_MULTIPLE:
             it.status = "over_reference"
             it.reference = ref
             it.multiple = round(it.amount / ref, 1)
-            it.reason = f"Charged about {it.multiple:.0f}× a typical Medicare reference (~${ref:,.0f})"
+            it.reason = f"Charged about {it.multiple:.0f}x a typical Medicare reference (~${ref:,.0f})"
             over_reference.append(it)
     if over_reference:
         score += 10
