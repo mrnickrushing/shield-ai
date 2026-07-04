@@ -1,19 +1,86 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Share, Text, View } from "react-native";
+import Animated, { Easing, useAnimatedStyle, useSharedValue, withDelay, withSpring, withTiming } from "react-native-reanimated";
 
+import { GlowBackground } from "@/components/GlowBackground";
+import { GradientButton } from "@/components/GradientButton";
 import { ShieldAPI, type Scan } from "@/lib/api";
-import { colors, radius, spacing } from "@/theme/theme";
+import { colors, glow, gradients, radius, riskColors, spacing } from "@/theme/theme";
 
-const RISK_TINT: Record<string, string> = {
-  safe: colors.safe,
-  low: colors.low,
-  suspicious: colors.suspicious,
-  high: colors.high,
-  critical: colors.critical,
+const RISK_TINT: Record<string, string> = riskColors;
+
+// Per-verdict background bloom colors, per the design deck (green aurora vs red pulse).
+const VERDICT_BLOOM: Record<string, string> = {
+  safe: "#052010",
+  low: "#0a1a06",
+  suspicious: "#1c1204",
+  high: "#1c0d03",
+  critical: "#1a0205",
 };
+
+/** Score counts up from 0 with an ease-out over ~800ms, per the design deck. */
+function useCountUp(target: number, duration = 800) {
+  const [value, setValue] = useState(0);
+  useEffect(() => {
+    const start = Date.now();
+    const timer = setInterval(() => {
+      const t = Math.min(1, (Date.now() - start) / duration);
+      const eased = 1 - Math.pow(1 - t, 3);
+      setValue(Math.round(target * eased));
+      if (t >= 1) clearInterval(timer);
+    }, 16);
+    return () => clearInterval(timer);
+  }, [target, duration]);
+  return value;
+}
+
+function VerdictBadge({ accent, riskScore, riskLevel, children }: {
+  accent: string;
+  riskScore: number;
+  riskLevel: string;
+  children?: React.ReactNode;
+}) {
+  const scale = useSharedValue(0.6);
+  const opacity = useSharedValue(0);
+  const displayScore = useCountUp(riskScore);
+
+  useEffect(() => {
+    scale.value = withDelay(100, withSpring(1, { damping: 10, stiffness: 120 }));
+    opacity.value = withDelay(100, withTiming(1, { duration: 300, easing: Easing.out(Easing.ease) }));
+  }, [scale, opacity]);
+
+  const style = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+    opacity: opacity.value,
+  }));
+
+  return (
+    <Animated.View style={[{ flexDirection: "row", alignItems: "center", gap: spacing.md }, style]}>
+      <View
+        style={{
+          width: 104,
+          height: 104,
+          borderRadius: 52,
+          borderWidth: 6,
+          borderColor: `${accent}88`,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: `${accent}12`,
+          ...glow(accent, "lg"),
+        }}
+      >
+        <Text style={{ color: colors.text, fontSize: 30, fontWeight: "900", letterSpacing: -1 }}>
+          {displayScore}
+        </Text>
+        <Text style={{ color: colors.textDim, fontSize: 11, fontWeight: "700" }}>RISK</Text>
+      </View>
+      {children}
+    </Animated.View>
+  );
+}
 
 function SignalTile({
   label,
@@ -30,7 +97,7 @@ function SignalTile({
         flexGrow: 1,
         flexBasis: "48%",
         minWidth: 0,
-        backgroundColor: colors.surface,
+        backgroundColor: colors.glassDeep,
         borderRadius: radius.lg,
         padding: spacing.md,
         borderWidth: 1,
@@ -63,7 +130,7 @@ function NumberedStep({
         gap: spacing.sm,
         padding: spacing.md,
         borderRadius: radius.lg,
-        backgroundColor: colors.surface,
+        backgroundColor: colors.glassDeep,
         borderWidth: 1,
         borderColor: `${accent}22`,
         marginBottom: spacing.sm,
@@ -155,7 +222,7 @@ export default function Result() {
       <View style={{ flex: 1, backgroundColor: colors.bg, padding: spacing.lg, justifyContent: "center" }}>
         <View
           style={{
-            backgroundColor: colors.surface,
+            backgroundColor: colors.glassDeep,
             borderRadius: 24,
             borderWidth: 1,
             borderColor: colors.border,
@@ -217,53 +284,35 @@ export default function Result() {
         ? "This deserves caution before you continue."
         : "No major threat signal dominated this scan.";
 
+  const bloom = VERDICT_BLOOM[report.risk_level] ?? colors.bgBloom;
+
   return (
     <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ paddingBottom: spacing.xl }}>
+      <GlowBackground accent={bloom} bloomOpacity={1} centerY={0.1} />
       <View
         style={{
-          backgroundColor: colors.surface,
           paddingHorizontal: spacing.lg,
           paddingTop: spacing.xl,
           paddingBottom: spacing.xl,
           overflow: "hidden",
-          borderBottomLeftRadius: 28,
-          borderBottomRightRadius: 28,
         }}
       >
-        <View
-          style={{
-            position: "absolute",
-            width: 220,
-            height: 220,
-            borderRadius: 110,
-            backgroundColor: `${accent}18`,
-            top: -70,
-            right: -60,
-          }}
-        />
         <Text style={{ color: accent, fontSize: 12, fontWeight: "800", letterSpacing: 1.2, marginBottom: spacing.sm }}>
           VERDICT
         </Text>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
-          <View
-            style={{
-              width: 104,
-              height: 104,
-              borderRadius: 52,
-              borderWidth: 6,
-              borderColor: `${accent}66`,
-              alignItems: "center",
-              justifyContent: "center",
-              backgroundColor: `${accent}12`,
-            }}
-          >
-            <Text style={{ color: colors.text, fontSize: 30, fontWeight: "900", letterSpacing: -1 }}>
-              {report.risk_score}
-            </Text>
-            <Text style={{ color: colors.textDim, fontSize: 11, fontWeight: "700" }}>RISK</Text>
-          </View>
+        <VerdictBadge accent={accent} riskScore={report.risk_score} riskLevel={report.risk_level}>
           <View style={{ flex: 1 }}>
-            <Text style={{ color: colors.text, fontSize: 28, fontWeight: "900", letterSpacing: -1 }}>
+            <Text
+              style={{
+                color: accent,
+                fontSize: 28,
+                fontWeight: "900",
+                letterSpacing: -1,
+                textShadowColor: accent,
+                textShadowRadius: 12,
+                textShadowOffset: { width: 0, height: 0 },
+              }}
+            >
               {report.risk_level.toUpperCase()}
             </Text>
             <Text style={{ color: colors.textMuted, fontSize: 14, marginTop: 4 }}>
@@ -273,7 +322,22 @@ export default function Result() {
               {report.threat_category} • {Math.round(report.confidence * 100)}% confidence
             </Text>
           </View>
-        </View>
+        </VerdictBadge>
+        {(report.risk_level === "critical" || report.risk_level === "high") && (
+          <View
+            style={{
+              marginTop: spacing.lg,
+              backgroundColor: colors.critical,
+              borderRadius: radius.md,
+              padding: spacing.md,
+              ...glow(colors.critical, "md"),
+            }}
+          >
+            <Text style={{ color: "#fff", fontWeight: "900", fontSize: 14, textAlign: "center" }}>
+              Do not interact with this content
+            </Text>
+          </View>
+        )}
       </View>
 
       <View style={{ padding: spacing.lg }}>
@@ -294,30 +358,25 @@ export default function Result() {
           <Text style={{ color: colors.text, fontWeight: "800", fontSize: 18, marginBottom: spacing.sm }}>
             {report.recommended_actions[0] ?? "Review the recommendations before taking action."}
           </Text>
-          <Pressable
+          <GradientButton
+            label={primaryAction.label}
+            icon={primaryAction.icon}
             onPress={primaryAction.onPress}
-            style={{
-              backgroundColor: accent,
-              borderRadius: radius.md,
-              padding: spacing.md,
-              alignItems: "center",
-              flexDirection: "row",
-              justifyContent: "center",
-              gap: spacing.sm,
-            }}
-          >
-            <Ionicons name={primaryAction.icon} size={18} color="#08111f" />
-            <Text style={{ color: "#08111f", fontWeight: "900", fontSize: 15 }}>
-              {primaryAction.label}
-            </Text>
-          </Pressable>
+            stops={
+              report.risk_level === "critical" || report.risk_level === "high"
+                ? gradients.critical
+                : report.risk_level === "safe"
+                  ? gradients.safe
+                  : gradients.primary
+            }
+          />
         </View>
 
         <View style={{ marginBottom: spacing.lg }}>
           <Text style={{ color: colors.text, fontSize: 18, fontWeight: "800", marginBottom: spacing.sm }}>
             Why we think this
           </Text>
-          <View style={{ backgroundColor: colors.surface, borderRadius: 22, padding: spacing.lg, borderWidth: 1, borderColor: colors.border }}>
+          <View style={{ backgroundColor: colors.glassDeep, borderRadius: 22, padding: spacing.lg, borderWidth: 1, borderColor: colors.border }}>
             <Text style={{ color: colors.text, lineHeight: 23, fontSize: 15 }}>{report.explanation}</Text>
           </View>
         </View>
@@ -344,7 +403,7 @@ export default function Result() {
               <View
                 key={`${flag}-${index}`}
                 style={{
-                  backgroundColor: colors.surface,
+                  backgroundColor: colors.glassDeep,
                   borderRadius: radius.lg,
                   borderWidth: 1,
                   borderColor: `${accent}22`,
@@ -377,7 +436,7 @@ export default function Result() {
             </Text>
             <View
               style={{
-                backgroundColor: colors.surface,
+                backgroundColor: colors.glassDeep,
                 borderRadius: radius.lg,
                 borderWidth: 1,
                 borderColor: colors.border,
@@ -413,7 +472,7 @@ export default function Result() {
               flex: 1,
               padding: spacing.md,
               borderRadius: radius.md,
-              backgroundColor: colors.surface,
+              backgroundColor: colors.glassDeep,
               borderWidth: 1,
               borderColor: colors.border,
               alignItems: "center",
@@ -442,7 +501,7 @@ export default function Result() {
             Share.share({ message: text, title: "Shield AI Risk Report" });
           }}
           style={{
-            backgroundColor: colors.surface,
+            backgroundColor: colors.glassDeep,
             borderRadius: radius.md,
             padding: spacing.md,
             alignItems: "center",

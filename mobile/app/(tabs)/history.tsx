@@ -5,9 +5,10 @@ import React, { useMemo, useState } from "react";
 import { FlatList, Pressable, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { GlowBackground } from "@/components/GlowBackground";
 import { ScanCard } from "@/components/ScanCard";
 import { ShieldAPI, type ScanType } from "@/lib/api";
-import { colors, radius, spacing } from "@/theme/theme";
+import { colors, glow, radius, spacing } from "@/theme/theme";
 
 const TYPE_FILTERS: { value: ScanType | "all"; label: string }[] = [
   { value: "all",         label: "All" },
@@ -49,9 +50,10 @@ function Chip({
         paddingHorizontal: spacing.md,
         paddingVertical: 7,
         borderRadius: radius.pill,
-        backgroundColor: active ? c + "22" : colors.surface,
-        borderColor: active ? c : colors.border,
+        backgroundColor: active ? c + "26" : colors.glass,
+        borderColor: active ? c + "99" : colors.borderHi,
         borderWidth: 1,
+        ...(active ? glow(c, "sm") : null),
       }}
     >
       <Text
@@ -94,6 +96,7 @@ export default function History() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
+      <GlowBackground centerY={0.05} bloomOpacity={0.7} />
       {/* Header */}
       <View
         style={{
@@ -120,8 +123,8 @@ export default function History() {
           style={{
             flexDirection: "row",
             alignItems: "center",
-            backgroundColor: colors.surface,
-            borderColor: colors.border,
+            backgroundColor: colors.glass,
+            borderColor: colors.borderHi,
             borderWidth: 1,
             borderRadius: radius.lg,
             paddingHorizontal: spacing.md,

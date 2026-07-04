@@ -4,7 +4,7 @@ import { Pressable, Text, View } from "react-native";
 
 import { RiskBadge } from "@/components/RiskBadge";
 import { type Scan } from "@/lib/api";
-import { colors, radius, spacing } from "@/theme/theme";
+import { colors, glow, radius, spacing } from "@/theme/theme";
 
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -49,17 +49,17 @@ export function ScanCard({ scan, onPress }: { scan: Scan; onPress: () => void })
     <Pressable
       onPress={onPress}
       style={({ pressed }) => ({
-        backgroundColor: pressed ? colors.surfaceActive : colors.surface,
+        backgroundColor: pressed ? colors.glassActive : colors.glassDeep,
         borderRadius: radius.lg,
         borderWidth: 1,
-        borderColor: colors.border,
+        borderColor: `${accentColor}30`,
         marginBottom: spacing.sm,
         flexDirection: "row",
         overflow: "hidden",
       })}
     >
-      {/* Left accent bar */}
-      <View style={{ width: 3, backgroundColor: accentColor, borderRadius: 2 }} />
+      {/* Left accent bar with glow */}
+      <View style={{ width: 3, backgroundColor: accentColor, borderRadius: 2, ...glow(accentColor, "sm") }} />
 
       <View style={{ flex: 1, padding: spacing.md, flexDirection: "row", gap: spacing.sm, alignItems: "flex-start" }}>
         {/* Icon */}

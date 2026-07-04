@@ -93,7 +93,7 @@ export default function DeveloperScreen() {
         {newKey && (
           <View style={{ backgroundColor: colors.bg, borderRadius: radius.md, padding: spacing.md, marginTop: spacing.md }}>
             <Text style={{ color: colors.safe, fontWeight: "700", marginBottom: 4 }}>
-              Key created — copy it now. It won't be shown again.
+              Key created — copy it now. It won&apos;t be shown again.
             </Text>
             <Text style={{ color: colors.text, fontFamily: "monospace", fontSize: 12 }} selectable>
               {newKey}

@@ -6,6 +6,23 @@ import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollVie
 import { useAuth } from "@/state/auth";
 import { colors, radius, spacing } from "@/theme/theme";
 
+function SettingRow({ label, description, value, onValueChange }: { label: string; description: string; value: boolean; onValueChange: (v: boolean) => void }) {
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.lg, marginBottom: spacing.sm, borderWidth: 1, borderColor: colors.border }}>
+      <View style={{ flex: 1, marginRight: spacing.md }}>
+        <Text style={{ color: colors.text, fontWeight: "700", fontSize: 15, marginBottom: 2 }}>{label}</Text>
+        <Text style={{ color: colors.textMuted, fontSize: 13 }}>{description}</Text>
+      </View>
+      <Switch
+        value={value}
+        onValueChange={onValueChange}
+        trackColor={{ false: colors.border, true: colors.primary }}
+        thumbColor={value ? colors.primaryBright : colors.textMuted}
+      />
+    </View>
+  );
+}
+
 export default function Profile() {
   const router = useRouter();
   const { user, updateProfile, logout } = useAuth();
@@ -47,21 +64,6 @@ export default function Profile() {
     .map((w) => w[0]?.toUpperCase() ?? "")
     .slice(0, 2)
     .join("");
-
-  const SettingRow = ({ label, description, value, onValueChange }: { label: string; description: string; value: boolean; onValueChange: (v: boolean) => void }) => (
-    <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.lg, marginBottom: spacing.sm, borderWidth: 1, borderColor: colors.border }}>
-      <View style={{ flex: 1, marginRight: spacing.md }}>
-        <Text style={{ color: colors.text, fontWeight: "700", fontSize: 15, marginBottom: 2 }}>{label}</Text>
-        <Text style={{ color: colors.textMuted, fontSize: 13 }}>{description}</Text>
-      </View>
-      <Switch
-        value={value}
-        onValueChange={onValueChange}
-        trackColor={{ false: colors.border, true: colors.primary }}
-        thumbColor={value ? colors.primaryBright : colors.textMuted}
-      />
-    </View>
-  );
 
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior={Platform.OS === "ios" ? "padding" : undefined}>

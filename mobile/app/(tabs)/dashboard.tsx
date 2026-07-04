@@ -10,18 +10,20 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { GlassCard } from "@/components/GlassCard";
+import { GlowBackground } from "@/components/GlowBackground";
 import { ProtectionRing } from "@/components/ProtectionRing";
 import { ScanCard } from "@/components/ScanCard";
 import { ShieldAPI } from "@/lib/api";
 import { useAuth } from "@/state/auth";
-import { colors, radius, shadow, spacing } from "@/theme/theme";
+import { colors, glow, radius, spacing } from "@/theme/theme";
 
-const QUICK_SCANS: Array<{
+const QUICK_SCANS: {
   type: string;
   label: string;
   icon: keyof typeof Ionicons.glyphMap;
   color: string;
-}> = [
+}[] = [
   { type: "link",        label: "Link",        icon: "link-outline",        color: colors.primaryBright },
   { type: "image",       label: "Screenshot",  icon: "image-outline",       color: colors.teal },
   { type: "message",     label: "Message",     icon: "chatbubble-outline",  color: colors.safe },
@@ -32,18 +34,35 @@ const QUICK_SCANS: Array<{
   { type: "qr",          label: "QR Code",     icon: "qr-code-outline",     color: colors.rose },
 ];
 
-const PROTECT_ITEMS: Array<{
+const PROTECT_ITEMS: {
   title: string;
   body: string;
   icon: keyof typeof Ionicons.glyphMap;
   color: string;
   route: string;
-}> = [
-  { title: "Identity",      body: "Breach & credit alerts",  icon: "shield-checkmark-outline", color: colors.primaryBright, route: "/identity" },
-  { title: "Safe Browser",  body: "Pre-scan every URL",      icon: "globe-outline",            color: colors.teal,          route: "/browser" },
-  { title: "Family",        body: "Protect loved ones",      icon: "people-outline",           color: colors.purple,        route: "/family" },
-  { title: "Education",     body: "Spot scams faster",       icon: "book-outline",             color: colors.safe,          route: "/education" },
+}[] = [
+  { title: "Identity",      body: "Breach & credit alerts",  icon: "shield-checkmark-outline", color: colors.purple, route: "/identity" },
+  { title: "Safe Browser",  body: "Pre-scan every URL",      icon: "globe-outline",            color: colors.teal,   route: "/browser" },
+  { title: "Family",        body: "Protect loved ones",      icon: "people-outline",           color: colors.rose,   route: "/family" },
+  { title: "Education",     body: "Spot scams faster",       icon: "book-outline",             color: colors.safe,   route: "/education" },
 ];
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <Text
+      style={{
+        color: colors.textMuted,
+        fontSize: 10,
+        fontWeight: "800",
+        letterSpacing: 1.8,
+        textTransform: "uppercase",
+        marginBottom: spacing.sm,
+      }}
+    >
+      {children}
+    </Text>
+  );
+}
 
 function QuickScanTile({
   item,
@@ -60,15 +79,16 @@ function QuickScanTile({
         flexBasis: "31%",
         minWidth: 0,
         minHeight: 88,
-        backgroundColor: pressed ? colors.surfaceActive : colors.surface,
+        backgroundColor: pressed ? colors.glassActive : colors.glass,
         borderRadius: radius.lg,
         borderWidth: 1,
-        borderColor: colors.border,
+        borderColor: pressed ? `${item.color}66` : colors.borderHi,
         alignItems: "center",
         justifyContent: "center",
         gap: spacing.xs,
         paddingHorizontal: spacing.xs,
         paddingVertical: spacing.sm,
+        transform: [{ scale: pressed ? 0.95 : 1 }],
       })}
     >
       <View
@@ -79,6 +99,7 @@ function QuickScanTile({
           backgroundColor: item.color + "22",
           alignItems: "center",
           justifyContent: "center",
+          ...glow(item.color, "sm"),
         }}
       >
         <Ionicons name={item.icon} size={18} color={item.color} />
@@ -115,55 +136,45 @@ function ProtectCard({
   onPress: () => void;
 }) {
   return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => ({
-        flex: 1,
-        flexBasis: 0,
-        minWidth: 0,
-        backgroundColor: pressed ? colors.surfaceActive : colors.surface,
-        borderRadius: radius.lg,
-        borderWidth: 1,
-        borderColor: colors.border,
-        padding: spacing.md,
-        minHeight: 96,
-        justifyContent: "space-between",
-      })}
-    >
-      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
-        <View
-          style={{
-            width: 36,
-            height: 36,
-            borderRadius: radius.md,
-            backgroundColor: color + "22",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <Ionicons name={icon} size={18} color={color} />
-        </View>
-        {badge != null && badge > 0 && (
+    <GlassCard accent={color} onPress={onPress} style={{ flex: 1, minWidth: 0 }}>
+      <View style={{ padding: spacing.md, minHeight: 96, justifyContent: "space-between" }}>
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
           <View
             style={{
-              backgroundColor: colors.critical,
-              borderRadius: radius.pill,
-              minWidth: 20,
-              height: 20,
+              width: 36,
+              height: 36,
+              borderRadius: radius.md,
+              backgroundColor: color + "22",
               alignItems: "center",
               justifyContent: "center",
-              paddingHorizontal: 5,
+              ...glow(color, "sm"),
             }}
           >
-            <Text style={{ color: "#fff", fontSize: 11, fontWeight: "800" }}>{badge}</Text>
+            <Ionicons name={icon} size={18} color={color} />
           </View>
-        )}
+          {badge != null && badge > 0 && (
+            <View
+              style={{
+                backgroundColor: colors.critical,
+                borderRadius: radius.pill,
+                minWidth: 20,
+                height: 20,
+                alignItems: "center",
+                justifyContent: "center",
+                paddingHorizontal: 5,
+                ...glow(colors.critical, "sm"),
+              }}
+            >
+              <Text style={{ color: "#fff", fontSize: 11, fontWeight: "800" }}>{badge}</Text>
+            </View>
+          )}
+        </View>
+        <View style={{ marginTop: spacing.sm }}>
+          <Text style={{ color: colors.text, fontSize: 13, fontWeight: "800", marginBottom: 2 }}>{title}</Text>
+          <Text style={{ color: colors.textMuted, fontSize: 11, lineHeight: 15 }}>{body}</Text>
+        </View>
       </View>
-      <View>
-        <Text style={{ color: colors.text, fontSize: 13, fontWeight: "800", marginBottom: 2 }}>{title}</Text>
-        <Text style={{ color: colors.textMuted, fontSize: 11, lineHeight: 15 }}>{body}</Text>
-      </View>
-    </Pressable>
+    </GlassCard>
   );
 }
 
@@ -220,6 +231,8 @@ export default function Dashboard() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
+      <GlowBackground centerY={0.22} />
+
       {/* Header */}
       <View
         style={{
@@ -254,9 +267,9 @@ export default function Dashboard() {
             width: 40,
             height: 40,
             borderRadius: 20,
-            backgroundColor: colors.surface,
+            backgroundColor: colors.glass,
             borderWidth: 1,
-            borderColor: colors.border,
+            borderColor: colors.borderHi,
             alignItems: "center",
             justifyContent: "center",
           }}
@@ -269,47 +282,14 @@ export default function Dashboard() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ padding: spacing.lg, paddingTop: 0, paddingBottom: spacing.xxl }}
       >
-        {/* Protection Score Card */}
-        <View
-          style={{
-            backgroundColor: colors.surface,
-            borderRadius: radius.xl,
-            borderWidth: 1,
-            borderColor: colors.borderHi,
-            padding: spacing.lg,
-            alignItems: "center",
-            marginBottom: spacing.lg,
-            ...shadow.md,
-          }}
-        >
-          <Text
-            style={{
-              color: colors.textMuted,
-              fontSize: 10,
-              fontWeight: "800",
-              letterSpacing: 1.8,
-              textTransform: "uppercase",
-              marginBottom: spacing.lg,
-            }}
-          >
-            PROTECTION SCORE
-          </Text>
-
+        {/* Protection ring — floats directly on the bloom, no box */}
+        <View style={{ alignItems: "center", paddingVertical: spacing.md }}>
           <ProtectionRing score={score} />
+        </View>
 
-          {/* Divider */}
-          <View
-            style={{
-              height: 1,
-              backgroundColor: colors.border,
-              width: "100%",
-              marginTop: spacing.lg,
-              marginBottom: spacing.lg,
-            }}
-          />
-
-          {/* Stats row */}
-          <View style={{ flexDirection: "row", width: "100%" }}>
+        {/* Stats row — glass strip */}
+        <GlassCard style={{ marginBottom: spacing.lg }}>
+          <View style={{ flexDirection: "row", paddingVertical: spacing.md }}>
             <StatBox value={todayCount} label="Today" />
             <View style={{ width: 1, backgroundColor: colors.border }} />
             <StatBox value={scans?.length ?? 0} label="Total Scans" />
@@ -320,21 +300,10 @@ export default function Dashboard() {
               color={threatsBlocked > 0 ? colors.critical : colors.safe}
             />
           </View>
-        </View>
+        </GlassCard>
 
         {/* Quick Scan */}
-        <Text
-          style={{
-            color: colors.textMuted,
-            fontSize: 10,
-            fontWeight: "800",
-            letterSpacing: 1.8,
-            textTransform: "uppercase",
-            marginBottom: spacing.sm,
-          }}
-        >
-          QUICK SCAN
-        </Text>
+        <SectionLabel>QUICK SCAN</SectionLabel>
         <View
           style={{
             flexDirection: "row",
@@ -353,18 +322,7 @@ export default function Dashboard() {
         </View>
 
         {/* Protect */}
-        <Text
-          style={{
-            color: colors.textMuted,
-            fontSize: 10,
-            fontWeight: "800",
-            letterSpacing: 1.8,
-            textTransform: "uppercase",
-            marginBottom: spacing.sm,
-          }}
-        >
-          PROTECT
-        </Text>
+        <SectionLabel>PROTECT</SectionLabel>
         <View style={{ flexDirection: "row", gap: spacing.sm, marginBottom: spacing.sm }}>
           {PROTECT_ITEMS.slice(0, 2).map((item) => (
             <ProtectCard
@@ -389,15 +347,17 @@ export default function Dashboard() {
         <Pressable
           onPress={() => router.push("/recovery")}
           style={({ pressed }) => ({
-            backgroundColor: pressed ? colors.criticalDim : colors.criticalDim,
+            backgroundColor: colors.criticalDim,
             borderRadius: radius.lg,
             borderWidth: 1,
-            borderColor: colors.critical + "40",
+            borderColor: colors.critical + "50",
             padding: spacing.md,
             flexDirection: "row",
             alignItems: "center",
             gap: spacing.md,
             marginBottom: spacing.lg,
+            transform: [{ scale: pressed ? 0.98 : 1 }],
+            ...glow(colors.critical, "sm"),
           })}
         >
           <View
@@ -422,7 +382,7 @@ export default function Dashboard() {
           </View>
         </Pressable>
 
-        {/* Recent Scans */}
+        {/* Recent threat feed */}
         {!isLoading && recentScans.length > 0 && (
           <>
             <View
@@ -433,17 +393,7 @@ export default function Dashboard() {
                 marginBottom: spacing.sm,
               }}
             >
-              <Text
-                style={{
-                  color: colors.textMuted,
-                  fontSize: 10,
-                  fontWeight: "800",
-                  letterSpacing: 1.8,
-                  textTransform: "uppercase",
-                }}
-              >
-                RECENT ACTIVITY
-              </Text>
+              <SectionLabel>RECENT ACTIVITY</SectionLabel>
               <Pressable onPress={() => router.push("/(tabs)/history")}>
                 <Text style={{ color: colors.primaryBright, fontSize: 12, fontWeight: "700" }}>
                   View all →

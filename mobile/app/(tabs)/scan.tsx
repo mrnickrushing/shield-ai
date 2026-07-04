@@ -15,8 +15,80 @@ import {
   View,
 } from "react-native";
 
+import { GlowBackground } from "@/components/GlowBackground";
+import { GradientButton } from "@/components/GradientButton";
+import { CornerBrackets, ScanBeam } from "@/components/ScanBeam";
 import { ShieldAPI } from "@/lib/api";
-import { colors, radius, spacing } from "@/theme/theme";
+import { colors, glow as glowStyle, mono, radius, spacing } from "@/theme/theme";
+
+const ANALYSIS_STAGES = [
+  "Extracting text...",
+  "Checking URLs...",
+  "Analyzing brand signals...",
+  "Running AI model...",
+];
+
+function AnalysisStageText() {
+  const [stage, setStage] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setStage((s) => (s + 1) % ANALYSIS_STAGES.length), 900);
+    return () => clearInterval(timer);
+  }, []);
+  return (
+    <Text style={{ ...mono, fontSize: 13, fontWeight: "600" }}>{ANALYSIS_STAGES[stage]}</Text>
+  );
+}
+
+function PrimaryButton({
+  label,
+  onPress,
+  disabled,
+  icon,
+  loading,
+}: {
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+  icon?: keyof typeof Ionicons.glyphMap;
+  loading: boolean;
+}) {
+  return (
+    <View style={{ marginTop: spacing.sm }}>
+      <GradientButton
+        label={label}
+        onPress={onPress}
+        disabled={disabled}
+        loading={loading}
+        icon={icon}
+      />
+      {loading ? <AnalyzingOverlay /> : null}
+    </View>
+  );
+}
+
+function AnalyzingOverlay({ height = 200 }: { height?: number }) {
+  return (
+    <View
+      style={{
+        height,
+        borderRadius: radius.lg,
+        overflow: "hidden",
+        backgroundColor: "rgba(6,6,11,0.75)",
+        borderWidth: 1,
+        borderColor: `${colors.accent}44`,
+        alignItems: "center",
+        justifyContent: "center",
+        gap: spacing.md,
+        marginTop: spacing.sm,
+      }}
+    >
+      <CornerBrackets color={colors.accent} />
+      <ScanBeam height={height} />
+      <ActivityIndicator color={colors.primaryBright} size="large" />
+      <AnalysisStageText />
+    </View>
+  );
+}
 
 type ScanMode =
   | "link"
@@ -143,12 +215,13 @@ function AccentPill({
       style={{
         width: "48%",
         minHeight: 90,
-        backgroundColor: active ? `${accent}18` : colors.surface,
-        borderColor: active ? `${accent}88` : colors.border,
+        backgroundColor: active ? `${accent}18` : colors.glass,
+        borderColor: active ? `${accent}88` : colors.borderHi,
         borderWidth: 1,
         borderRadius: radius.lg,
         padding: spacing.md,
         justifyContent: "space-between",
+        ...(active ? glowStyle(accent) : null),
       }}
     >
       <View
@@ -327,51 +400,16 @@ export default function ScanScreen() {
   const runSocial = () =>
     wrap(() => ShieldAPI.scanSocial(socialText.trim(), socialPlatform || undefined));
 
-  const PrimaryButton = ({
-    label,
-    onPress,
-    disabled,
-    icon,
-  }: {
-    label: string;
-    onPress: () => void;
-    disabled?: boolean;
-    icon?: keyof typeof Ionicons.glyphMap;
-  }) => (
-    <Pressable
-      onPress={onPress}
-      disabled={disabled || loading}
-      style={{
-        backgroundColor: disabled || loading ? colors.surfaceActive : active.accent,
-        padding: spacing.md,
-        borderRadius: radius.md,
-        alignItems: "center",
-        justifyContent: "center",
-        marginTop: spacing.sm,
-        flexDirection: "row",
-        gap: spacing.sm,
-      }}
-    >
-      {loading ? (
-        <ActivityIndicator color="#08111f" />
-      ) : (
-        <>
-          {icon ? <Ionicons name={icon} size={18} color="#08111f" /> : null}
-          <Text style={{ color: "#08111f", fontWeight: "800", fontSize: 15 }}>{label}</Text>
-        </>
-      )}
-    </Pressable>
-  );
-
   return (
     <KeyboardAvoidingView
       style={{ flex: 1, backgroundColor: colors.bg }}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
+      <GlowBackground accent={`${active.accent}30`} centerY={0.12} />
       <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xl }}>
         <View
           style={{
-            backgroundColor: colors.surface,
+            backgroundColor: colors.glassDeep,
             borderRadius: 24,
             borderWidth: 1,
             borderColor: `${active.accent}33`,
@@ -467,7 +505,7 @@ export default function ScanScreen() {
 
         <View
           style={{
-            backgroundColor: colors.surface,
+            backgroundColor: colors.glassDeep,
             borderRadius: 24,
             borderWidth: 1,
             borderColor: `${active.accent}33`,
@@ -521,7 +559,7 @@ export default function ScanScreen() {
                   <Text style={{ color: active.accent, fontWeight: "800", fontSize: 13 }}>Paste</Text>
                 </Pressable>
               </View>
-              <PrimaryButton label={active.cta} onPress={runLink} disabled={!url.trim()} icon="shield-checkmark-outline" />
+              <PrimaryButton loading={loading} label={active.cta} onPress={runLink} disabled={!url.trim()} icon="shield-checkmark-outline" />
             </>
           )}
 
@@ -530,7 +568,7 @@ export default function ScanScreen() {
               <Text style={{ color: colors.textMuted, lineHeight: 21, marginBottom: spacing.sm }}>
                 Upload the screenshot exactly as you received it. Include the sender, warning, or payment request in frame.
               </Text>
-              <PrimaryButton label={active.cta} onPress={runImage} icon="images-outline" />
+              <PrimaryButton loading={loading} label={active.cta} onPress={runImage} icon="images-outline" />
             </>
           )}
 
@@ -540,7 +578,7 @@ export default function ScanScreen() {
                 Hold the code inside the frame. We’ll inspect the hidden destination before you open it.
               </Text>
               {!cameraPermission?.granted ? (
-                <PrimaryButton label="Allow Camera Access" onPress={requestCameraPermission} icon="camera-outline" />
+                <PrimaryButton loading={loading} label="Allow Camera Access" onPress={requestCameraPermission} icon="camera-outline" />
               ) : (
                 <View style={{ borderRadius: radius.lg, overflow: "hidden", height: 320, marginTop: spacing.sm }}>
                   <CameraView
@@ -549,14 +587,8 @@ export default function ScanScreen() {
                     onBarcodeScanned={loading ? undefined : handleQRScanned}
                     barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
                   />
-                  <View
-                    style={{
-                      ...StyleSheet_absoluteFill,
-                      borderWidth: 2,
-                      borderColor: `${active.accent}66`,
-                    }}
-                    pointerEvents="none"
-                  />
+                  <CornerBrackets color={colors.primaryBright} />
+                  {!loading && <ScanBeam height={320} />}
                   {loading && (
                     <View
                       style={{
@@ -564,12 +596,12 @@ export default function ScanScreen() {
                         backgroundColor: "rgba(6,12,24,0.78)",
                         justifyContent: "center",
                         alignItems: "center",
+                        gap: spacing.sm,
                       }}
                     >
+                      <ScanBeam height={320} />
                       <ActivityIndicator color={active.accent} size="large" />
-                      <Text style={{ color: colors.text, marginTop: spacing.sm, fontWeight: "700" }}>
-                        Analyzing QR destination...
-                      </Text>
+                      <AnalysisStageText />
                     </View>
                   )}
                 </View>
@@ -606,7 +638,7 @@ export default function ScanScreen() {
                   );
                 })}
               </View>
-              <PrimaryButton label={active.cta} onPress={runMessage} disabled={!messageText.trim()} icon="flash-outline" />
+              <PrimaryButton loading={loading} label={active.cta} onPress={runMessage} disabled={!messageText.trim()} icon="flash-outline" />
             </>
           )}
 
@@ -661,6 +693,7 @@ export default function ScanScreen() {
                 <Text style={{ color: active.accent, fontSize: 13, fontWeight: "800" }}>Paste body from clipboard</Text>
               </Pressable>
               <PrimaryButton
+                loading={loading}
                 label={active.cta}
                 onPress={runEmail}
                 disabled={!emailSender.trim() && !emailSubject.trim() && !emailBody.trim()}
@@ -680,7 +713,7 @@ export default function ScanScreen() {
                 onChangeText={setPhoneNumber}
                 style={inputStyle}
               />
-              <PrimaryButton label={active.cta} onPress={runPhone} disabled={!phoneNumber.trim()} icon="call-outline" />
+              <PrimaryButton loading={loading} label={active.cta} onPress={runPhone} disabled={!phoneNumber.trim()} icon="call-outline" />
             </>
           )}
 
@@ -713,7 +746,7 @@ export default function ScanScreen() {
                   );
                 })}
               </View>
-              <PrimaryButton label={active.cta} onPress={runMarketplace} disabled={!marketplaceText.trim()} icon="storefront-outline" />
+              <PrimaryButton loading={loading} label={active.cta} onPress={runMarketplace} disabled={!marketplaceText.trim()} icon="storefront-outline" />
             </>
           )}
 
@@ -746,7 +779,7 @@ export default function ScanScreen() {
                   );
                 })}
               </View>
-              <PrimaryButton label={active.cta} onPress={runSocial} disabled={!socialText.trim()} icon="sparkles-outline" />
+              <PrimaryButton loading={loading} label={active.cta} onPress={runSocial} disabled={!socialText.trim()} icon="sparkles-outline" />
             </>
           )}
         </View>

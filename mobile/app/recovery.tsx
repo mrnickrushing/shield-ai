@@ -69,7 +69,7 @@ export default function RecoveryScreen() {
     return (
       <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ padding: spacing.lg }}>
         <Text style={{ color: colors.text, fontSize: 26, fontWeight: "900", letterSpacing: -0.5, marginBottom: 4 }}>Scam Recovery</Text>
-        <Text style={{ color: colors.textMuted, fontSize: 14, marginBottom: spacing.lg }}>What type of scam happened? We'll give you a step-by-step plan.</Text>
+        <Text style={{ color: colors.textMuted, fontSize: 14, marginBottom: spacing.lg }}>What type of scam happened? We&apos;ll give you a step-by-step plan.</Text>
         {SCAM_TYPES.map((t) => (
           <Pressable key={t.key}
             onPress={() => { setSelectedType(t.key); createIncident.mutate(t.key); }}

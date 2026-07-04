@@ -44,9 +44,9 @@ export default function Onboarding() {
   const [activeIndex, setActiveIndex] = useState(0);
   const flatRef = useRef<FlatList>(null);
 
-  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
+  const [onViewableItemsChanged] = useState(() => ({ viewableItems }: { viewableItems: ViewToken[] }) => {
     if (viewableItems[0]) setActiveIndex(viewableItems[0].index ?? 0);
-  }).current;
+  });
 
   const finish = async () => {
     await SecureStore.setItemAsync("hasSeenOnboarding", "true");

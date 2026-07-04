@@ -1,7 +1,5 @@
 import React, { useState } from "react";
 import {
-  Animated,
-  Dimensions,
   Modal,
   Pressable,
   ScrollView,
@@ -10,8 +8,6 @@ import {
 } from "react-native";
 
 import { colors, radius, spacing } from "@/theme/theme";
-
-const { width } = Dimensions.get("window");
 
 type Step = {
   emoji: string;
@@ -174,7 +170,7 @@ export default function AppTour({ visible, onDone }: Props) {
                 {current.exampleLabel}
               </Text>
               <Text style={{ color: colors.textMuted, fontSize: 14, lineHeight: 20, fontStyle: "italic" }}>
-                "{current.example}"
+                &ldquo;{current.example}&rdquo;
               </Text>
             </View>
           </ScrollView>

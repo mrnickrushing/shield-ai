@@ -1,11 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as SecureStore from "expo-secure-store";
-import { Tabs, useRouter } from "expo-router";
+import { Tabs } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 
 import AppTour from "@/components/AppTour";
-import { colors, spacing } from "@/theme/theme";
+import { colors } from "@/theme/theme";
 
 function ScanTabButton(props: any) {
   const focused = props.accessibilityState?.selected ?? false;
@@ -20,16 +20,16 @@ function ScanTabButton(props: any) {
           width: 56,
           height: 56,
           borderRadius: 28,
-          backgroundColor: focused ? colors.primary : colors.surface,
+          backgroundColor: focused ? colors.primary : colors.surfaceAlt,
           borderWidth: 1.5,
-          borderColor: focused ? colors.primaryBright + "aa" : colors.borderHi,
+          borderColor: colors.primaryBright + (focused ? "dd" : "55"),
           alignItems: "center",
           justifyContent: "center",
           marginTop: -22,
           shadowColor: colors.primaryBright,
           shadowOffset: { width: 0, height: 0 },
-          shadowOpacity: focused ? 0.55 : 0.15,
-          shadowRadius: 14,
+          shadowOpacity: focused ? 0.7 : 0.3,
+          shadowRadius: 18,
           elevation: 12,
         }}
       >
@@ -54,7 +54,6 @@ function ScanTabButton(props: any) {
 }
 
 export default function TabsLayout() {
-  const router = useRouter();
   const [showTour, setShowTour] = useState(false);
 
   useEffect(() => {
@@ -80,8 +79,8 @@ export default function TabsLayout() {
         screenOptions={{
           headerShown: false,
           tabBarStyle: {
-            backgroundColor: colors.surface,
-            borderTopColor: colors.border,
+            backgroundColor: "rgba(10,10,18,0.94)",
+            borderTopColor: colors.borderHi,
             borderTopWidth: 1,
             height: 72,
             paddingBottom: 8,

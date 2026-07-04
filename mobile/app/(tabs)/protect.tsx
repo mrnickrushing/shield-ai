@@ -5,8 +5,9 @@ import React from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { GlowBackground } from "@/components/GlowBackground";
 import { ShieldAPI } from "@/lib/api";
-import { colors, radius, shadow, spacing } from "@/theme/theme";
+import { colors, glow, radius, spacing } from "@/theme/theme";
 
 type FeatureCardProps = {
   icon: keyof typeof Ionicons.glyphMap;
@@ -95,18 +96,35 @@ function FeatureCard({
       style={({ pressed }) => ({
         width: "100%",
         height: wide ? 144 : 168,
-        backgroundColor: pressed ? colors.surfaceActive : colors.surface,
+        backgroundColor: pressed ? colors.glassActive : colors.glassDeep,
         borderRadius: radius.xl,
         borderWidth: 1,
-        borderColor: colors.border,
+        borderColor: `${color}35`,
         overflow: "hidden",
         alignSelf: compact ? "stretch" : undefined,
-        ...shadow.sm,
+        transform: [{ scale: pressed ? 0.97 : 1 }],
+        ...glow(color, "sm"),
       })}
     >
+      {/* Accent top-edge glow line */}
+      <View
+        pointerEvents="none"
+        style={{
+          position: "absolute",
+          top: 0,
+          left: radius.xl,
+          right: radius.xl,
+          height: 2,
+          borderRadius: 1,
+          backgroundColor: color,
+          opacity: 0.85,
+          zIndex: 1,
+          ...glow(color, "sm"),
+        }}
+      />
       <View
         style={{
-          backgroundColor: `${color}18`,
+          backgroundColor: `${color}14`,
           borderBottomWidth: 1,
           borderBottomColor: `${color}30`,
           padding: spacing.md,
@@ -124,6 +142,7 @@ function FeatureCard({
             backgroundColor: `${color}28`,
             alignItems: "center",
             justifyContent: "center",
+            ...glow(color, "sm"),
           }}
         >
           <Ionicons name={icon} size={20} color={color} />
@@ -203,6 +222,7 @@ export default function ProtectScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
+      <GlowBackground centerY={0.1} />
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{
@@ -213,7 +233,7 @@ export default function ProtectScreen() {
       >
         <View
           style={{
-            backgroundColor: colors.surface,
+            backgroundColor: colors.glassDeep,
             borderRadius: 24,
             borderWidth: 1,
             borderColor: `${colors.primaryBright}33`,
