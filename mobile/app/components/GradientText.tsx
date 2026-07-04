@@ -23,7 +23,7 @@ export function GradientText({
   fontSize: number;
   width: number;
   height: number;
-  stops?: string[];
+  stops?: readonly string[];
   fontWeight?: string;
   letterSpacing?: number;
 }) {

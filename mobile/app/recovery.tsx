@@ -4,8 +4,9 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useState } from "react";
 import { Alert, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 
+import { Button, Eyebrow, FadeIn, GlowOrb, Surface } from "@/components/ui";
 import { ShieldAPI } from "@/lib/api";
-import { colors, radius, shadow, spacing } from "@/theme/theme";
+import { colors, radius, spacing, withAlpha } from "@/theme/theme";
 
 const SCAM_TYPES = [
   { key: "bank_transfer",    label: "Bank Transfer",    icon: "card-outline" as const,            description: "Wire, Zelle, ACH, or check fraud",           iconColor: colors.critical },
@@ -67,36 +68,38 @@ export default function RecoveryScreen() {
 
   if (phase === "select") {
     return (
-      <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ padding: spacing.lg }}>
-        <Text style={{ color: colors.text, fontSize: 26, fontWeight: "900", letterSpacing: -0.5, marginBottom: 4 }}>Scam Recovery</Text>
-        <Text style={{ color: colors.textMuted, fontSize: 14, marginBottom: spacing.lg }}>What type of scam happened? We&apos;ll give you a step-by-step plan.</Text>
-        {SCAM_TYPES.map((t) => (
-          <Pressable key={t.key}
-            onPress={() => { setSelectedType(t.key); createIncident.mutate(t.key); }}
-            disabled={createIncident.isPending}
-            style={({ pressed }) => ({
-              backgroundColor: pressed ? colors.surfaceActive : colors.surface,
-              borderColor: colors.border,
-              borderWidth: 1,
-              borderRadius: radius.lg,
-              padding: spacing.lg,
-              marginBottom: spacing.sm,
-              flexDirection: "row",
-              alignItems: "center",
-              gap: spacing.md,
-              ...shadow.sm,
-            })}
-          >
-            <View style={{ width: 42, height: 42, borderRadius: radius.md, backgroundColor: t.iconColor + "22", alignItems: "center", justifyContent: "center" }}>
-              <Ionicons name={t.icon} size={20} color={t.iconColor} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ color: colors.text, fontWeight: "700", fontSize: 16, letterSpacing: -0.2 }}>{t.label}</Text>
-              <Text style={{ color: colors.textMuted, fontSize: 13 }}>{t.description}</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-          </Pressable>
-        ))}
+      <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxl }}>
+        <FadeIn>
+          <Surface accent={colors.critical} glow={withAlpha(colors.critical, "30")} style={{ marginBottom: spacing.lg, position: "relative" }}>
+            <GlowOrb color={colors.critical} size={200} opacity={0.26} style={{ top: -60, right: -50 }} />
+            <Eyebrow style={{ color: colors.critical, marginBottom: spacing.sm }}>RECOVERY</Eyebrow>
+            <Text style={{ color: colors.text, fontSize: 26, fontWeight: "900", letterSpacing: -0.5, marginBottom: 4 }}>Scam Recovery</Text>
+            <Text style={{ color: colors.textMuted, fontSize: 14, lineHeight: 21 }}>
+              What type of scam happened? We&apos;ll give you a step-by-step plan.
+            </Text>
+          </Surface>
+        </FadeIn>
+
+        <FadeIn delay={60}>
+          <View style={{ gap: spacing.sm }}>
+            {SCAM_TYPES.map((t) => (
+              <Surface
+                key={t.key}
+                onPress={() => { setSelectedType(t.key); createIncident.mutate(t.key); }}
+                style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}
+              >
+                <View style={{ width: 42, height: 42, borderRadius: radius.md, backgroundColor: withAlpha(t.iconColor, "22"), alignItems: "center", justifyContent: "center" }}>
+                  <Ionicons name={t.icon} size={20} color={t.iconColor} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: colors.text, fontWeight: "700", fontSize: 16, letterSpacing: -0.2 }}>{t.label}</Text>
+                  <Text style={{ color: colors.textMuted, fontSize: 13 }}>{t.description}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+              </Surface>
+            ))}
+          </View>
+        </FadeIn>
       </ScrollView>
     );
   }
@@ -106,98 +109,105 @@ export default function RecoveryScreen() {
     const progress = totalSteps > 0 ? checkedSteps.length / totalSteps : 0;
 
     return (
-      <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ padding: spacing.lg }}>
-        <Text style={{ color: colors.text, fontSize: 26, fontWeight: "900", letterSpacing: -0.5, marginBottom: 4 }}>Recovery Steps</Text>
-        <Text style={{ color: colors.textMuted, fontSize: 14, marginBottom: spacing.md }}>Work through each step. Tap to mark complete.</Text>
+      <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxl }}>
+        <FadeIn>
+          <Text style={{ color: colors.text, fontSize: 26, fontWeight: "900", letterSpacing: -0.5, marginBottom: 4 }}>Recovery Steps</Text>
+          <Text style={{ color: colors.textMuted, fontSize: 14, marginBottom: spacing.md }}>Work through each step. Tap to mark complete.</Text>
+        </FadeIn>
 
-        {/* Progress bar */}
-        <View style={{ backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.md, marginBottom: spacing.lg }}>
-          <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 8 }}>
-            <Text style={{ color: colors.textMuted, fontSize: 12 }}>Progress</Text>
-            <Text style={{ color: progress === 1 ? colors.safe : colors.primaryBright, fontWeight: "700", fontSize: 12 }}>
-              {checkedSteps.length} / {totalSteps} steps
-            </Text>
-          </View>
-          <View style={{ height: 6, backgroundColor: colors.bg, borderRadius: 3, overflow: "hidden" }}>
-            <View style={{ height: "100%", width: `${progress * 100}%`, backgroundColor: progress === 1 ? colors.safe : colors.primary, borderRadius: 3 }} />
-          </View>
-        </View>
+        <FadeIn delay={60}>
+          <Surface style={{ marginBottom: spacing.lg }}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 8 }}>
+              <Eyebrow>PROGRESS</Eyebrow>
+              <Text style={{ color: progress === 1 ? colors.safe : colors.primaryBright, fontWeight: "700", fontSize: 12 }}>
+                {checkedSteps.length} / {totalSteps} steps
+              </Text>
+            </View>
+            <View style={{ height: 6, backgroundColor: colors.bg, borderRadius: 3, overflow: "hidden" }}>
+              <View style={{ height: "100%", width: `${progress * 100}%`, backgroundColor: progress === 1 ? colors.safe : colors.primary, borderRadius: 3 }} />
+            </View>
+          </Surface>
+        </FadeIn>
 
-        {(steps ?? []).map((step: any) => {
-          const done = checkedSteps.includes(step.id);
-          return (
-            <Pressable key={step.id} onPress={() => toggleStep(step.id)}
-              style={{
-                backgroundColor: done ? "#0f2a18" : colors.surface,
-                borderColor: done ? colors.safe : colors.border,
-                borderWidth: 1,
-                borderRadius: radius.lg,
-                padding: spacing.lg,
-                marginBottom: spacing.md,
-                ...shadow.sm,
-              }}
-            >
-              <View style={{ flexDirection: "row", alignItems: "flex-start", gap: spacing.sm }}>
-                <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: done ? colors.safe : "transparent", borderWidth: 2, borderColor: done ? colors.safe : colors.border, alignItems: "center", justifyContent: "center", marginTop: 2 }}>
-                  {done && <Text style={{ color: "#000", fontSize: 11, fontWeight: "900" }}>✓</Text>}
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ color: done ? colors.safe : colors.text, fontWeight: "700", fontSize: 16, marginBottom: 4, letterSpacing: -0.2 }}>{step.title}</Text>
-                  <View style={{ flexDirection: "row", marginBottom: 6 }}>
-                    <View style={{ backgroundColor: (URGENCY_COLOR[step.urgency] ?? colors.textMuted) + "22", borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 }}>
-                      <Text style={{ color: URGENCY_COLOR[step.urgency] ?? colors.textMuted, fontSize: 10, fontWeight: "700", textTransform: "uppercase" }}>{step.urgency}</Text>
+        <FadeIn delay={100}>
+          <View style={{ gap: spacing.md, marginBottom: spacing.sm }}>
+            {(steps ?? []).map((step: any) => {
+              const done = checkedSteps.includes(step.id);
+              return (
+                <Surface
+                  key={step.id}
+                  onPress={() => toggleStep(step.id)}
+                  accent={done ? colors.safe : undefined}
+                  style={done ? { backgroundColor: withAlpha(colors.safe, "14") } : undefined}
+                >
+                  <View style={{ flexDirection: "row", alignItems: "flex-start", gap: spacing.sm }}>
+                    <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: done ? colors.safe : "transparent", borderWidth: 2, borderColor: done ? colors.safe : colors.border, alignItems: "center", justifyContent: "center", marginTop: 2 }}>
+                      {done && <Text style={{ color: "#000", fontSize: 11, fontWeight: "900" }}>✓</Text>}
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: done ? colors.safe : colors.text, fontWeight: "700", fontSize: 16, marginBottom: 4, letterSpacing: -0.2 }}>{step.title}</Text>
+                      <View style={{ flexDirection: "row", marginBottom: 6 }}>
+                        <View style={{ backgroundColor: withAlpha(URGENCY_COLOR[step.urgency] ?? colors.textMuted, "22"), borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 }}>
+                          <Text style={{ color: URGENCY_COLOR[step.urgency] ?? colors.textMuted, fontSize: 10, fontWeight: "700", textTransform: "uppercase" }}>{step.urgency}</Text>
+                        </View>
+                      </View>
+                      <Text style={{ color: colors.textMuted, fontSize: 14, lineHeight: 21 }}>{step.body}</Text>
+                      {step.contacts?.map((c: any) => (
+                        <Text key={c.label} style={{ color: colors.primaryBright, fontSize: 13, marginTop: 6 }}>→ {c.label}: {c.value}</Text>
+                      ))}
                     </View>
                   </View>
-                  <Text style={{ color: colors.textMuted, fontSize: 14, lineHeight: 21 }}>{step.body}</Text>
-                  {step.contacts?.map((c: any) => (
-                    <Text key={c.label} style={{ color: colors.primaryBright, fontSize: 13, marginTop: 6 }}>→ {c.label}: {c.value}</Text>
-                  ))}
-                </View>
-              </View>
-            </Pressable>
-          );
-        })}
+                </Surface>
+              );
+            })}
+          </View>
+        </FadeIn>
 
-        <Pressable onPress={() => setPhase("evidence")}
-          style={{ backgroundColor: colors.primary, borderRadius: radius.lg, padding: spacing.lg, alignItems: "center", marginTop: spacing.sm, marginBottom: spacing.lg }}>
-          <Text style={{ color: "#fff", fontWeight: "700", fontSize: 16 }}>Add Evidence →</Text>
-        </Pressable>
+        <FadeIn delay={140}>
+          <Button label="Add Evidence" icon="arrow-forward" onPress={() => setPhase("evidence")} style={{ marginTop: spacing.sm }} />
+        </FadeIn>
       </ScrollView>
     );
   }
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ padding: spacing.lg }}>
-      <Text style={{ color: colors.text, fontSize: 26, fontWeight: "900", letterSpacing: -0.5, marginBottom: 4 }}>Preserve Evidence</Text>
-      <Text style={{ color: colors.textMuted, fontSize: 14, marginBottom: spacing.lg }}>Add notes, URLs, transaction IDs, or any other details for your report.</Text>
-      <TextInput
-        placeholder="Label (e.g. Scammer message, Transaction ID)"
-        placeholderTextColor={colors.textMuted}
-        value={evidenceLabel}
-        onChangeText={setEvidenceLabel}
-        style={{ backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: radius.md, color: colors.text, padding: spacing.md, marginBottom: spacing.sm, fontSize: 15 }}
-      />
-      <TextInput
-        placeholder="Paste text, URL, transaction ID, or notes here..."
-        placeholderTextColor={colors.textMuted}
-        value={evidenceText}
-        onChangeText={setEvidenceText}
-        multiline
-        numberOfLines={5}
-        style={{ backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: radius.md, color: colors.text, padding: spacing.md, marginBottom: spacing.md, fontSize: 15, textAlignVertical: "top", minHeight: 120 }}
-      />
-      <Pressable
-        onPress={() => { if (evidenceText) addEvidence.mutate(); }}
-        style={{ backgroundColor: evidenceText ? colors.primary : colors.surface, borderRadius: radius.lg, padding: spacing.lg, alignItems: "center", marginBottom: spacing.md }}
-      >
-        <Text style={{ color: evidenceText ? "#fff" : colors.textMuted, fontWeight: "700", fontSize: 16 }}>Save Evidence</Text>
-      </Pressable>
-      <Pressable
-        onPress={() => incidentId ? router.replace(`/incident?id=${incidentId}`) : router.back()}
-        style={{ padding: spacing.md, alignItems: "center" }}
-      >
-        <Text style={{ color: colors.primaryBright, fontSize: 15 }}>View Full Report →</Text>
-      </Pressable>
+    <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxl }}>
+      <FadeIn>
+        <Text style={{ color: colors.text, fontSize: 26, fontWeight: "900", letterSpacing: -0.5, marginBottom: 4 }}>Preserve Evidence</Text>
+        <Text style={{ color: colors.textMuted, fontSize: 14, marginBottom: spacing.lg }}>Add notes, URLs, transaction IDs, or any other details for your report.</Text>
+      </FadeIn>
+
+      <FadeIn delay={60}>
+        <TextInput
+          placeholder="Label (e.g. Scammer message, Transaction ID)"
+          placeholderTextColor={colors.textMuted}
+          value={evidenceLabel}
+          onChangeText={setEvidenceLabel}
+          style={{ backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: radius.md, color: colors.text, padding: spacing.md, marginBottom: spacing.sm, fontSize: 15 }}
+        />
+        <TextInput
+          placeholder="Paste text, URL, transaction ID, or notes here..."
+          placeholderTextColor={colors.textMuted}
+          value={evidenceText}
+          onChangeText={setEvidenceText}
+          multiline
+          numberOfLines={5}
+          style={{ backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: radius.md, color: colors.text, padding: spacing.md, marginBottom: spacing.md, fontSize: 15, textAlignVertical: "top", minHeight: 120 }}
+        />
+        <Button
+          label="Save Evidence"
+          onPress={() => { if (evidenceText) addEvidence.mutate(); }}
+          disabled={!evidenceText}
+          loading={addEvidence.isPending}
+          style={{ marginBottom: spacing.md }}
+        />
+        <Pressable
+          onPress={() => (incidentId ? router.replace(`/incident?id=${incidentId}`) : router.back())}
+          style={{ padding: spacing.md, alignItems: "center" }}
+        >
+          <Text style={{ color: colors.primaryBright, fontSize: 15 }}>View Full Report →</Text>
+        </Pressable>
+      </FadeIn>
     </ScrollView>
   );
 }

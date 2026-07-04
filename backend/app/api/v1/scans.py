@@ -35,21 +35,10 @@ router = APIRouter(prefix="/scans", tags=["scans"])
 
 
 def _check_quota(db: Session, user: User) -> None:
-    if user.is_premium:
-        return
-    from app.core.config import settings
+    # Shared daily allowance (also enforced on Shield Labs vertical scans).
+    from app.services.quota import check_daily_scan_quota
 
-    start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-    used = (
-        db.query(ScanHistory)
-        .filter(ScanHistory.user_id == user.id, ScanHistory.created_at >= start)
-        .count()
-    )
-    if used >= settings.FREE_TIER_DAILY_SCANS:
-        raise HTTPException(
-            status.HTTP_429_TOO_MANY_REQUESTS,
-            "Daily free scan limit reached. Upgrade to Premium for unlimited scans.",
-        )
+    check_daily_scan_quota(db, user)
 
 
 @router.post("/link", response_model=ScanOut, status_code=status.HTTP_201_CREATED)
@@ -94,7 +83,7 @@ def create_image_scan(
     db.refresh(scan)
 
     scan_service.process_image_scan(db, scan, image_bytes, storage_key=payload.filename)
-    db.add(ApiUsage(user_id=user.id, provider="openai"))
+    db.add(ApiUsage(user_id=user.id, provider="anthropic"))
     db.commit()
     db.refresh(scan)
     return scan
@@ -186,7 +175,7 @@ def create_message_scan(
     db.refresh(scan)
 
     scan_service.process_message_scan(db, scan, payload.message_text, payload.platform_hint)
-    db.add(ApiUsage(user_id=user.id, provider="openai"))
+    db.add(ApiUsage(user_id=user.id, provider="anthropic"))
     db.commit()
     db.refresh(scan)
     return scan
@@ -224,7 +213,7 @@ def create_email_scan(
         subject=payload.subject,
         body_text=payload.body_text,
     )
-    db.add(ApiUsage(user_id=user.id, provider="openai"))
+    db.add(ApiUsage(user_id=user.id, provider="anthropic"))
     db.commit()
     db.refresh(scan)
     return scan
@@ -271,7 +260,7 @@ def create_marketplace_scan(
     db.refresh(scan)
 
     scan_service.process_marketplace_scan(db, scan, payload.content_text, payload.platform_hint)
-    db.add(ApiUsage(user_id=user.id, provider="openai"))
+    db.add(ApiUsage(user_id=user.id, provider="anthropic"))
     db.commit()
     db.refresh(scan)
     return scan
@@ -293,7 +282,7 @@ def create_social_scan(
     db.refresh(scan)
 
     scan_service.process_social_scan(db, scan, payload.content_text, payload.platform)
-    db.add(ApiUsage(user_id=user.id, provider="openai"))
+    db.add(ApiUsage(user_id=user.id, provider="anthropic"))
     db.commit()
     db.refresh(scan)
     return scan

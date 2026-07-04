@@ -1,10 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, Switch, Text, TextInput, View } from "react-native";
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Switch, Text, TextInput, View } from "react-native";
 
+import { Button, Eyebrow, FadeIn, GlowOrb, Surface } from "@/components/ui";
 import { useAuth } from "@/state/auth";
-import { colors, radius, spacing } from "@/theme/theme";
+import { colors, radius, spacing, withAlpha } from "@/theme/theme";
 
 function SettingRow({ label, description, value, onValueChange }: { label: string; description: string; value: boolean; onValueChange: (v: boolean) => void }) {
   return (
@@ -20,6 +21,53 @@ function SettingRow({ label, description, value, onValueChange }: { label: strin
         thumbColor={value ? colors.primaryBright : colors.textMuted}
       />
     </View>
+  );
+}
+
+function LinkRow({
+  icon,
+  label,
+  description,
+  onPress,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  description: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => ({
+        flexDirection: "row",
+        alignItems: "center",
+        backgroundColor: pressed ? colors.surfaceActive : colors.surface,
+        borderRadius: radius.lg,
+        padding: spacing.lg,
+        marginBottom: spacing.sm,
+        borderWidth: 1,
+        borderColor: colors.border,
+        gap: spacing.md,
+      })}
+    >
+      <View
+        style={{
+          width: 40,
+          height: 40,
+          borderRadius: radius.md,
+          backgroundColor: withAlpha(colors.primaryBright, "1a"),
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Ionicons name={icon} size={20} color={colors.primaryBright} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={{ color: colors.text, fontWeight: "700", fontSize: 15 }}>{label}</Text>
+        <Text style={{ color: colors.textMuted, fontSize: 13, marginTop: 1 }}>{description}</Text>
+      </View>
+      <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+    </Pressable>
   );
 }
 
@@ -70,71 +118,105 @@ export default function Profile() {
       <ScrollView contentContainerStyle={{ padding: spacing.lg }}>
 
         {/* Avatar + tier */}
-        <View style={{ alignItems: "center", marginBottom: spacing.xl }}>
-          <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center", marginBottom: spacing.sm }}>
-            <Text style={{ color: "#fff", fontSize: 28, fontWeight: "800" }}>{initials}</Text>
+        <FadeIn>
+          <View style={{ alignItems: "center", marginBottom: spacing.xl }}>
+            <View style={{ alignItems: "center", justifyContent: "center", marginBottom: spacing.sm }}>
+              <GlowOrb color={colors.primaryBright} size={150} opacity={0.4} style={{ top: -35, left: -35 }} />
+              <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" }}>
+                <Text style={{ color: "#fff", fontSize: 28, fontWeight: "800" }}>{initials}</Text>
+              </View>
+            </View>
+            <View style={{ backgroundColor: user?.is_premium ? colors.purple : colors.surface, borderRadius: radius.sm, paddingHorizontal: spacing.sm, paddingVertical: 4 }}>
+              <Text style={{ color: user?.is_premium ? "#fff" : colors.textMuted, fontSize: 12, fontWeight: "700", letterSpacing: 0.8 }}>
+                {user?.is_premium ? "✦  PREMIUM" : "FREE"}
+              </Text>
+            </View>
           </View>
-          <View style={{ backgroundColor: user?.is_premium ? colors.purple : colors.surface, borderRadius: radius.sm, paddingHorizontal: spacing.sm, paddingVertical: 4 }}>
-            <Text style={{ color: user?.is_premium ? "#fff" : colors.textMuted, fontSize: 12, fontWeight: "700", letterSpacing: 0.8 }}>
-              {user?.is_premium ? "✦  PREMIUM" : "FREE"}
-            </Text>
+        </FadeIn>
+
+        <FadeIn delay={60}>
+          {/* Display name */}
+          <Eyebrow style={{ marginBottom: spacing.xs }}>Display Name</Eyebrow>
+          <TextInput
+            value={name}
+            onChangeText={setName}
+            placeholder="Your name"
+            placeholderTextColor={colors.textMuted}
+            returnKeyType="done"
+            onSubmitEditing={save}
+            style={{ backgroundColor: colors.surface, borderColor: isDirty ? colors.primary : colors.border, borderWidth: 1, borderRadius: radius.md, color: colors.text, padding: spacing.md, marginBottom: spacing.lg }}
+          />
+
+          {/* Email */}
+          <Eyebrow style={{ marginBottom: spacing.xs }}>Email</Eyebrow>
+          <View style={{ backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.xl }}>
+            <Text style={{ color: colors.textMuted }}>{user?.email}</Text>
           </View>
-        </View>
+        </FadeIn>
 
-        {/* Display name */}
-        <Text style={{ color: colors.textMuted, fontSize: 11, marginBottom: spacing.xs, textTransform: "uppercase", letterSpacing: 0.8, fontWeight: "700" }}>Display Name</Text>
-        <TextInput
-          value={name}
-          onChangeText={setName}
-          placeholder="Your name"
-          placeholderTextColor={colors.textMuted}
-          returnKeyType="done"
-          onSubmitEditing={save}
-          style={{ backgroundColor: colors.surface, borderColor: isDirty ? colors.primary : colors.border, borderWidth: 1, borderRadius: radius.md, color: colors.text, padding: spacing.md, marginBottom: spacing.lg }}
-        />
+        <FadeIn delay={100}>
+          {/* Accessibility settings */}
+          <Eyebrow style={{ marginBottom: spacing.sm }}>Accessibility</Eyebrow>
+          <SettingRow
+            label="Large Text Mode"
+            description="Increases font sizes throughout the app."
+            value={largeText}
+            onValueChange={setLargeText}
+          />
+          <SettingRow
+            label="Simple Language"
+            description="Uses plain, easy-to-read language in reports."
+            value={simpleLanguage}
+            onValueChange={setSimpleLanguage}
+          />
 
-        {/* Email */}
-        <Text style={{ color: colors.textMuted, fontSize: 11, marginBottom: spacing.xs, textTransform: "uppercase", letterSpacing: 0.8, fontWeight: "700" }}>Email</Text>
-        <View style={{ backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.xl }}>
-          <Text style={{ color: colors.textMuted }}>{user?.email}</Text>
-        </View>
+          {error && <Text style={{ color: colors.critical, marginBottom: spacing.md, marginTop: spacing.sm }}>{error}</Text>}
 
-        {/* Accessibility settings */}
-        <Text style={{ color: colors.textMuted, fontSize: 11, marginBottom: spacing.sm, textTransform: "uppercase", letterSpacing: 0.8, fontWeight: "700" }}>Accessibility</Text>
-        <SettingRow
-          label="Large Text Mode"
-          description="Increases font sizes throughout the app."
-          value={largeText}
-          onValueChange={setLargeText}
-        />
-        <SettingRow
-          label="Simple Language"
-          description="Uses plain, easy-to-read language in reports."
-          value={simpleLanguage}
-          onValueChange={setSimpleLanguage}
-        />
+          <Button
+            label={saved ? "Saved ✓" : "Save Changes"}
+            onPress={save}
+            disabled={!isDirty}
+            loading={saving}
+            variant={isDirty ? "primary" : "secondary"}
+            style={{ marginBottom: spacing.lg, marginTop: spacing.sm }}
+          />
+        </FadeIn>
 
-        {error && <Text style={{ color: colors.critical, marginBottom: spacing.md, marginTop: spacing.sm }}>{error}</Text>}
+        <FadeIn delay={140}>
+          <Eyebrow style={{ marginBottom: spacing.sm }}>Advanced</Eyebrow>
+          <LinkRow
+            icon="notifications-outline"
+            label="Notifications"
+            description="Review alerts and updates we've sent you."
+            onPress={() => router.push("/notifications")}
+          />
+          <LinkRow
+            icon="code-slash-outline"
+            label="Developer"
+            description="Manage API keys for programmatic scanning."
+            onPress={() => router.push("/developer")}
+          />
+        </FadeIn>
 
-        <Pressable
-          onPress={save}
-          disabled={saving || !isDirty}
-          style={{ backgroundColor: isDirty ? colors.primary : colors.surface, padding: spacing.md, borderRadius: radius.md, alignItems: "center", marginBottom: spacing.md, marginTop: spacing.sm, opacity: saving ? 0.7 : 1 }}
-        >
-          {saving ? <ActivityIndicator color="#fff" /> : (
-            <Text style={{ color: isDirty ? "#fff" : colors.textMuted, fontWeight: "700" }}>
-              {saved ? "Saved ✓" : "Save Changes"}
-            </Text>
-          )}
-        </Pressable>
-
-        <Pressable
-          onPress={async () => { await logout(); router.replace("/login"); }}
-          style={{ padding: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: colors.critical, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: spacing.sm }}
-        >
-          <Ionicons name="log-out-outline" size={18} color={colors.critical} />
-          <Text style={{ color: colors.critical, fontWeight: "600" }}>Sign Out</Text>
-        </Pressable>
+        <FadeIn delay={180}>
+          <Surface
+            onPress={async () => {
+              await logout();
+              router.replace("/login");
+            }}
+            style={{
+              alignItems: "center",
+              flexDirection: "row",
+              justifyContent: "center",
+              gap: spacing.sm,
+              borderColor: colors.critical,
+              marginTop: spacing.md,
+            }}
+          >
+            <Ionicons name="log-out-outline" size={18} color={colors.critical} />
+            <Text style={{ color: colors.critical, fontWeight: "600" }}>Sign Out</Text>
+          </Surface>
+        </FadeIn>
       </ScrollView>
     </KeyboardAvoidingView>
   );

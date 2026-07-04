@@ -25,9 +25,26 @@ SUSPICIOUS_TLDS = {
 
 # Common brands frequently impersonated in phishing.
 SENSITIVE_BRANDS = [
+    # Payment / financial
     "paypal", "apple", "icloud", "microsoft", "amazon", "netflix", "chase",
     "wellsfargo", "bankofamerica", "coinbase", "binance", "usps", "fedex",
     "ups", "dhl", "irs", "facebook", "instagram", "google", "outlook",
+    "mcafee", "norton", "lifelock", "webroot", "malwarebytes", "geek squad",
+    "citibank", "citi", "capitalone", "usbank", "tdbank", "discover",
+    "americanexpress", "amex", "hsbc", "venmo", "cashapp", "zelle",
+    "robinhood", "kraken", "schwab", "fidelity",
+    # Tech / subscriptions
+    "adobe", "dropbox", "spotify", "disneyplus", "hulu", "linkedin",
+    "tiktok", "snapchat", "whatsapp", "twitter", "steam", "playstation",
+    "xbox", "roblox",
+    # Telecom / retail
+    "verizon", "at&t", "tmobile", "t-mobile", "xfinity", "comcast", "walmart", "target",
+    "costco", "bestbuy",
+    # Shipping / logistics
+    "dpd", "ontrac",
+    # Government / insurance
+    "socialsecurity", "medicare", "dmv", "geico", "statefarm", "allstate",
+    "progressive",
 ]
 
 

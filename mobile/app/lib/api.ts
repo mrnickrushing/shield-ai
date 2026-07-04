@@ -72,11 +72,13 @@ export type ScanType =
   | "email"
   | "phone"
   | "marketplace"
-  | "social";
+  | "social"
+  | "vertical";
 
 export type Scan = {
   id: string;
   scan_type: ScanType;
+  vertical_key?: string | null;
   status: string;
   raw_input: string;
   created_at: string;
@@ -201,6 +203,34 @@ export type EmailScanPayload = {
   body_text?: string;
 };
 
+// Shield Labs — portfolio verticals on the shared Verdict Engine
+export type VerticalInfo = {
+  key: string;
+  name: string;
+  tagline: string;
+  accent: string;
+  icon: string;
+  input_label: string;
+  input_placeholder: string;
+  input_multiline: boolean;
+  accepts_files: boolean;
+};
+
+export type Verdict = {
+  vertical: string;
+  vertical_name: string;
+  risk_score: number;
+  risk_level: "safe" | "low" | "suspicious" | "high" | "critical";
+  threat_category: string;
+  confidence: number;
+  explanation: string;
+  red_flags: string[];
+  recommended_actions: string[];
+  evidence: Record<string, unknown>;
+  output_title: string;
+  output_artifact: string;
+};
+
 // ---------------------------------------------------------------------------
 // API surface
 // ---------------------------------------------------------------------------
@@ -215,7 +245,11 @@ export const ShieldAPI = {
     `${API_URL}/api/v1/auth/google/start?return_url=${encodeURIComponent(return_url)}`,
   updateProfile: (patch: { display_name?: string; large_text_mode?: boolean; simple_language_mode?: boolean }) => api.patch<UserProfile>("/auth/me", patch).then((r) => r.data),
   scanLink: (url: string) => api.post<Scan>("/scans/link", { url }).then((r) => r.data),
-  scanImage: (image_base64: string, filename = "screenshot.png") => api.post<Scan>("/scans/image", { image_base64, filename }).then((r) => r.data),
+  // Claude vision + OCR + URL enrichment routinely runs past the default
+  // 30s timeout, which surfaces as a response-less error here — give image
+  // scans more headroom than the rest of the API.
+  scanImage: (image_base64: string, filename = "screenshot.png") =>
+    api.post<Scan>("/scans/image", { image_base64, filename }, { timeout: 60000 }).then((r) => r.data),
   scanQR: (qr_content: string) => api.post<Scan>("/scans/qr", { qr_content }).then((r) => r.data),
   scanMessage: (message_text: string, platform_hint?: string) =>
     api.post<Scan>("/scans/message", { message_text, platform_hint }).then((r) => r.data),
@@ -231,6 +265,13 @@ export const ShieldAPI = {
   getScan: (id: string) => api.get<Scan>(`/scans/${id}`).then((r) => r.data),
   feedback: (id: string, feedback: "helpful" | "false_positive") =>
     api.post(`/scans/${id}/feedback`, { feedback }),
+
+  // Shield Labs — portfolio verticals
+  listVerticals: () => api.get<VerticalInfo[]>("/verticals").then((r) => r.data),
+  scanVertical: (key: string, input: string, context: Record<string, unknown> = {}) =>
+    api.post<Verdict>(`/verticals/${key}/scan`, { input, context }).then((r) => r.data),
+  scanVerticalFile: (key: string, file_base64: string, context: Record<string, unknown> = {}) =>
+    api.post<Verdict>(`/verticals/${key}/scan`, { file_base64, context }).then((r) => r.data),
 
   // Notifications
   registerDevice: (push_token: string, platform: "ios" | "android") =>

@@ -15,7 +15,7 @@ type GradientButtonProps = {
   disabled?: boolean;
   loading?: boolean;
   /** Gradient stops; defaults to the primary indigo run. */
-  stops?: string[];
+  stops?: readonly string[];
   /** Glow color; defaults to the middle gradient stop. */
   glowColor?: string;
 };

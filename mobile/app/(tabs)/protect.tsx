@@ -346,6 +346,19 @@ export default function ProtectScreen() {
           ))}
         </View>
 
+        <SectionLabel>SHIELD LABS</SectionLabel>
+        <View style={{ marginBottom: spacing.lg }}>
+          <FeatureCard
+            icon="flask-outline"
+            color={colors.primaryBright}
+            title="Shield Labs"
+            body="New decision assistants on the same engine: medical bills, contracts, job offers, calls, family, and recovery."
+            tag="NEW"
+            onPress={() => router.push("/labs" as any)}
+            wide
+          />
+        </View>
+
         <SectionLabel>STAY SHARP</SectionLabel>
         <View style={{ gap: spacing.md }}>
           <FeatureCard

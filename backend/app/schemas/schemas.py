@@ -1,7 +1,7 @@
 """Pydantic request/response schemas for Phase 1 + Phase 2 + Phase 4."""
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, model_validator
 
 
 class UserRegister(BaseModel):
@@ -76,6 +76,7 @@ class RiskReportOut(BaseModel):
 class ScanOut(BaseModel):
     id: str
     scan_type: str
+    vertical_key: str | None = None
     status: str
     raw_input: str
     created_at: datetime
@@ -125,6 +126,49 @@ class SocialScanCreate(BaseModel):
 class DeviceRegister(BaseModel):
     push_token: str
     platform: str = Field(pattern="^(ios|android)$")
+
+
+# ---------------------------------------------------------------------------
+# Verticals — portfolio apps on the shared Verdict Engine
+# ---------------------------------------------------------------------------
+
+class VerticalScanRequest(BaseModel):
+    input: str = Field(default="", max_length=20000)
+    file_base64: str | None = None  # photo or PDF of a document (verticals that accept files)
+    context: dict = {}
+
+    @model_validator(mode="after")
+    def _require_input_or_file(self):
+        if not (self.input.strip() or self.file_base64):
+            raise ValueError("Provide either input text or a file.")
+        return self
+
+
+class VerticalInfo(BaseModel):
+    key: str
+    name: str
+    tagline: str
+    accent: str
+    icon: str
+    input_label: str
+    input_placeholder: str
+    input_multiline: bool
+    accepts_files: bool = False
+
+
+class VerdictOut(BaseModel):
+    vertical: str
+    vertical_name: str
+    risk_score: int
+    risk_level: str
+    threat_category: str
+    confidence: float
+    explanation: str
+    red_flags: list[str]
+    recommended_actions: list[str]
+    evidence: dict
+    output_title: str = ""
+    output_artifact: str = ""
 
 
 class NotificationOut(BaseModel):

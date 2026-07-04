@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
@@ -12,15 +13,16 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
 
+import { Button, Eyebrow, FadeIn, Surface } from "@/components/ui";
 import { ShieldAPI, Scan } from "@/lib/api";
-import { colors, radius, spacing } from "@/theme/theme";
+import { colors, radius, spacing, withAlpha } from "@/theme/theme";
 
 const RISK_COLORS: Record<string, string> = {
-  safe: colors.safe ?? "#22c55e",
-  low: "#facc15",
-  suspicious: "#f97316",
-  high: "#ef4444",
-  critical: "#dc2626",
+  safe: colors.safe,
+  low: colors.low,
+  suspicious: colors.suspicious,
+  high: colors.high,
+  critical: colors.critical,
 };
 
 export default function BrowserScreen() {
@@ -70,6 +72,7 @@ export default function BrowserScreen() {
   const riskScore = scanResult?.report?.risk_score ?? 0;
   const isSafe = riskLevel === "safe" || riskLevel === "low";
   const isDangerous = riskLevel === "high" || riskLevel === "critical";
+  const riskColor = RISK_COLORS[riskLevel ?? "safe"];
 
   const domainLabel = (() => {
     if (!inputUrl.trim()) return null;
@@ -89,15 +92,17 @@ export default function BrowserScreen() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       {/* Header */}
-      <View style={{
-        paddingTop: insets.top + spacing.sm,
-        paddingHorizontal: spacing.md,
-        paddingBottom: spacing.md,
-        borderBottomColor: colors.border,
-        borderBottomWidth: 1,
-        gap: spacing.sm,
-      }}>
-        <Pressable onPress={() => router.back()}>
+      <View
+        style={{
+          paddingTop: insets.top + spacing.sm,
+          paddingHorizontal: spacing.md,
+          paddingBottom: spacing.md,
+          borderBottomColor: colors.border,
+          borderBottomWidth: 1,
+          gap: spacing.sm,
+        }}
+      >
+        <Pressable onPress={() => router.back()} hitSlop={12}>
           <Text style={{ color: colors.primaryBright, fontSize: 14 }}>← Back</Text>
         </Pressable>
 
@@ -128,38 +133,32 @@ export default function BrowserScreen() {
               fontSize: 14,
             }}
           />
-          <Pressable
+          <Button
+            label="Scan"
             onPress={handleScan}
-            disabled={scanning || !inputUrl.trim()}
-            style={{
-              backgroundColor: inputUrl.trim() ? colors.primary : colors.surface,
-              borderRadius: radius.md,
-              paddingHorizontal: spacing.md,
-              justifyContent: "center",
-            }}
-          >
-            {scanning ? (
-              <ActivityIndicator color="#fff" size="small" />
-            ) : (
-              <Text style={{ color: "#fff", fontWeight: "700" }}>Scan</Text>
-            )}
-          </Pressable>
+            disabled={!inputUrl.trim()}
+            loading={scanning}
+            size="sm"
+            style={{ alignSelf: "stretch", justifyContent: "center" }}
+          />
         </View>
 
         {/* Domain clarity bar */}
         {domainLabel && (
           <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.xs }}>
             {scanResult && (
-              <View style={{
-                width: 8,
-                height: 8,
-                borderRadius: 4,
-                backgroundColor: RISK_COLORS[riskLevel ?? "safe"],
-              }} />
+              <View
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: 4,
+                  backgroundColor: riskColor,
+                }}
+              />
             )}
             <Text style={{ color: colors.textMuted, fontSize: 12 }}>{domainLabel}</Text>
             {scanResult && riskScore > 0 && (
-              <Text style={{ color: RISK_COLORS[riskLevel ?? "safe"], fontSize: 12, fontWeight: "700" }}>
+              <Text style={{ color: riskColor, fontSize: 12, fontWeight: "700" }}>
                 · Risk {riskScore}/100
               </Text>
             )}
@@ -177,78 +176,77 @@ export default function BrowserScreen() {
       {/* Scan result warning overlay */}
       {scanResult && !confirmed && (
         <View style={{ padding: spacing.lg }}>
-          <View style={{
-            backgroundColor: colors.surface,
-            borderRadius: radius.lg,
-            borderColor: isDangerous ? colors.critical ?? "#ef4444" : colors.border,
-            borderWidth: isDangerous ? 2 : 1,
-            padding: spacing.lg,
-          }}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, marginBottom: spacing.sm }}>
-              <Text style={{ fontSize: 28 }}>{isDangerous ? "⚠️" : isSafe ? "✅" : "🔶"}</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={{ color: colors.text, fontWeight: "800", fontSize: 16 }}>
-                  {isDangerous ? "Warning: High Risk" : isSafe ? "Looks Safe" : "Proceed with Caution"}
-                </Text>
-                <Text style={{ color: RISK_COLORS[riskLevel ?? "safe"], fontWeight: "700" }}>
-                  {riskLevel?.toUpperCase()} · Score {riskScore}/100
-                </Text>
-              </View>
-            </View>
-
-            {scanResult.report?.explanation && (
-              <Text style={{ color: colors.textMuted, fontSize: 13, marginBottom: spacing.sm }}>
-                {scanResult.report.explanation}
-              </Text>
-            )}
-
-            {scanResult.report?.red_flags && scanResult.report.red_flags.length > 0 && (
-              <>
-                <Text style={{ color: colors.textMuted, fontSize: 12, fontWeight: "700", marginBottom: spacing.xs }}>
-                  RED FLAGS
-                </Text>
-                {scanResult.report.red_flags.map((flag, i) => (
-                  <View key={i} style={{ flexDirection: "row", gap: spacing.xs, marginBottom: 4 }}>
-                    <Text style={{ color: colors.critical ?? "#ef4444", fontSize: 13 }}>•</Text>
-                    <Text style={{ color: colors.textMuted, fontSize: 13, flex: 1 }}>{flag}</Text>
-                  </View>
-                ))}
-              </>
-            )}
-
-            <View style={{ flexDirection: "row", gap: spacing.sm, marginTop: spacing.md }}>
-              <Pressable
-                onPress={() => { setScanResult(null); setInputUrl(""); }}
-                style={{
-                  flex: 1,
-                  backgroundColor: colors.surface,
-                  borderColor: colors.border,
-                  borderWidth: 1,
-                  borderRadius: radius.md,
-                  padding: spacing.md,
-                  alignItems: "center",
-                }}
-              >
-                <Text style={{ color: colors.text, fontWeight: "700" }}>Go Back</Text>
-              </Pressable>
-              {!isDangerous && (
-                <Pressable
-                  onPress={proceed}
+          <FadeIn>
+            <Surface
+              accent={isDangerous ? colors.critical : undefined}
+              style={isDangerous ? { borderWidth: 2 } : undefined}
+            >
+              <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, marginBottom: spacing.sm }}>
+                <View
                   style={{
-                    flex: 1,
-                    backgroundColor: isSafe ? colors.primary : "#f97316",
-                    borderRadius: radius.md,
-                    padding: spacing.md,
+                    width: 44,
+                    height: 44,
+                    borderRadius: 22,
+                    backgroundColor: withAlpha(riskColor, "22"),
                     alignItems: "center",
+                    justifyContent: "center",
                   }}
                 >
-                  <Text style={{ color: "#fff", fontWeight: "700" }}>
-                    {isSafe ? "Open Safely" : "Open Anyway"}
+                  <Ionicons
+                    name={isDangerous ? "warning-outline" : isSafe ? "checkmark-circle-outline" : "alert-circle-outline"}
+                    size={22}
+                    color={riskColor}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: colors.text, fontWeight: "800", fontSize: 16 }}>
+                    {isDangerous ? "Warning: High Risk" : isSafe ? "Looks Safe" : "Proceed with Caution"}
                   </Text>
-                </Pressable>
+                  <Text style={{ color: riskColor, fontWeight: "700" }}>
+                    {riskLevel?.toUpperCase()} · Score {riskScore}/100
+                  </Text>
+                </View>
+              </View>
+
+              {scanResult.report?.explanation && (
+                <Text style={{ color: colors.textMuted, fontSize: 13, marginBottom: spacing.sm }}>
+                  {scanResult.report.explanation}
+                </Text>
               )}
-            </View>
-          </View>
+
+              {scanResult.report?.red_flags && scanResult.report.red_flags.length > 0 && (
+                <>
+                  <Eyebrow style={{ marginBottom: spacing.xs }}>Red Flags</Eyebrow>
+                  {scanResult.report.red_flags.map((flag, i) => (
+                    <View key={i} style={{ flexDirection: "row", gap: spacing.xs, marginBottom: 4 }}>
+                      <Text style={{ color: colors.critical, fontSize: 13 }}>•</Text>
+                      <Text style={{ color: colors.textMuted, fontSize: 13, flex: 1 }}>{flag}</Text>
+                    </View>
+                  ))}
+                </>
+              )}
+
+              <View style={{ flexDirection: "row", gap: spacing.sm, marginTop: spacing.md }}>
+                <Button
+                  label="Go Back"
+                  variant="secondary"
+                  onPress={() => {
+                    setScanResult(null);
+                    setInputUrl("");
+                  }}
+                  style={{ flex: 1 }}
+                />
+                {!isDangerous && (
+                  <Button
+                    label={isSafe ? "Open Safely" : "Open Anyway"}
+                    onPress={proceed}
+                    gradient={isSafe ? undefined : [colors.suspicious, colors.high]}
+                    style={{ flex: 1 }}
+                  />
+                )}
+              </View>
+            </Surface>
+          </FadeIn>
         </View>
       )}
 
@@ -269,7 +267,19 @@ export default function BrowserScreen() {
       {/* Empty state */}
       {!scanResult && !scanning && !confirmed && !error && (
         <View style={{ flex: 1, justifyContent: "center", alignItems: "center", padding: spacing.xl }}>
-          <Text style={{ fontSize: 40, marginBottom: spacing.md }}>🌐</Text>
+          <View
+            style={{
+              width: 72,
+              height: 72,
+              borderRadius: 36,
+              backgroundColor: withAlpha(colors.teal, "18"),
+              alignItems: "center",
+              justifyContent: "center",
+              marginBottom: spacing.md,
+            }}
+          >
+            <Ionicons name="globe-outline" size={32} color={colors.teal} />
+          </View>
           <Text style={{ color: colors.text, fontSize: 18, fontWeight: "700", marginBottom: spacing.sm, textAlign: "center" }}>
             Safe Browser
           </Text>

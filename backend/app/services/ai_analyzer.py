@@ -5,28 +5,56 @@ classification. It receives the deterministic signals as context so it grounds
 its reasoning in real evidence rather than guessing.
 
 For image scans, analyze_image_with_vision() sends the raw screenshot to
-GPT-4o vision — far more accurate than OCR text alone.
+Claude's vision input — far more accurate than OCR text alone.
 """
 from __future__ import annotations
 
 import base64
 import json
 import logging
+import re
 
 from app.core.config import settings
 from app.services.model_router import get_config
 
 log = logging.getLogger(__name__)
 
-_JSON_FORMAT = """
+_JSON_BLOCK_RE = re.compile(r"\{.*\}", re.DOTALL)
+
+
+def _parse_json_response(text: str) -> dict:
+    """Claude sometimes wraps JSON in prose or markdown fences despite
+    instructions to return JSON only — extract the outermost object."""
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        match = _JSON_BLOCK_RE.search(text)
+        if not match:
+            raise
+        return json.loads(match.group(0))
+
+
+DEFAULT_CATEGORIES = (
+    "credential_theft",
+    "payment_fraud",
+    "impersonation",
+    "malware",
+    "social_engineering",
+    "unknown",
+)
+
+
+def _json_format(categories: tuple[str, ...]) -> str:
+    enum = "|".join(categories)
+    return f"""
 Return ONLY valid JSON with this exact shape:
-{
+{{
   "risk_score": <int 0-100>,
-  "threat_category": "<credential_theft|payment_fraud|impersonation|malware|social_engineering|unknown>",
+  "threat_category": "<{enum}>",
   "confidence": <float 0-1>,
   "explanation": "<2-4 plain-language sentences a non-technical person understands>",
   "red_flags": ["<short red flag>", ...]
-}
+}}
 
 Rules:
 - Ground your reasoning in the provided evidence. Do not invent facts.
@@ -37,8 +65,12 @@ Rules:
 """
 
 
-def _build_system_prompt(system_hint: str) -> str:
-    return f"{system_hint}\n{_JSON_FORMAT}"
+# Preserved for backward compatibility / external references.
+_JSON_FORMAT = _json_format(DEFAULT_CATEGORIES)
+
+
+def _build_system_prompt(system_hint: str, categories: tuple[str, ...] | None = None) -> str:
+    return f"{system_hint}\n{_json_format(categories or DEFAULT_CATEGORIES)}"
 
 
 def _build_user_prompt(content: str, evidence: dict) -> str:
@@ -51,53 +83,61 @@ def _build_user_prompt(content: str, evidence: dict) -> str:
     )
 
 
-def analyze(content: str, evidence: dict, artifact_type: str = "unknown") -> dict | None:
-    """Call the LLM with text content. Returns parsed dict or None on failure."""
-    if not settings.OPENAI_API_KEY:
+def analyze(
+    content: str,
+    evidence: dict,
+    artifact_type: str = "unknown",
+    *,
+    system_hint: str | None = None,
+    categories: tuple[str, ...] | None = None,
+) -> dict | None:
+    """Call the LLM with text content. Returns parsed dict or None on failure.
+
+    ``system_hint`` and ``categories`` let verticals override the analyst persona
+    and classification vocabulary without touching the core scam scanner.
+    """
+    if not settings.ANTHROPIC_API_KEY:
         return None
     try:
-        from openai import OpenAI
+        import anthropic
 
         cfg = get_config(artifact_type)
-        client = OpenAI(api_key=settings.OPENAI_API_KEY)
-        resp = client.chat.completions.create(
+        client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+        resp = client.messages.create(
             model=cfg.model,
-            response_format={"type": "json_object"},
             temperature=cfg.temperature,
             max_tokens=cfg.max_tokens,
-            messages=[
-                {"role": "system", "content": _build_system_prompt(cfg.system_hint)},
-                {"role": "user", "content": _build_user_prompt(content, evidence)},
-            ],
+            system=_build_system_prompt(system_hint or cfg.system_hint, categories),
+            messages=[{"role": "user", "content": _build_user_prompt(content, evidence)}],
         )
-        return json.loads(resp.choices[0].message.content)
+        return _parse_json_response(resp.content[0].text)
     except Exception as exc:
         log.warning("LLM analysis failed (artifact_type=%s): %s", artifact_type, exc)
         return None
 
 
 def analyze_image_with_vision(image_bytes: bytes, evidence: dict) -> dict | None:
-    """Send the raw screenshot to GPT-4o vision for direct visual analysis.
+    """Send the raw screenshot to Claude's vision input for direct visual analysis.
 
     This is dramatically more accurate than OCR text alone — the model can
     see logos, layout, color, and visual urgency cues that OCR loses.
     Falls back to None so scan_service can fall through to text-based analysis.
     """
-    if not settings.OPENAI_API_KEY:
+    if not settings.ANTHROPIC_API_KEY:
         return None
     try:
-        from openai import OpenAI
+        import anthropic
 
         cfg = get_config("image")
-        client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
 
         b64 = base64.b64encode(image_bytes).decode()
-        # Try JPEG first; if it was a PNG the base64 still works with image/jpeg hint
-        # for most content — OpenAI accepts both.
-        data_uri = f"data:image/jpeg;base64,{b64}"
-
         evidence_text = json.dumps(evidence, indent=2, default=str)
         user_message = [
+            {
+                "type": "image",
+                "source": {"type": "base64", "media_type": "image/jpeg", "data": b64},
+            },
             {
                 "type": "text",
                 "text": (
@@ -106,23 +146,16 @@ def analyze_image_with_vision(image_bytes: bytes, evidence: dict) -> dict | None
                     "Respond with JSON only."
                 ),
             },
-            {
-                "type": "image_url",
-                "image_url": {"url": data_uri, "detail": "high"},
-            },
         ]
 
-        resp = client.chat.completions.create(
+        resp = client.messages.create(
             model=cfg.model,
-            response_format={"type": "json_object"},
             temperature=cfg.temperature,
             max_tokens=cfg.max_tokens,
-            messages=[
-                {"role": "system", "content": _build_system_prompt(cfg.system_hint)},
-                {"role": "user", "content": user_message},
-            ],
+            system=_build_system_prompt(cfg.system_hint),
+            messages=[{"role": "user", "content": user_message}],
         )
-        return json.loads(resp.choices[0].message.content)
+        return _parse_json_response(resp.content[0].text)
     except Exception as exc:
         log.warning("Vision analysis failed, falling back to text analysis: %s", exc)
         return None

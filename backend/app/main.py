@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1 import admin, auth, community, developer, education, family, identity, notifications, recovery, scans
+from app.api.v1 import admin, auth, community, developer, education, family, identity, notifications, recovery, scans, verticals
 from app.core.config import settings
 
 
@@ -15,7 +15,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title=settings.APP_NAME,
-    version="0.5.0",
+    version="0.6.0",
     description="AI-powered scam, phishing, and fraud detection assistant.",
     lifespan=lifespan,
 )
@@ -30,6 +30,7 @@ app.add_middleware(
 
 app.include_router(auth.router, prefix=settings.API_V1_PREFIX)
 app.include_router(scans.router, prefix=settings.API_V1_PREFIX)
+app.include_router(verticals.router, prefix=settings.API_V1_PREFIX)
 app.include_router(notifications.router, prefix=settings.API_V1_PREFIX)
 app.include_router(recovery.router, prefix=settings.API_V1_PREFIX)
 app.include_router(family.router, prefix=settings.API_V1_PREFIX)
@@ -42,7 +43,7 @@ app.include_router(admin.router, prefix=settings.API_V1_PREFIX)
 
 @app.get("/health", tags=["system"])
 def health():
-    return {"status": "ok", "app": settings.APP_NAME, "version": "0.5.0"}
+    return {"status": "ok", "app": settings.APP_NAME, "version": "0.6.0"}
 
 
 @app.get("/", tags=["system"])

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import {
+  Dimensions,
   Modal,
   Pressable,
   ScrollView,
@@ -7,7 +8,10 @@ import {
   View,
 } from "react-native";
 
+import { Button, FadeIn, GlowOrb, Surface } from "@/components/ui";
 import { colors, radius, spacing } from "@/theme/theme";
+
+const { width } = Dimensions.get("window");
 
 type Step = {
   emoji: string;
@@ -96,13 +100,20 @@ export default function AppTour({ visible, onDone }: Props) {
         {/* Card */}
         <View style={{
           backgroundColor: colors.bg,
-          borderTopLeftRadius: radius.xl ?? 24,
-          borderTopRightRadius: radius.xl ?? 24,
+          borderTopLeftRadius: radius.xl,
+          borderTopRightRadius: radius.xl,
+          borderTopWidth: 1,
+          borderLeftWidth: 1,
+          borderRightWidth: 1,
+          borderColor: colors.border,
           paddingTop: spacing.lg,
           paddingHorizontal: spacing.lg,
           paddingBottom: 48,
           maxHeight: "85%",
+          overflow: "hidden",
         }}>
+          <GlowOrb color={colors.primaryBright} size={width} opacity={0.16} style={{ top: -width * 0.6, left: 0 }} />
+
           {/* Progress dots + skip */}
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.lg }}>
             <View style={{ flexDirection: "row", gap: 6 }}>
@@ -124,72 +135,58 @@ export default function AppTour({ visible, onDone }: Props) {
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false}>
-            {/* Emoji */}
-            <Text style={{ fontSize: 52, textAlign: "center", marginBottom: spacing.md }}>{current.emoji}</Text>
+            <FadeIn key={step}>
+              {/* Emoji */}
+              <Text style={{ fontSize: 52, textAlign: "center", marginBottom: spacing.md }}>{current.emoji}</Text>
 
-            {/* Title */}
-            <Text style={{
-              color: colors.text,
-              fontSize: 24,
-              fontWeight: "900",
-              letterSpacing: -0.5,
-              textAlign: "center",
-              marginBottom: spacing.sm,
-            }}>
-              {current.title}
-            </Text>
-
-            {/* Body */}
-            <Text style={{
-              color: colors.textMuted,
-              fontSize: 15,
-              lineHeight: 22,
-              textAlign: "center",
-              marginBottom: spacing.lg,
-            }}>
-              {current.body}
-            </Text>
-
-            {/* Example box */}
-            <View style={{
-              backgroundColor: colors.surface,
-              borderRadius: radius.md,
-              borderLeftWidth: 3,
-              borderLeftColor: colors.primaryBright,
-              padding: spacing.md,
-              marginBottom: spacing.xl,
-            }}>
+              {/* Title */}
               <Text style={{
-                color: colors.primaryBright,
-                fontSize: 11,
-                fontWeight: "700",
-                letterSpacing: 0.8,
-                marginBottom: spacing.xs,
-                textTransform: "uppercase",
+                color: colors.text,
+                fontSize: 24,
+                fontWeight: "900",
+                letterSpacing: -0.5,
+                textAlign: "center",
+                marginBottom: spacing.sm,
               }}>
-                {current.exampleLabel}
+                {current.title}
               </Text>
-              <Text style={{ color: colors.textMuted, fontSize: 14, lineHeight: 20, fontStyle: "italic" }}>
-                &ldquo;{current.example}&rdquo;
+
+              {/* Body */}
+              <Text style={{
+                color: colors.textMuted,
+                fontSize: 15,
+                lineHeight: 22,
+                textAlign: "center",
+                marginBottom: spacing.lg,
+              }}>
+                {current.body}
               </Text>
-            </View>
+
+              {/* Example box */}
+              <Surface accent={colors.primaryBright} style={{ marginBottom: spacing.xl }}>
+                <Text style={{
+                  color: colors.primaryBright,
+                  fontSize: 11,
+                  fontWeight: "700",
+                  letterSpacing: 0.8,
+                  marginBottom: spacing.xs,
+                  textTransform: "uppercase",
+                }}>
+                  {current.exampleLabel}
+                </Text>
+                <Text style={{ color: colors.textMuted, fontSize: 14, lineHeight: 20, fontStyle: "italic" }}>
+                  &ldquo;{current.example}&rdquo;
+                </Text>
+              </Surface>
+            </FadeIn>
           </ScrollView>
 
           {/* CTA */}
-          <Pressable
+          <Button
+            label={isLast ? "Let's go →" : "Next"}
             onPress={handleNext}
-            style={{
-              backgroundColor: colors.primary,
-              borderRadius: radius.lg,
-              padding: spacing.lg,
-              alignItems: "center",
-              marginTop: spacing.sm,
-            }}
-          >
-            <Text style={{ color: "#fff", fontWeight: "800", fontSize: 17 }}>
-              {isLast ? "Let's go →" : "Next"}
-            </Text>
-          </Pressable>
+            style={{ marginTop: spacing.sm }}
+          />
 
           {/* Step counter */}
           <Text style={{ color: colors.textMuted, fontSize: 13, textAlign: "center", marginTop: spacing.sm }}>

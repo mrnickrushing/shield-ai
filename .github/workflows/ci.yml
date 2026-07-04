@@ -1,8 +1,14 @@
 name: CI
 
+# CI runs on pull requests only — it's the pre-merge quality gate.
+#
+# Deployment is handled by Railway's native GitHub auto-deploy on push to main,
+# so a merge ships immediately. We intentionally do NOT run this workflow on
+# push to main: Railway's "Wait for CI" gate would otherwise hold (and, if a run
+# fails or Actions are unavailable, SKIP) every deploy. Keeping CI off the main
+# push also avoids burning Actions minutes on commits that were already tested
+# on their PR.
 on:
-  push:
-    branches: [main, "claude/**"]
   pull_request:
 
 jobs:
@@ -54,38 +60,3 @@ jobs:
 
       - name: TypeScript check
         run: npx tsc --noEmit
-
-  deploy:
-    name: Deploy to Railway
-    runs-on: ubuntu-latest
-    needs: [backend, mobile-typecheck]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    defaults:
-      run:
-        working-directory: backend
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Railway CLI
-        run: npm install -g @railway/cli
-
-      - name: Deploy backend to Railway
-        run: railway up
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-
-      - name: Deploy web admin to Railway
-        working-directory: web
-        run: railway up
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN_WEB }}
-
-      - name: Verify deployment health
-        run: |
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://backend-production-f835.up.railway.app/health)
-          echo "Health check HTTP status: $STATUS"
-          if [ "$STATUS" != "200" ]; then
-            echo "Health check failed with status $STATUS"
-            exit 1
-          fi
-          echo "Deployment healthy!"
