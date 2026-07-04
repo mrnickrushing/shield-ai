@@ -28,6 +28,28 @@ const ANALYSIS_STAGES = [
   "Running AI model...",
 ];
 
+type DetectedKind = "link" | "phone" | "message";
+
+const DETECT_HINT: Record<DetectedKind, { label: string; icon: keyof typeof Ionicons.glyphMap }> = {
+  link: { label: "Link detected", icon: "link-outline" },
+  phone: { label: "Phone number detected", icon: "call-outline" },
+  message: { label: "Will analyze as a message", icon: "chatbubble-outline" },
+};
+
+function detectInputKind(text: string): DetectedKind {
+  const t = text.trim();
+  if (/^(https?:\/\/|www\.)\S+$/i.test(t)) return "link";
+  if (!/\s/.test(t) && /^[a-z0-9-]+(\.[a-z0-9-]+)+(\/\S*)?$/i.test(t)) return "link";
+  const digits = t.replace(/\D/g, "");
+  if (/^[\d\s()+.-]+$/.test(t) && digits.length >= 7 && digits.length <= 15) return "phone";
+  return "message";
+}
+
+function normalizeUrl(text: string) {
+  const t = text.trim();
+  return /^https?:\/\//i.test(t) ? t : `https://${t}`;
+}
+
 function AnalysisStageText() {
   const [stage, setStage] = useState(0);
   useEffect(() => {
@@ -296,6 +318,8 @@ export default function ScanScreen() {
   const [mode, setMode] = useState<ScanMode>((params.type as ScanMode) ?? "link");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [universalText, setUniversalText] = useState("");
+  const [advancedOpen, setAdvancedOpen] = useState(!!params.type);
   const qrScanned = useRef(false);
 
   const [url, setUrl] = useState("");
@@ -314,7 +338,10 @@ export default function ScanScreen() {
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
 
   useEffect(() => {
-    if (params.type) setMode(params.type as ScanMode);
+    if (params.type) {
+      setMode(params.type as ScanMode);
+      setAdvancedOpen(true);
+    }
   }, [params.type]);
 
   const active = MODE_META[mode];
@@ -358,6 +385,13 @@ export default function ScanScreen() {
   };
 
   const runLink = () => wrap(() => ShieldAPI.scanLink(url.trim()));
+
+  const runUniversal = () => {
+    const kind = detectInputKind(universalText);
+    if (kind === "link") return wrap(() => ShieldAPI.scanLink(normalizeUrl(universalText)));
+    if (kind === "phone") return wrap(() => ShieldAPI.scanPhone(universalText.trim()));
+    return wrap(() => ShieldAPI.scanMessage(universalText.trim(), undefined));
+  };
 
   const runImage = async () => {
     setError(null);
@@ -405,85 +439,132 @@ export default function ScanScreen() {
       style={{ flex: 1, backgroundColor: colors.bg }}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <GlowBackground accent={`${active.accent}30`} centerY={0.12} />
+      <GlowBackground accent={`${colors.primary}30`} centerY={0.12} />
       <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xl }}>
+        {/* Universal scan — paste anything, we detect what it is */}
         <View
           style={{
             backgroundColor: colors.glassDeep,
             borderRadius: 24,
             borderWidth: 1,
-            borderColor: `${active.accent}33`,
+            borderColor: `${colors.primaryBright}33`,
             padding: spacing.lg,
             overflow: "hidden",
-            marginBottom: spacing.lg,
+            marginBottom: spacing.md,
           }}
         >
-          <View
-            style={{
-              position: "absolute",
-              width: 180,
-              height: 180,
-              borderRadius: 90,
-              backgroundColor: `${active.accent}15`,
-              top: -55,
-              right: -40,
-            }}
-          />
-          <View
-            style={{
-              alignSelf: "flex-start",
-              backgroundColor: `${active.accent}1f`,
-              borderRadius: radius.pill,
-              paddingHorizontal: spacing.sm,
-              paddingVertical: 6,
-              marginBottom: spacing.md,
-            }}
-          >
-            <Text style={{ color: active.accent, fontSize: 12, fontWeight: "800", letterSpacing: 1 }}>
-              THREAT LAB
-            </Text>
-          </View>
-          <Text style={{ color: colors.text, fontSize: 29, fontWeight: "900", letterSpacing: -1, marginBottom: 8 }}>
-            Analyze anything before you act.
+          <Text style={{ color: colors.text, fontSize: 26, fontWeight: "900", letterSpacing: -1, marginBottom: 6 }}>
+            Scan anything.
           </Text>
-          <Text style={{ color: colors.textMuted, fontSize: 14, lineHeight: 22, marginBottom: spacing.lg }}>
-            Start with the suspicious artifact you actually have. We’ll turn it into a verdict, evidence, and a next move.
+          <Text style={{ color: colors.textMuted, fontSize: 14, lineHeight: 21, marginBottom: spacing.md }}>
+            Paste a link, phone number, or message — we figure out the rest.
           </Text>
-          <View
+          <TextInput
+            placeholder="Paste or type anything suspicious..."
+            placeholderTextColor={colors.textMuted}
+            multiline
+            autoCapitalize="none"
+            value={universalText}
+            onChangeText={setUniversalText}
             style={{
               backgroundColor: colors.bg,
+              borderColor: `${colors.primaryBright}44`,
               borderWidth: 1,
-              borderColor: `${active.accent}2a`,
-              borderRadius: radius.lg,
+              borderRadius: radius.md,
+              color: colors.text,
               padding: spacing.md,
+              minHeight: 88,
+              textAlignVertical: "top",
+              marginBottom: spacing.sm,
             }}
-          >
-            <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, marginBottom: 6 }}>
-              <View
-                style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 18,
-                  backgroundColor: `${active.accent}22`,
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <Ionicons name={active.icon} size={18} color={active.accent} />
+          />
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: spacing.sm }}>
+            {universalText.trim() ? (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <Ionicons
+                  name={DETECT_HINT[detectInputKind(universalText)].icon}
+                  size={14}
+                  color={colors.accent}
+                />
+                <Text style={{ ...mono, fontSize: 12, fontWeight: "600" }}>
+                  {DETECT_HINT[detectInputKind(universalText)].label}
+                </Text>
               </View>
-              <Text style={{ color: colors.text, fontSize: 17, fontWeight: "800", flex: 1 }}>
-                {active.title}
-              </Text>
-            </View>
-            <Text style={{ color: colors.textMuted, fontSize: 13, lineHeight: 20 }}>
-              {active.subtitle}
-            </Text>
+            ) : (
+              <View />
+            )}
+            <Pressable onPress={() => pasteText(setUniversalText)} hitSlop={8}>
+              <Text style={{ color: colors.primaryBright, fontSize: 13, fontWeight: "800" }}>Paste</Text>
+            </Pressable>
+          </View>
+          <GradientButton
+            label="Scan It"
+            icon="scan"
+            onPress={runUniversal}
+            disabled={!universalText.trim()}
+            loading={loading && !advancedOpen}
+          />
+          {loading && !advancedOpen ? <AnalyzingOverlay /> : null}
+
+          {/* Photo / QR shortcuts */}
+          <View style={{ flexDirection: "row", gap: spacing.sm, marginTop: spacing.md }}>
+            <Pressable
+              onPress={runImage}
+              style={({ pressed }) => ({
+                flex: 1,
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: spacing.sm,
+                paddingVertical: spacing.md,
+                borderRadius: radius.md,
+                backgroundColor: pressed ? colors.glassActive : colors.glass,
+                borderWidth: 1,
+                borderColor: colors.borderHi,
+              })}
+            >
+              <Ionicons name="image-outline" size={18} color={colors.teal} />
+              <Text style={{ color: colors.text, fontWeight: "700", fontSize: 13 }}>Screenshot</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                setMode("qr");
+                setAdvancedOpen(true);
+                setError(null);
+              }}
+              style={({ pressed }) => ({
+                flex: 1,
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: spacing.sm,
+                paddingVertical: spacing.md,
+                borderRadius: radius.md,
+                backgroundColor: pressed ? colors.glassActive : colors.glass,
+                borderWidth: 1,
+                borderColor: colors.borderHi,
+              })}
+            >
+              <Ionicons name="qr-code-outline" size={18} color={colors.rose} />
+              <Text style={{ color: colors.text, fontWeight: "700", fontSize: 13 }}>QR Code</Text>
+            </Pressable>
           </View>
         </View>
 
-        <Text style={{ color: colors.textDim, fontSize: 11, fontWeight: "800", letterSpacing: 1.2, marginBottom: spacing.sm }}>
-          PICK AN INPUT
-        </Text>
+        {/* Advanced: specific scan types */}
+        <Pressable
+          onPress={() => setAdvancedOpen((open) => !open)}
+          style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: spacing.md, alignSelf: "flex-start" }}
+          hitSlop={8}
+        >
+          <Text style={{ color: colors.textDim, fontSize: 12, fontWeight: "800", letterSpacing: 1 }}>
+            MORE SCAN TYPES
+          </Text>
+          <Ionicons name={advancedOpen ? "chevron-up" : "chevron-down"} size={14} color={colors.textDim} />
+        </Pressable>
+
+        {advancedOpen && (
+        <>
         <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", rowGap: spacing.sm, marginBottom: spacing.lg }}>
           {MODE_ORDER.map((value) => {
             const meta = MODE_META[value];
@@ -783,6 +864,8 @@ export default function ScanScreen() {
             </>
           )}
         </View>
+        </>
+        )}
 
         {error ? (
           <View

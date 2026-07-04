@@ -12,40 +12,12 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { GlassCard } from "@/components/GlassCard";
 import { GlowBackground } from "@/components/GlowBackground";
+import { GradientButton } from "@/components/GradientButton";
 import { ProtectionRing } from "@/components/ProtectionRing";
 import { ScanCard } from "@/components/ScanCard";
 import { ShieldAPI } from "@/lib/api";
 import { useAuth } from "@/state/auth";
 import { colors, glow, radius, spacing } from "@/theme/theme";
-
-const QUICK_SCANS: {
-  type: string;
-  label: string;
-  icon: keyof typeof Ionicons.glyphMap;
-  color: string;
-}[] = [
-  { type: "link",        label: "Link",        icon: "link-outline",        color: colors.primaryBright },
-  { type: "image",       label: "Screenshot",  icon: "image-outline",       color: colors.teal },
-  { type: "message",     label: "Message",     icon: "chatbubble-outline",  color: colors.safe },
-  { type: "email",       label: "Email",       icon: "mail-outline",        color: colors.accent },
-  { type: "phone",       label: "Phone",       icon: "call-outline",        color: colors.suspicious },
-  { type: "marketplace", label: "Market",      icon: "storefront-outline",  color: colors.low },
-  { type: "social",      label: "Social",      icon: "people-outline",      color: colors.purple },
-  { type: "qr",          label: "QR Code",     icon: "qr-code-outline",     color: colors.rose },
-];
-
-const PROTECT_ITEMS: {
-  title: string;
-  body: string;
-  icon: keyof typeof Ionicons.glyphMap;
-  color: string;
-  route: string;
-}[] = [
-  { title: "Identity",      body: "Breach & credit alerts",  icon: "shield-checkmark-outline", color: colors.purple, route: "/identity" },
-  { title: "Safe Browser",  body: "Pre-scan every URL",      icon: "globe-outline",            color: colors.teal,   route: "/browser" },
-  { title: "Family",        body: "Protect loved ones",      icon: "people-outline",           color: colors.rose,   route: "/family" },
-  { title: "Education",     body: "Spot scams faster",       icon: "book-outline",             color: colors.safe,   route: "/education" },
-];
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -61,120 +33,6 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
     >
       {children}
     </Text>
-  );
-}
-
-function QuickScanTile({
-  item,
-  onPress,
-}: {
-  item: (typeof QUICK_SCANS)[0];
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => ({
-        flexGrow: 1,
-        flexBasis: "31%",
-        minWidth: 0,
-        minHeight: 88,
-        backgroundColor: pressed ? colors.glassActive : colors.glass,
-        borderRadius: radius.lg,
-        borderWidth: 1,
-        borderColor: pressed ? `${item.color}66` : colors.borderHi,
-        alignItems: "center",
-        justifyContent: "center",
-        gap: spacing.xs,
-        paddingHorizontal: spacing.xs,
-        paddingVertical: spacing.sm,
-        transform: [{ scale: pressed ? 0.95 : 1 }],
-      })}
-    >
-      <View
-        style={{
-          width: 38,
-          height: 38,
-          borderRadius: radius.md,
-          backgroundColor: item.color + "22",
-          alignItems: "center",
-          justifyContent: "center",
-          ...glow(item.color, "sm"),
-        }}
-      >
-        <Ionicons name={item.icon} size={18} color={item.color} />
-      </View>
-      <Text
-        style={{
-          color: colors.textDim,
-          fontSize: 10,
-          fontWeight: "700",
-          textAlign: "center",
-          letterSpacing: 0.2,
-        }}
-        numberOfLines={2}
-      >
-        {item.label}
-      </Text>
-    </Pressable>
-  );
-}
-
-function ProtectCard({
-  title,
-  body,
-  icon,
-  color,
-  badge,
-  onPress,
-}: {
-  title: string;
-  body: string;
-  icon: keyof typeof Ionicons.glyphMap;
-  color: string;
-  badge?: number;
-  onPress: () => void;
-}) {
-  return (
-    <GlassCard accent={color} onPress={onPress} style={{ flex: 1, minWidth: 0 }}>
-      <View style={{ padding: spacing.md, minHeight: 96, justifyContent: "space-between" }}>
-        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
-          <View
-            style={{
-              width: 36,
-              height: 36,
-              borderRadius: radius.md,
-              backgroundColor: color + "22",
-              alignItems: "center",
-              justifyContent: "center",
-              ...glow(color, "sm"),
-            }}
-          >
-            <Ionicons name={icon} size={18} color={color} />
-          </View>
-          {badge != null && badge > 0 && (
-            <View
-              style={{
-                backgroundColor: colors.critical,
-                borderRadius: radius.pill,
-                minWidth: 20,
-                height: 20,
-                alignItems: "center",
-                justifyContent: "center",
-                paddingHorizontal: 5,
-                ...glow(colors.critical, "sm"),
-              }}
-            >
-              <Text style={{ color: "#fff", fontSize: 11, fontWeight: "800" }}>{badge}</Text>
-            </View>
-          )}
-        </View>
-        <View style={{ marginTop: spacing.sm }}>
-          <Text style={{ color: colors.text, fontSize: 13, fontWeight: "800", marginBottom: 2 }}>{title}</Text>
-          <Text style={{ color: colors.textMuted, fontSize: 11, lineHeight: 15 }}>{body}</Text>
-        </View>
-      </View>
-    </GlassCard>
   );
 }
 
@@ -302,46 +160,29 @@ export default function Dashboard() {
           </View>
         </GlassCard>
 
-        {/* Quick Scan */}
-        <SectionLabel>QUICK SCAN</SectionLabel>
-        <View
-          style={{
-            flexDirection: "row",
-            flexWrap: "wrap",
-            gap: spacing.sm,
-            marginBottom: spacing.lg,
-          }}
-        >
-          {QUICK_SCANS.map((item) => (
-            <QuickScanTile
-              key={item.type}
-              item={item}
-              onPress={() => router.push(`/(tabs)/scan?type=${item.type}` as any)}
-            />
-          ))}
+        {/* Single primary action — everything funnels through Scan */}
+        <View style={{ marginBottom: spacing.md }}>
+          <GradientButton
+            label="Scan Anything Suspicious"
+            icon="scan"
+            onPress={() => router.push("/(tabs)/scan" as any)}
+          />
         </View>
-
-        {/* Protect */}
-        <SectionLabel>PROTECT</SectionLabel>
-        <View style={{ flexDirection: "row", gap: spacing.sm, marginBottom: spacing.sm }}>
-          {PROTECT_ITEMS.slice(0, 2).map((item) => (
-            <ProtectCard
-              key={item.title}
-              {...item}
-              badge={item.title === "Identity" ? unreadAlerts : undefined}
-              onPress={() => router.push(item.route as any)}
-            />
-          ))}
-        </View>
-        <View style={{ flexDirection: "row", gap: spacing.sm, marginBottom: spacing.lg }}>
-          {PROTECT_ITEMS.slice(2, 4).map((item) => (
-            <ProtectCard
-              key={item.title}
-              {...item}
-              onPress={() => router.push(item.route as any)}
-            />
-          ))}
-        </View>
+        {unreadAlerts > 0 && (
+          <GlassCard
+            accent={colors.purple}
+            onPress={() => router.push("/identity" as any)}
+            style={{ marginBottom: spacing.lg }}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, padding: spacing.md }}>
+              <Ionicons name="shield-checkmark-outline" size={18} color={colors.purple} />
+              <Text style={{ color: colors.text, fontWeight: "700", fontSize: 13, flex: 1 }}>
+                {unreadAlerts} identity alert{unreadAlerts === 1 ? "" : "s"} need{unreadAlerts === 1 ? "s" : ""} review
+              </Text>
+              <Text style={{ color: colors.purple, fontWeight: "800", fontSize: 12 }}>Review →</Text>
+            </View>
+          </GlassCard>
+        )}
 
         {/* Emergency Banner */}
         <Pressable
