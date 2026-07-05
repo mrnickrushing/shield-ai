@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1 import admin, auth, community, developer, education, family, identity, notifications, recovery, scans, verticals
+from app.api.v1 import admin, auth, community, developer, education, family, identity, notifications, phone_reputation, recovery, scans, verticals
 from app.core.config import settings
 
 
@@ -37,6 +37,7 @@ app.include_router(family.router, prefix=settings.API_V1_PREFIX)
 app.include_router(education.router, prefix=settings.API_V1_PREFIX)
 app.include_router(identity.router, prefix=settings.API_V1_PREFIX)
 app.include_router(community.router, prefix=settings.API_V1_PREFIX)
+app.include_router(phone_reputation.router, prefix=settings.API_V1_PREFIX)
 app.include_router(developer.router, prefix=settings.API_V1_PREFIX)
 app.include_router(admin.router, prefix=settings.API_V1_PREFIX)
 

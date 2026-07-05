@@ -121,6 +121,16 @@ workflows:
             "$PROFILES_DIR/share_extension.mobileprovision"
           echo "Installed share extension profile from repo" | tee -a "$LOG"
 
+          # Install call directory extension profile from repo (same reason).
+          cp "$CM_BUILD_DIR/scripts/call_directory_extension.mobileprovision" \
+            "$PROFILES_DIR/call_directory_extension.mobileprovision"
+          echo "Installed call directory extension profile from repo" | tee -a "$LOG"
+
+          # Install widget extension profile from repo (same reason).
+          cp "$CM_BUILD_DIR/scripts/widget_extension.mobileprovision" \
+            "$PROFILES_DIR/widget_extension.mobileprovision"
+          echo "Installed widget extension profile from repo" | tee -a "$LOG"
+
           echo "=== Installed profiles ===" | tee -a "$LOG"
           for f in "$PROFILES_DIR"/*.mobileprovision; do
             [ -e "$f" ] || continue
@@ -144,6 +154,12 @@ workflows:
           # Patch the pbxproj directly in case use-profiles couldn't resolve
           # the ShareExtension bundle ID (stored as a variable in the project).
           python3 "$CM_BUILD_DIR/scripts/patch_share_extension_profile.py" 2>&1 | tee -a "$LOG"
+
+          # Same for the CallDirectoryExtension bundle ID.
+          python3 "$CM_BUILD_DIR/scripts/patch_call_directory_extension_profile.py" 2>&1 | tee -a "$LOG"
+
+          # Same for the WidgetExtension bundle ID.
+          python3 "$CM_BUILD_DIR/scripts/patch_widget_extension_profile.py" 2>&1 | tee -a "$LOG"
 
       - name: Increment build number
         working_directory: mobile/ios

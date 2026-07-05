@@ -1,0 +1,162 @@
+import { Ionicons } from "@expo/vector-icons";
+import { useMutation } from "@tanstack/react-query";
+import { useRouter } from "expo-router";
+import React, { useEffect, useState } from "react";
+import { Linking, Platform, Pressable, ScrollView, Text, View } from "react-native";
+
+import { Button, Eyebrow, FadeIn, Surface } from "@/components/ui";
+import { syncCallProtection } from "@/lib/callDirectorySync";
+import { colors, spacing, withAlpha } from "@/theme/theme";
+
+const STEPS = [
+  "Open the Settings app",
+  "Go to Phone → Call Blocking & Identification",
+  "Turn on Shield AI",
+];
+
+function timeAgo(date: Date | null): string {
+  if (!date) return "Never";
+  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (seconds < 60) return "Just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
+
+export default function CallProtectionScreen() {
+  const router = useRouter();
+  const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
+  const [protectedCount, setProtectedCount] = useState(0);
+
+  const syncMutation = useMutation({
+    mutationFn: syncCallProtection,
+    onSuccess: (result) => {
+      if (result.synced) {
+        setLastSyncedAt(new Date());
+        setProtectedCount(result.count);
+      }
+    },
+  });
+
+  useEffect(() => {
+    syncMutation.mutate();
+    // Sync once when the screen opens; the manual button covers the rest.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const notSupported = Platform.OS !== "ios";
+  const syncFailed = syncMutation.isError || (syncMutation.data && !syncMutation.data.synced);
+
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+      <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxl }}>
+        <Pressable onPress={() => router.back()} style={{ marginBottom: spacing.md }} hitSlop={12}>
+          <Text style={{ color: colors.primaryBright, fontSize: 15 }}>← Back</Text>
+        </Pressable>
+
+        <FadeIn>
+          <Surface accent={colors.high} glow={withAlpha(colors.high, "30")} style={{ marginBottom: spacing.lg }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, marginBottom: spacing.sm }}>
+              <View
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 22,
+                  backgroundColor: withAlpha(colors.high, "22"),
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Ionicons name="call-outline" size={22} color={colors.high} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: colors.text, fontWeight: "800", fontSize: 17 }}>Call Protection</Text>
+                <Text style={{ color: colors.textMuted, fontSize: 12 }}>
+                  Labels scam and spam calls system-wide
+                </Text>
+              </View>
+            </View>
+            <Text style={{ color: colors.textMuted, fontSize: 13, lineHeight: 19 }}>
+              Numbers repeatedly reported as high-risk by the Shield AI community get labeled
+              &ldquo;Scam Likely&rdquo; right on your iPhone&apos;s incoming call screen — no app needs to be open.
+            </Text>
+          </Surface>
+        </FadeIn>
+
+        {notSupported ? (
+          <Surface accent={colors.textMuted} style={{ marginBottom: spacing.lg }}>
+            <Text style={{ color: colors.textMuted, fontSize: 13 }}>
+              Call Protection uses Apple&apos;s Call Directory extension and is only available on iOS.
+            </Text>
+          </Surface>
+        ) : (
+          <>
+            <FadeIn>
+              <Surface style={{ marginBottom: spacing.lg }}>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: spacing.md }}>
+                  <View>
+                    <Eyebrow>Last synced</Eyebrow>
+                    <Text style={{ color: colors.text, fontWeight: "700", fontSize: 15 }}>
+                      {timeAgo(lastSyncedAt)}
+                    </Text>
+                  </View>
+                  <View style={{ alignItems: "flex-end" }}>
+                    <Eyebrow>Numbers protected</Eyebrow>
+                    <Text style={{ color: colors.text, fontWeight: "700", fontSize: 15 }}>
+                      {protectedCount}
+                    </Text>
+                  </View>
+                </View>
+                {syncFailed ? (
+                  <Text style={{ color: colors.suspicious, fontSize: 12, marginBottom: spacing.sm }}>
+                    Sync didn&apos;t complete. Check your connection and try again.
+                  </Text>
+                ) : null}
+                <Button
+                  label="Sync Now"
+                  icon="refresh-outline"
+                  onPress={() => syncMutation.mutate()}
+                  loading={syncMutation.isPending}
+                  variant="secondary"
+                />
+              </Surface>
+            </FadeIn>
+
+            <Eyebrow style={{ marginBottom: spacing.sm }}>Finish setup</Eyebrow>
+            <Surface style={{ marginBottom: spacing.lg }}>
+              <Text style={{ color: colors.textMuted, fontSize: 13, marginBottom: spacing.md }}>
+                Apple requires you to turn this on yourself — Shield AI can&apos;t do it for you:
+              </Text>
+              {STEPS.map((step, i) => (
+                <View key={step} style={{ flexDirection: "row", gap: spacing.sm, marginBottom: spacing.sm }}>
+                  <View
+                    style={{
+                      width: 22,
+                      height: 22,
+                      borderRadius: 11,
+                      backgroundColor: withAlpha(colors.primaryBright, "22"),
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Text style={{ color: colors.primaryBright, fontSize: 11, fontWeight: "800" }}>{i + 1}</Text>
+                  </View>
+                  <Text style={{ color: colors.text, fontSize: 13, flex: 1, lineHeight: 19 }}>{step}</Text>
+                </View>
+              ))}
+              <Button
+                label="Open Settings"
+                icon="settings-outline"
+                onPress={() => Linking.openSettings()}
+                variant="secondary"
+                style={{ marginTop: spacing.sm }}
+              />
+            </Surface>
+          </>
+        )}
+      </ScrollView>
+    </View>
+  );
+}

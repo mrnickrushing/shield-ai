@@ -250,7 +250,7 @@ class PhoneScan(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
     scan_id: Mapped[str] = mapped_column(ForeignKey("scan_history.id"), index=True)
     phone_number: Mapped[str] = mapped_column(String)
-    normalized_number: Mapped[str] = mapped_column(String, default="")
+    normalized_number: Mapped[str] = mapped_column(String, default="", index=True)
     country_code: Mapped[str] = mapped_column(String, default="")
     carrier: Mapped[str] = mapped_column(String, default="")
     line_type: Mapped[str] = mapped_column(String, default="")

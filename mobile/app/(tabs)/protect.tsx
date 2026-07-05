@@ -59,6 +59,15 @@ const PRIMARY_LANES: ProtectLane[] = [
     body: "Set up trusted contacts so recovery help and alert-sharing stay one tap away.",
     onPress: () => {},
   },
+  {
+    id: "call-protection",
+    icon: "call-outline",
+    color: colors.high,
+    title: "Call Protection",
+    body: "Label scam and spam calls system-wide, sourced from what the community reports.",
+    tag: "NEW",
+    onPress: () => {},
+  },
 ];
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
@@ -215,6 +224,8 @@ export default function ProtectScreen() {
         return { ...lane, onPress: () => router.push("/(tabs)/scan?type=social" as any) };
       case "family":
         return { ...lane, onPress: () => router.push("/family") };
+      case "call-protection":
+        return { ...lane, onPress: () => router.push("/call-protection") };
       default:
         return lane;
     }

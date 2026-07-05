@@ -1,0 +1,8 @@
+{
+  "name": "call-directory-sync",
+  "version": "1.0.0",
+  "description": "Writes the phone-reputation snapshot into the shared App Group container and reloads the CallDirectoryExtension.",
+  "main": "index.js",
+  "license": "UNLICENSED",
+  "private": true
+}

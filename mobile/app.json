@@ -81,7 +81,9 @@
             "image/*"
           ]
         }
-      ]
+      ],
+      "./plugins/withCallDirectoryExtension.js",
+      "./plugins/withWidgetExtension.js"
     ],
     "runtimeVersion": {
       "policy": "appVersion"

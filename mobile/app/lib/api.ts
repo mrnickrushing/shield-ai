@@ -194,6 +194,16 @@ export type ScamPatternOut = {
   created_at: string;
 };
 
+export type PhoneReputationEntry = {
+  number: string;
+  label: string;
+};
+
+export type PhoneReputationSync = {
+  version: string;
+  entries: PhoneReputationEntry[];
+};
+
 export type EmailScanPayload = {
   raw_email?: string;
   sender_email?: string;
@@ -335,6 +345,10 @@ export const ShieldAPI = {
     api.get<CommunityReportOut[]>("/community/reports").then((r) => r.data),
   listPublicPatterns: () =>
     api.get<ScamPatternOut[]>("/community/patterns").then((r) => r.data),
+
+  // Phone reputation — Call Directory Extension sync
+  syncPhoneReputation: () =>
+    api.get<PhoneReputationSync>("/phone-reputation/sync").then((r) => r.data),
 
   // Developer API key management
   createApiKey: (name: string, scopes = ["scan:read", "scan:write"]) =>

@@ -1,0 +1,8 @@
+{
+  "name": "widget-sync",
+  "version": "1.0.0",
+  "description": "Writes the protection-stats snapshot into the shared App Group container and reloads the ShieldWidgets WidgetKit timelines.",
+  "main": "index.js",
+  "license": "UNLICENSED",
+  "private": true
+}

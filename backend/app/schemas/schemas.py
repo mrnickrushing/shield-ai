@@ -404,3 +404,13 @@ class AdminUserOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class PhoneReputationEntry(BaseModel):
+    number: str
+    label: str
+
+
+class PhoneReputationSyncOut(BaseModel):
+    version: str
+    entries: list[PhoneReputationEntry]

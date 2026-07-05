@@ -48,6 +48,12 @@ class Settings(BaseSettings):
     # --- Phase 3 optional APIs ---
     HIBP_API_KEY: str = ""         # HaveIBeenPwned v3 breach lookup
 
+    # --- Phone reputation / CallKit Call Directory sync ---
+    # Minimum number of distinct users who must have scanned a phone number as
+    # high/critical risk before it's surfaced in the shared call-blocking feed.
+    # Guards against one user's report getting a legitimate number blocked app-wide.
+    PHONE_BLOCKLIST_MIN_REPORTERS: int = 3
+
     # --- Limits ---
     FREE_TIER_DAILY_SCANS: int = 15
     MAX_UPLOAD_MB: int = 10

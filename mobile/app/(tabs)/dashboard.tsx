@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
-import React from "react";
+import React, { useEffect } from "react";
 import {
   Pressable,
   ScrollView,
@@ -16,6 +16,7 @@ import { GradientButton } from "@/components/GradientButton";
 import { ProtectionRing } from "@/components/ProtectionRing";
 import { ScanCard } from "@/components/ScanCard";
 import { ShieldAPI } from "@/lib/api";
+import { syncWidgetSnapshot } from "@/lib/widgetSync";
 import { useAuth } from "@/state/auth";
 import { colors, glow, radius, spacing } from "@/theme/theme";
 
@@ -79,6 +80,17 @@ export default function Dashboard() {
         s.report && ["suspicious", "high", "critical"].includes(s.report.risk_level)
     ).length ?? 0;
   const unreadAlerts = alerts?.filter((a) => !a.is_read).length ?? 0;
+
+  useEffect(() => {
+    if (!scans) return;
+    const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const scansThisWeek = scans.filter((s) => new Date(s.created_at).getTime() >= weekAgo).length;
+    const callsProtected = scans.filter(
+      (s) => s.scan_type === "phone" && s.report && ["high", "critical"].includes(s.report.risk_level)
+    ).length;
+    syncWidgetSnapshot({ scansThisWeek, threatsBlocked, callsProtected });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scans]);
 
   const score =
     scans && scans.length > 0
