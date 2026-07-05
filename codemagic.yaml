@@ -57,9 +57,6 @@ workflows:
       app_store_connect: CyberLab ASC Key
 
     environment:
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.shieldai.app
       vars:
         BUNDLE_ID: com.shieldai.app
         EXPO_PUBLIC_API_URL: https://api.shieldai.rushingtechnologies.com
@@ -109,29 +106,37 @@ workflows:
             ../node_modules/react-native/scripts/cocoapods/privacy_manifest_utils.rb
           pod install
 
+      - name: Fetch fresh App Store signing files
+        script: |
+          if [ -z "${CERTIFICATE_PRIVATE_KEY:-}" ]; then
+            echo "CERTIFICATE_PRIVATE_KEY is required for automatic iOS signing."
+            echo "Add it as a secret Codemagic variable or pass it through the Build API."
+            exit 1
+          fi
+
+          keychain initialize
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --create
+          app-store-connect fetch-signing-files "$BUNDLE_ID.share-extension" \
+            --type IOS_APP_STORE \
+            --create
+          app-store-connect fetch-signing-files "$BUNDLE_ID.calldirectory" \
+            --type IOS_APP_STORE \
+            --create
+          app-store-connect fetch-signing-files "$BUNDLE_ID.widget" \
+            --type IOS_APP_STORE \
+            --create
+          keychain add-certificates
+
       - name: Set up code signing
         script: |
           PROFILES_DIR=~/Library/MobileDevice/Provisioning\ Profiles
           LOG=/tmp/shield_signing.log
           echo "=== Set up code signing $(date) ===" | tee -a "$LOG"
 
-          # Install share extension profile from repo (ios_signing only covers main bundle).
-          mkdir -p "$PROFILES_DIR"
-          cp "$CM_BUILD_DIR/scripts/share_extension.mobileprovision" \
-            "$PROFILES_DIR/share_extension.mobileprovision"
-          echo "Installed share extension profile from repo" | tee -a "$LOG"
-
-          # Install call directory extension profile from repo (same reason).
-          cp "$CM_BUILD_DIR/scripts/call_directory_extension.mobileprovision" \
-            "$PROFILES_DIR/call_directory_extension.mobileprovision"
-          echo "Installed call directory extension profile from repo" | tee -a "$LOG"
-
-          # Install widget extension profile from repo (same reason).
-          cp "$CM_BUILD_DIR/scripts/widget_extension.mobileprovision" \
-            "$PROFILES_DIR/widget_extension.mobileprovision"
-          echo "Installed widget extension profile from repo" | tee -a "$LOG"
-
           echo "=== Installed profiles ===" | tee -a "$LOG"
+          mkdir -p "$PROFILES_DIR"
           for f in "$PROFILES_DIR"/*.mobileprovision; do
             [ -e "$f" ] || continue
             bid=$(security cms -D -i "$f" 2>/dev/null \
