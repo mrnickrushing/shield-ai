@@ -70,3 +70,58 @@ def list_patterns(
         .limit(limit)
         .all()
     )
+
+
+@router.get("/trends")
+def scam_trends(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """What scammers are running THIS week, from live community data.
+
+    Aggregates the last 14 days of high/critical scan verdicts by threat
+    category across all users (counts only — no scan content leaves the
+    aggregate), plus fresh community reports.
+    """
+    from datetime import datetime, timedelta, timezone
+
+    from sqlalchemy import func
+
+    from app.models.models import RiskLevel, RiskReport
+
+    since = datetime.now(timezone.utc) - timedelta(days=14)
+
+    category_rows = (
+        db.query(RiskReport.threat_category, func.count(RiskReport.id))
+        .filter(
+            RiskReport.created_at >= since,
+            RiskReport.risk_level.in_([RiskLevel.high, RiskLevel.critical]),
+            RiskReport.threat_category != "unknown",
+        )
+        .group_by(RiskReport.threat_category)
+        .order_by(func.count(RiskReport.id).desc())
+        .limit(6)
+        .all()
+    )
+
+    report_rows = (
+        db.query(CommunityReport.category, func.count(CommunityReport.id))
+        .filter(CommunityReport.created_at >= since, CommunityReport.category != "")
+        .group_by(CommunityReport.category)
+        .order_by(func.count(CommunityReport.id).desc())
+        .limit(6)
+        .all()
+    )
+
+    total = sum(count for _, count in category_rows) or 1
+    return {
+        "window_days": 14,
+        "trending": [
+            {
+                "category": category,
+                "detections": count,
+                "share": round(100 * count / total),
+            }
+            for category, count in category_rows
+        ],
+        "community_reports": [
+            {"category": category, "reports": count} for category, count in report_rows
+        ],
+    }

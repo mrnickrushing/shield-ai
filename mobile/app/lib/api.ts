@@ -243,6 +243,27 @@ export type IdentityAlert = {
   created_at: string;
 };
 
+export type ProtectionScoreComponent = {
+  key: string;
+  points: number;
+  title: string;
+  earned: boolean;
+  screen: string;
+};
+
+export type ProtectionScore = {
+  score: number;
+  components: ProtectionScoreComponent[];
+  fixes: { key: string; points: number; hint: string; screen: string }[];
+  generated_at: string;
+};
+
+export type ScamTrends = {
+  window_days: number;
+  trending: { category: string; detections: number; share: number }[];
+  community_reports: { category: string; reports: number }[];
+};
+
 export type BrokerStatus = "not_started" | "not_listed" | "found" | "requested" | "removed";
 
 export type BrokerExposureItem = {
@@ -504,6 +525,10 @@ export const ShieldAPI = {
     api.post("/monitoring/extension-events", payload),
   monitoringSummary: () =>
     api.get("/monitoring/summary").then((r) => r.data),
+  protectionScore: () =>
+    api.get<ProtectionScore>("/monitoring/protection-score").then((r) => r.data),
+  scamTrends: () =>
+    api.get<ScamTrends>("/community/trends").then((r) => r.data),
   weeklyReport: () =>
     api.get<WeeklyReport>("/monitoring/report/weekly").then((r) => r.data),
 

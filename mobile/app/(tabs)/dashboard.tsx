@@ -68,6 +68,16 @@ export default function Dashboard() {
     queryFn: ShieldAPI.listIdentityAlerts,
     staleTime: 60_000,
   });
+  const { data: protection } = useQuery({
+    queryKey: ["protection-score"],
+    queryFn: ShieldAPI.protectionScore,
+    staleTime: 5 * 60_000,
+  });
+  const { data: trends } = useQuery({
+    queryKey: ["scam-trends"],
+    queryFn: ShieldAPI.scamTrends,
+    staleTime: 30 * 60_000,
+  });
 
   const recentScans = scans?.slice(0, 3) ?? [];
   const todayCount =
@@ -92,10 +102,15 @@ export default function Dashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scans]);
 
+  // Real protection posture from the backend; the old scan-ratio formula is
+  // only a placeholder while the first fetch is in flight.
   const score =
-    scans && scans.length > 0
+    protection?.score ??
+    (scans && scans.length > 0
       ? Math.max(42, Math.round(100 - (threatsBlocked / scans.length) * 58))
-      : 100;
+      : 100);
+  const topFix = protection?.fixes?.[0];
+  const topTrend = trends?.trending?.[0];
 
   const firstName = user?.display_name?.split(" ")[0] ?? null;
 
@@ -180,6 +195,50 @@ export default function Dashboard() {
             onPress={() => router.push("/(tabs)/scan" as any)}
           />
         </View>
+        {/* Top protection fix — the single highest-impact thing to enable */}
+        {topFix && (
+          <GlassCard
+            accent={colors.suspicious}
+            onPress={() => router.push(`/${topFix.screen}` as any)}
+            style={{ marginBottom: spacing.md }}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, padding: spacing.md }}>
+              <Ionicons name="trending-up" size={18} color={colors.suspicious} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: colors.text, fontWeight: "700", fontSize: 13 }}>
+                  +{topFix.points} to your score
+                </Text>
+                <Text style={{ color: colors.textMuted, fontSize: 12 }} numberOfLines={2}>
+                  {topFix.hint}
+                </Text>
+              </View>
+              <Text style={{ color: colors.suspicious, fontWeight: "800", fontSize: 12 }}>Fix →</Text>
+            </View>
+          </GlassCard>
+        )}
+
+        {/* This week's scam trend from live community data */}
+        {topTrend && (
+          <GlassCard
+            accent={colors.purple}
+            onPress={() => router.push("/community" as any)}
+            style={{ marginBottom: spacing.md }}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, padding: spacing.md }}>
+              <Ionicons name="flame" size={18} color={colors.purple} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: colors.text, fontWeight: "700", fontSize: 13 }}>
+                  Trending scam: {topTrend.category.replaceAll("_", " ")}
+                </Text>
+                <Text style={{ color: colors.textMuted, fontSize: 12 }}>
+                  {topTrend.share}% of high-risk detections this week
+                </Text>
+              </View>
+              <Text style={{ color: colors.purple, fontWeight: "800", fontSize: 12 }}>More →</Text>
+            </View>
+          </GlassCard>
+        )}
+
         {/* Weekly protection report */}
         <GlassCard
           accent={colors.teal}

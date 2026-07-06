@@ -126,6 +126,14 @@ def monitoring_summary(db: Session = Depends(get_db), user: User = Depends(get_c
     }
 
 
+@router.get("/protection-score")
+def protection_score(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """Scam-proof score: protection posture + the top fixes to improve it."""
+    from app.services.protection_score import compute_protection_score
+
+    return compute_protection_score(db, user)
+
+
 @router.get("/report/weekly")
 def weekly_protection_report(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     """Live view of the same numbers the weekly digest sends."""
