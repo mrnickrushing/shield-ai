@@ -314,11 +314,13 @@ function ChoicePill({
 
 export default function ScanScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ type?: string }>();
+  const params = useLocalSearchParams<{ type?: string; text?: string }>();
   const [mode, setMode] = useState<ScanMode>((params.type as ScanMode) ?? "link");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [universalText, setUniversalText] = useState("");
+  // Siri/Shortcuts entry point: shieldai://scan?text=... pre-fills the
+  // universal box (e.g. a "Check with Shield AI" shortcut passing the clipboard).
+  const [universalText, setUniversalText] = useState(params.text ? decodeURIComponent(params.text) : "");
   const [advancedOpen, setAdvancedOpen] = useState(!!params.type);
   const qrScanned = useRef(false);
 

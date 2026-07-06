@@ -126,6 +126,14 @@ def monitoring_summary(db: Session = Depends(get_db), user: User = Depends(get_c
     }
 
 
+@router.get("/protection-score")
+def protection_score(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """Scam-proof score: protection posture + the top fixes to improve it."""
+    from app.services.protection_score import compute_protection_score
+
+    return compute_protection_score(db, user)
+
+
 @router.get("/stream")
 async def alert_stream(user: User = Depends(get_current_user)):
     async def events():
