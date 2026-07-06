@@ -104,6 +104,20 @@ export type UrlVerdict = {
   cached: boolean;
 };
 
+export type WeeklyReport = {
+  period_days: number;
+  since: string;
+  generated_at: string;
+  scans_total: number;
+  threats_caught: number;
+  sites_blocked: number;
+  sites_warned: number;
+  calls_labeled: number;
+  texts_junked: number;
+  new_breach_alerts: number;
+  summary: string;
+};
+
 export type Incident = {
   id: string;
   incident_type: string;
@@ -448,6 +462,8 @@ export const ShieldAPI = {
     api.post("/monitoring/extension-events", payload),
   monitoringSummary: () =>
     api.get("/monitoring/summary").then((r) => r.data),
+  weeklyReport: () =>
+    api.get<WeeklyReport>("/monitoring/report/weekly").then((r) => r.data),
 
   // Community reporting
   submitReport: (payload: { scan_id?: string; report_type: CommunityReportType; artifact_text?: string; category?: string; platform_hint?: string }) =>

@@ -126,6 +126,16 @@ def monitoring_summary(db: Session = Depends(get_db), user: User = Depends(get_c
     }
 
 
+@router.get("/report/weekly")
+def weekly_protection_report(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """Live view of the same numbers the weekly digest sends."""
+    from app.services.protection_report import build_report, summarize
+
+    report = build_report(db, user.id)
+    report["summary"] = summarize(report)
+    return report
+
+
 @router.get("/stream")
 async def alert_stream(user: User = Depends(get_current_user)):
     async def events():
