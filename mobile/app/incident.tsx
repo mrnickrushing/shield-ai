@@ -1,8 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React from "react";
-import { ActivityIndicator, ScrollView, Share, Text, View } from "react-native";
+import React, { useState } from "react";
+import { ActivityIndicator, Pressable, ScrollView, Share, Text, View } from "react-native";
 
 import { Button, Eyebrow, FadeIn, Surface } from "@/components/ui";
 import { ShieldAPI } from "@/lib/api";
@@ -29,6 +29,19 @@ export default function IncidentScreen() {
     enabled: !!incident,
   });
   const createShare = useMutation({ mutationFn: () => ShieldAPI.createCasePackShare(id) });
+  const [generatingDoc, setGeneratingDoc] = useState<string | null>(null);
+
+  const generateDoc = async (docType: "bank_dispute" | "ftc_complaint" | "police_report") => {
+    setGeneratingDoc(docType);
+    try {
+      const doc = await ShieldAPI.generateIncidentDocument(id, docType);
+      await Share.share({ message: doc.body, title: doc.title });
+    } catch {
+      // Share sheet dismissal also throws on some platforms; nothing to surface.
+    } finally {
+      setGeneratingDoc(null);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -129,6 +142,52 @@ export default function IncidentScreen() {
         >
           <Text style={{ color: colors.text, fontWeight: "700" }}>Continue Recovery Steps</Text>
           <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+        </Surface>
+
+        <Eyebrow style={{ marginBottom: spacing.sm }}>Ready-to-send documents</Eyebrow>
+        <Surface style={{ marginBottom: spacing.md, gap: spacing.sm }}>
+          {(
+            [
+              { key: "bank_dispute", label: "Bank / card dispute letter", icon: "card-outline" },
+              { key: "ftc_complaint", label: "FTC complaint draft", icon: "flag-outline" },
+              { key: "police_report", label: "Police report narrative", icon: "shield-outline" },
+            ] as const
+          ).map((doc) => (
+            <Pressable
+              key={doc.key}
+              onPress={() => generateDoc(doc.key)}
+              disabled={generatingDoc !== null}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: spacing.sm,
+                paddingVertical: spacing.xs,
+                opacity: generatingDoc && generatingDoc !== doc.key ? 0.4 : 1,
+              }}
+            >
+              <View
+                style={{
+                  width: 34,
+                  height: 34,
+                  borderRadius: 17,
+                  backgroundColor: withAlpha(colors.teal, "22"),
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                {generatingDoc === doc.key ? (
+                  <ActivityIndicator size="small" color={colors.teal} />
+                ) : (
+                  <Ionicons name={doc.icon} size={16} color={colors.teal} />
+                )}
+              </View>
+              <Text style={{ color: colors.text, fontSize: 14, fontWeight: "600", flex: 1 }}>{doc.label}</Text>
+              <Ionicons name="share-outline" size={16} color={colors.textMuted} />
+            </Pressable>
+          ))}
+          <Text style={{ color: colors.textMuted, fontSize: 11 }}>
+            Written from this case&apos;s details — review before sending.
+          </Text>
         </Surface>
 
         <Button

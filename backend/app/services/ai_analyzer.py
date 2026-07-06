@@ -159,3 +159,37 @@ def analyze_image_with_vision(image_bytes: bytes, evidence: dict) -> dict | None
     except Exception as exc:
         log.warning("Vision analysis failed, falling back to text analysis: %s", exc)
         return None
+
+
+def generate_text(instruction: str, facts: str, example: str) -> str | None:
+    """Free-form document generation grounded in provided facts.
+
+    Used by the recovery concierge. Returns plain text or None (caller falls
+    back to its deterministic template).
+    """
+    if not settings.ANTHROPIC_API_KEY:
+        return None
+    try:
+        import anthropic
+
+        cfg = get_config("message")
+        client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+        resp = client.messages.create(
+            model=cfg.model,
+            temperature=0.2,
+            max_tokens=1500,
+            system=(
+                "You draft documents for scam victims. Be factual and precise. "
+                "Use only the facts given; keep bracketed placeholders for anything "
+                "unknown. Return only the document text — no preamble or comments."
+            ),
+            messages=[{
+                "role": "user",
+                "content": f"{instruction}\n\nFACTS:\n{facts}\n\nEXAMPLE STRUCTURE TO FOLLOW:\n{example}",
+            }],
+        )
+        text = resp.content[0].text.strip()
+        return text or None
+    except Exception as exc:
+        log.warning("LLM document generation failed: %s", exc)
+        return None
