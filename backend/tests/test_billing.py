@@ -6,6 +6,7 @@ os.environ["DATABASE_URL"] = "sqlite+pysqlite:///:memory:"
 os.environ["ENVIRONMENT"] = "development"
 os.environ["REVENUECAT_WEBHOOK_SECRET"] = "test-webhook-secret"
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -34,7 +35,19 @@ def _override_db():
         db.close()
 
 
-app.dependency_overrides[get_db] = _override_db
+@pytest.fixture(autouse=True)
+def _use_this_module_db():
+    # Swap in this module's DB and restore whatever was there before, so we
+    # don't clobber other test modules' overrides (see test_verticals.py).
+    prev = app.dependency_overrides.get(get_db)
+    app.dependency_overrides[get_db] = _override_db
+    yield
+    if prev is not None:
+        app.dependency_overrides[get_db] = prev
+    else:
+        app.dependency_overrides.pop(get_db, None)
+
+
 client = TestClient(app)
 
 AUTH = {"Authorization": "test-webhook-secret"}
