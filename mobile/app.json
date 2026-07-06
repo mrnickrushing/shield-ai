@@ -82,6 +82,13 @@
           ]
         }
       ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Shield AI uses the microphone to record suspicious voicemails you play for analysis.",
+          "speechRecognitionPermission": "Shield AI transcribes voicemails on your device so the audio never leaves your phone."
+        }
+      ],
       "./plugins/withCallDirectoryExtension.js",
       "./plugins/withWidgetExtension.js",
       "./plugins/withMessageFilterExtension.js"

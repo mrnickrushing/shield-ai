@@ -203,6 +203,8 @@ MESSAGE_SIGNAL_WEIGHTS = [
     ("toll_scam_signals", 30, "Matches fake unpaid-toll smishing patterns (E-ZPass/FasTrak/SunPass impersonation)."),
     ("bank_alert_smishing_signals", 30, "Mimics a bank fraud alert to bait a reply, a common smishing setup."),
     ("has_urgency", 15, "Uses urgency or time pressure to force a quick decision."),
+    ("voicemail_scam_signals", 35, "Voicemail uses scripted callback pressure (urgent call-back, legal threats, secrecy)."),
+    ("caller_reported_as_scam", 40, "The caller's number has been reported as high-risk by the Shield AI community."),
 ]
 
 
