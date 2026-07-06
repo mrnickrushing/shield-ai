@@ -33,6 +33,10 @@ celery_app.conf.beat_schedule = {
         "task": "monitoring.scan_pattern_followups",
         "schedule": 60 * 60,
     },
+    "weekly-protection-report": {
+        "task": "monitoring.weekly_protection_report",
+        "schedule": 7 * 24 * 60 * 60,
+    },
 }
 
 
@@ -120,5 +124,19 @@ def scan_pattern_followups_task() -> int:
         alerts = run_scan_pattern_monitor(db)
         db.commit()
         return alerts
+    finally:
+        db.close()
+
+
+@celery_app.task(name="monitoring.weekly_protection_report")
+def weekly_protection_report_task() -> int:
+    from app.db.session import SessionLocal
+    from app.services.protection_report import run_weekly_reports
+
+    db = SessionLocal()
+    try:
+        sent = run_weekly_reports(db)
+        db.commit()
+        return sent
     finally:
         db.close()
