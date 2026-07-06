@@ -68,7 +68,12 @@ workflows:
       cocoapods: 1.15.2
 
     triggering:
-      events: []
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+          source: true
 
     scripts:
       - name: Install JS dependencies
@@ -211,4 +216,4 @@ workflows:
           failure: false
       app_store_connect:
         auth: integration
-        submit_to_testflight: false
+        submit_to_testflight: true
