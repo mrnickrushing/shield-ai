@@ -1,15 +1,20 @@
 """Shield AI — FastAPI application entrypoint."""
 from contextlib import asynccontextmanager
+from time import monotonic
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.api.v1 import admin, auth, billing, community, developer, education, family, identity, message_filter, monitoring, notifications, phone_reputation, recovery, scans, verticals
-from app.core.config import settings
+from app.core.config import settings, validate_runtime_settings
+
+_RATE_LIMIT_BUCKETS: dict[str, list[float]] = {}
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    validate_runtime_settings()
     yield
 
 
@@ -27,6 +32,26 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def production_rate_limit(request: Request, call_next):
+    if settings.ENVIRONMENT.lower() not in {"production", "prod"} or settings.RATE_LIMIT_PER_MINUTE <= 0:
+        return await call_next(request)
+    if request.url.path in {"/health", "/"} or request.url.path.startswith(("/docs", "/openapi")):
+        return await call_next(request)
+
+    forwarded = request.headers.get("x-forwarded-for", "")
+    ip = (forwarded.split(",")[0].strip() if forwarded else (request.client.host if request.client else "unknown"))
+    key = f"{ip}:{request.url.path.split('/')[1:4]}"
+    now = monotonic()
+    window_start = now - 60
+    bucket = [ts for ts in _RATE_LIMIT_BUCKETS.get(key, []) if ts >= window_start]
+    if len(bucket) >= settings.RATE_LIMIT_PER_MINUTE:
+        return JSONResponse({"detail": "Rate limit exceeded"}, status_code=429)
+    bucket.append(now)
+    _RATE_LIMIT_BUCKETS[key] = bucket
+    return await call_next(request)
 
 app.include_router(auth.router, prefix=settings.API_V1_PREFIX)
 app.include_router(scans.router, prefix=settings.API_V1_PREFIX)

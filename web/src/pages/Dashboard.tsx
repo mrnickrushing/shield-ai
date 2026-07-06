@@ -38,7 +38,10 @@ export default function DashboardPage() {
           </div>
           <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
             <StatCard label="Open Community Reports" value={stats.open_community_reports} accent={stats.open_community_reports > 0 ? "#f97316" : C.bright} />
+            <StatCard label="Pending Feedback Reviews" value={stats.pending_feedback_reviews} accent={stats.pending_feedback_reviews > 0 ? "#f97316" : C.bright} />
             <StatCard label="Active Scam Patterns" value={stats.active_scam_patterns} />
+          </div>
+          <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginTop: 16 }}>
             <StatCard label="Active API Keys" value={stats.active_api_keys} />
           </div>
         </>

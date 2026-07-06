@@ -45,6 +45,14 @@ class Settings(BaseSettings):
     # --- Phase 2 optional APIs ---
     NUMVERIFY_API_KEY: str = ""    # apilayer.net phone lookup
     EXPO_ACCESS_TOKEN: str = ""    # Expo push notification service
+    ALERT_DELIVERY_TIMEOUT_SECONDS: float = 5.0
+
+    # --- Optional email alert delivery ---
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM_EMAIL: str = "alerts@shieldai.app"
 
     # --- Phase 3 optional APIs ---
     HIBP_API_KEY: str = ""         # HaveIBeenPwned v3 breach lookup
@@ -57,7 +65,24 @@ class Settings(BaseSettings):
 
     # --- Limits ---
     FREE_TIER_DAILY_SCANS: int = 15
+    FREE_TIER_MONITOR_TARGETS: int = 1
     MAX_UPLOAD_MB: int = 10
+
+    # --- Production safety ---
+    STRICT_PRODUCTION_CONFIG: bool = True
+    RATE_LIMIT_PER_MINUTE: int = 600
+
+
+def validate_runtime_settings() -> None:
+    """Fail fast when production is running with unsafe development defaults."""
+    if settings.ENVIRONMENT.lower() not in {"production", "prod"}:
+        return
+    if not settings.STRICT_PRODUCTION_CONFIG:
+        return
+    if settings.SECRET_KEY == "CHANGE_ME_IN_PRODUCTION" or len(settings.SECRET_KEY) < 32:
+        raise RuntimeError("SECRET_KEY must be set to a strong production value.")
+    if "*" in settings.CORS_ORIGINS:
+        raise RuntimeError("CORS_ORIGINS must not include '*' in production.")
 
 
 @lru_cache

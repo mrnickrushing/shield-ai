@@ -16,6 +16,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.db.session import Base, get_db
 from app.main import app
+from app.models.models import User
 
 # Shared in-memory SQLite for the test session.
 engine = create_engine(
@@ -231,7 +232,7 @@ def test_notification_preferences_round_trip():
 
 
 def test_realtime_monitoring_targets_and_telemetry():
-    headers = _auth_headers()
+    headers = _auth_headers(premium=True)
     target = client.post(
         "/api/v1/monitoring/targets",
         json={"target_type": "email", "value": "monitor@example.com", "label": "Primary"},
@@ -263,6 +264,22 @@ def test_realtime_monitoring_targets_and_telemetry():
 
     removed = client.delete(f"/api/v1/monitoring/targets/{target.json()['id']}", headers=headers)
     assert removed.status_code == 204, removed.text
+
+
+def test_free_monitoring_is_limited_to_one_email_target():
+    headers = _auth_headers()
+    first = client.post(
+        "/api/v1/monitoring/targets",
+        json={"target_type": "email", "value": "free-monitor@example.com"},
+        headers=headers,
+    )
+    assert first.status_code == 201, first.text
+    second = client.post(
+        "/api/v1/monitoring/targets",
+        json={"target_type": "domain", "value": "paypal-secure.xyz"},
+        headers=headers,
+    )
+    assert second.status_code == 402, second.text
 
 
 def test_link_scan_requires_auth():
@@ -377,12 +394,20 @@ def test_phone_scan_endpoint_requires_auth():
     assert r.status_code in (401, 403)
 
 
-def _auth_headers() -> dict:
+def _auth_headers(premium: bool = False) -> dict:
     email = f"p2test+{uuid.uuid4().hex}@example.com"
     r = client.post(
         "/api/v1/auth/register",
         json={"email": email, "password": "supersecret1", "display_name": "P2"},
     )
+    if premium:
+        db = TestingSession()
+        try:
+            user = db.query(User).filter(User.email == email).first()
+            user.is_premium = True
+            db.commit()
+        finally:
+            db.close()
     return {"Authorization": f"Bearer {r.json()['access_token']}"}
 
 
@@ -940,3 +965,66 @@ def test_scam_pattern_crud_admin():
     # Disable the pattern
     del_r = client.delete(f"/api/v1/admin/patterns/{pat['id']}", headers=admin_headers)
     assert del_r.status_code == 204
+
+
+def test_admin_feedback_review_queue_and_promotion():
+    headers = _auth_headers()
+    scan = client.post(
+        "/api/v1/scans/message",
+        json={"message_text": "Suspicious correction seed.", "platform_hint": "sms"},
+        headers=headers,
+    )
+    assert scan.status_code == 201, scan.text
+    feedback = client.post(
+        f"/api/v1/scans/{scan.json()['id']}/feedback-detail",
+        json={
+            "feedback": "missed_scam",
+            "reason": "Analyst should review this.",
+            "corrected_context": "wire money to release prize",
+            "evidence": "sample evidence",
+        },
+        headers=headers,
+    )
+    assert feedback.status_code == 201, feedback.text
+
+    email = f"admin-feedback+{uuid.uuid4().hex}@example.com"
+    reg = client.post("/api/v1/auth/register", json={"email": email, "password": "supersecret1", "display_name": "Admin"})
+    token = reg.json()["access_token"]
+    user_id = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"}).json()["id"]
+    db = TestingSession()
+    try:
+        admin = db.get(User, user_id)
+        admin.is_admin = True
+        db.commit()
+    finally:
+        db.close()
+    admin_headers = {"Authorization": f"Bearer {token}"}
+
+    queue = client.get("/api/v1/admin/feedback", headers=admin_headers)
+    assert queue.status_code == 200, queue.text
+    assert any(item["id"] == feedback.json()["id"] for item in queue.json())
+
+    reviewed = client.patch(
+        f"/api/v1/admin/feedback/{feedback.json()['id']}",
+        json={"review_status": "reviewed"},
+        headers=admin_headers,
+    )
+    assert reviewed.status_code == 200, reviewed.text
+    assert reviewed.json()["review_status"] == "reviewed"
+
+    promoted = client.post(
+        f"/api/v1/admin/feedback/{feedback.json()['id']}/pattern",
+        json={
+            "name": f"feedback_test_{uuid.uuid4().hex}",
+            "description": "Promoted test feedback",
+            "pattern_type": "keyword",
+            "artifact_types": ["message"],
+            "pattern_data": {"keywords": ["release prize"]},
+            "risk_score_boost": 25,
+            "category": "payment_fraud",
+            "source": "feedback",
+        },
+        headers=admin_headers,
+    )
+    assert promoted.status_code == 201, promoted.text
+    assert promoted.json()["source"] == "feedback"

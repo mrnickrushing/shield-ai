@@ -504,6 +504,7 @@ class AdminStatsOut(BaseModel):
     total_scans: int
     scans_today: int
     open_community_reports: int
+    pending_feedback_reviews: int
     active_scam_patterns: int
     active_api_keys: int
 

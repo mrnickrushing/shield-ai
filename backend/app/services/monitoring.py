@@ -4,30 +4,27 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models.models import (
     BrowserTelemetryEvent,
+    CommunityReport,
     ExtensionTelemetryEvent,
     IdentityAlert,
     Incident,
+    LinkScan,
     MonitoredIdentity,
     Notification,
-    NotificationPreference,
+    PhoneScan,
     RiskLevel,
     RiskReport,
     ScanHistory,
+    SocialScan,
 )
-from app.services import breach_check
-
-SEVERITY_RANK = {"safe": 0, "low": 1, "suspicious": 2, "high": 3, "critical": 4}
-DEFAULT_TOPICS = {
-    "breach": True,
-    "impersonation": True,
-    "account": True,
-    "family": True,
-    "community": False,
-}
+from app.services import breach_check, phone_lookup
+from app.services.notification_delivery import SEVERITY_RANK, preferences_for, send_email_alert, send_push_to_devices, should_deliver
+from app.services.url_check import check_url
 
 
 def normalize_domain(url: str, fallback: str = "") -> str:
@@ -37,27 +34,6 @@ def normalize_domain(url: str, fallback: str = "") -> str:
         return urlparse(url).hostname or ""
     except Exception:
         return ""
-
-
-def _preferences(db: Session, user_id: str) -> NotificationPreference | None:
-    return db.query(NotificationPreference).filter(NotificationPreference.user_id == user_id).first()
-
-
-def should_notify(db: Session, user_id: str, severity: str, topic: str, channel: str = "push") -> bool:
-    pref = _preferences(db, user_id)
-    if not pref:
-        return True
-    if channel == "push" and not pref.push_enabled:
-        return False
-    if channel == "email" and not pref.email_enabled:
-        return False
-    topics = {**DEFAULT_TOPICS, **(pref.topics or {})}
-    if not topics.get(topic, True):
-        return False
-    minimum = pref.minimum_severity or "all"
-    if minimum != "all" and SEVERITY_RANK.get(severity, 0) < SEVERITY_RANK.get(minimum, 0):
-        return False
-    return True
 
 
 def create_alert(
@@ -70,10 +46,20 @@ def create_alert(
     scan_id: str | None = None,
     force_inbox: bool = True,
 ) -> Notification | None:
-    if not force_inbox and not should_notify(db, user_id, severity, topic, "push"):
+    if not force_inbox and not should_deliver(db, user_id, severity, topic, "push"):
         return None
     notif = Notification(user_id=user_id, title=title, body=body[:1000], scan_id=scan_id)
     db.add(notif)
+    send_push_to_devices(
+        db,
+        user_id,
+        title,
+        body,
+        severity=severity,
+        topic=topic,
+        data={"scan_id": scan_id, "topic": topic, "type": "monitoring_alert"},
+    )
+    send_email_alert(db, user_id, title, body, severity=severity, topic=topic)
     return notif
 
 
@@ -138,10 +124,56 @@ def record_extension_event(
 def monitor_identity_target(db: Session, target: MonitoredIdentity) -> bool:
     now = datetime.now(timezone.utc)
     target.last_checked_at = now
-    if target.target_type != "email":
-        target.last_status = "monitored"
-        return False
+    if target.target_type == "email":
+        return _monitor_email(db, target)
+    if target.target_type == "phone":
+        return _monitor_phone(db, target)
+    if target.target_type == "domain":
+        return _monitor_domain(db, target)
+    if target.target_type == "username":
+        return _monitor_username(db, target)
+    target.last_status = "unsupported"
+    return False
 
+
+def _identity_alert_exists(db: Session, target: MonitoredIdentity, alert_type: str) -> bool:
+    return bool(
+        db.query(IdentityAlert)
+        .filter(
+            IdentityAlert.user_id == target.user_id,
+            IdentityAlert.email == target.value,
+            IdentityAlert.alert_type == alert_type,
+        )
+        .first()
+    )
+
+
+def _record_identity_alert(
+    db: Session,
+    target: MonitoredIdentity,
+    alert_type: str,
+    detail: dict,
+    title: str,
+    body: str,
+    *,
+    severity: str,
+    topic: str,
+) -> bool:
+    if _identity_alert_exists(db, target, alert_type):
+        return False
+    db.add(
+        IdentityAlert(
+            user_id=target.user_id,
+            alert_type=alert_type,
+            email=target.value,
+            detail={**detail, "monitor_id": target.id, "target_type": target.target_type},
+        )
+    )
+    create_alert(db, target.user_id, title, body, severity=severity, topic=topic)
+    return True
+
+
+def _monitor_email(db: Session, target: MonitoredIdentity) -> bool:
     result = breach_check.check_breaches(target.value)
     if not result.get("data_available"):
         target.last_status = "unavailable"
@@ -152,39 +184,122 @@ def monitor_identity_target(db: Session, target: MonitoredIdentity) -> bool:
     if breach_count <= 0:
         return False
 
-    existing = (
-        db.query(IdentityAlert)
+    return _record_identity_alert(
+        db,
+        target,
+        "monitored_breach",
+        {
+            "breach_count": breach_count,
+            "severity": result.get("severity", "high"),
+            "top_breaches": [b["name"] for b in result.get("breaches", [])[:5]],
+        },
+        "Monitored identity found in breach",
+        f"{target.value} appeared in {breach_count} known breach{'es' if breach_count != 1 else ''}.",
+        severity="high",
+        topic="breach",
+    )
+
+
+def _monitor_phone(db: Session, target: MonitoredIdentity) -> bool:
+    normalized = phone_lookup.normalize_phone(target.value)
+    if not normalized:
+        target.last_status = "invalid"
+        return False
+    rows = (
+        db.query(func.count(func.distinct(ScanHistory.user_id)), func.max(RiskReport.created_at))
+        .select_from(PhoneScan)
+        .join(ScanHistory, ScanHistory.id == PhoneScan.scan_id)
+        .join(RiskReport, RiskReport.scan_id == ScanHistory.id)
         .filter(
-            IdentityAlert.user_id == target.user_id,
-            IdentityAlert.email == target.value,
-            IdentityAlert.alert_type == "monitored_breach",
+            PhoneScan.normalized_number.in_({normalized, normalized[-10:]}),
+            RiskReport.risk_level.in_([RiskLevel.high, RiskLevel.critical]),
         )
         .first()
     )
-    if not existing:
-        db.add(
-            IdentityAlert(
-                user_id=target.user_id,
-                alert_type="monitored_breach",
-                email=target.value,
-                detail={
-                    "breach_count": breach_count,
-                    "severity": result.get("severity", "high"),
-                    "top_breaches": [b["name"] for b in result.get("breaches", [])[:5]],
-                    "monitor_id": target.id,
-                },
-            )
+    reporters = int(rows[0] or 0) if rows else 0
+    target.last_status = "reported_high_risk" if reporters else "clear"
+    if reporters <= 0:
+        return False
+    return _record_identity_alert(
+        db,
+        target,
+        "monitored_phone_reputation",
+        {"reporters": reporters, "last_seen": rows[1].isoformat() if rows and rows[1] else None},
+        "Monitored phone number has scam reports",
+        f"{target.value} matched high-risk phone reputation from {reporters} Shield AI reporter{'s' if reporters != 1 else ''}.",
+        severity="high",
+        topic="account",
+    )
+
+
+def _monitor_domain(db: Session, target: MonitoredIdentity) -> bool:
+    domain = target.value.strip().lower().removeprefix("https://").removeprefix("http://").strip("/")
+    if not domain:
+        target.last_status = "invalid"
+        return False
+    verdict = check_url(f"https://{domain}")
+    target.last_status = str(verdict.get("verdict") or "unverified")
+    prior_high_risk = (
+        db.query(LinkScan)
+        .join(ScanHistory, ScanHistory.id == LinkScan.scan_id)
+        .join(RiskReport, RiskReport.scan_id == ScanHistory.id)
+        .filter(
+            LinkScan.domain == domain,
+            RiskReport.risk_level.in_([RiskLevel.high, RiskLevel.critical]),
         )
-        create_alert(
-            db,
-            target.user_id,
-            "Monitored identity found in breach",
-            f"{target.value} appeared in {breach_count} known breach{'es' if breach_count != 1 else ''}.",
-            severity="high",
-            topic="breach",
+        .count()
+    )
+    if target.last_status not in ("high", "critical") and prior_high_risk <= 0:
+        return False
+    return _record_identity_alert(
+        db,
+        target,
+        "monitored_domain_risk",
+        {"verdict": verdict, "prior_high_risk_scans": prior_high_risk},
+        "Monitored domain looks risky",
+        f"{domain} is currently rated {target.last_status} or matched prior high-risk scans.",
+        severity="high" if target.last_status != "critical" else "critical",
+        topic="impersonation",
+    )
+
+
+def _monitor_username(db: Session, target: MonitoredIdentity) -> bool:
+    value = target.value.strip().lower().lstrip("@")
+    if not value:
+        target.last_status = "invalid"
+        return False
+    social_hits = (
+        db.query(SocialScan)
+        .join(ScanHistory, ScanHistory.id == SocialScan.scan_id)
+        .join(RiskReport, RiskReport.scan_id == ScanHistory.id)
+        .filter(
+            SocialScan.content_text.ilike(f"%{value}%"),
+            RiskReport.risk_level.in_([RiskLevel.high, RiskLevel.critical]),
         )
-        return True
-    return False
+        .count()
+    )
+    report_hits = (
+        db.query(CommunityReport)
+        .filter(
+            CommunityReport.artifact_text.ilike(f"%{value}%"),
+            CommunityReport.status.in_(["pending", "reviewed", "approved"]),
+        )
+        .count()
+    )
+    hits = social_hits + report_hits
+    target.last_status = "mentioned_high_risk" if hits else "monitored"
+    if hits <= 0:
+        return False
+    return _record_identity_alert(
+        db,
+        target,
+        "monitored_username_risk",
+        {"social_scan_hits": social_hits, "community_report_hits": report_hits},
+        "Monitored username appears in scam reports",
+        f"@{value} appeared in {hits} high-risk scan or community report signal{'s' if hits != 1 else ''}.",
+        severity="suspicious",
+        topic="impersonation",
+    )
 
 
 def run_identity_monitors(db: Session, max_age_hours: int = 24) -> int:
@@ -200,6 +315,11 @@ def run_identity_monitors(db: Session, max_age_hours: int = 24) -> int:
     )
     alerts = 0
     for target in targets:
+        pref = preferences_for(db, target.user_id)
+        if pref and not pref.proactive_monitoring:
+            target.last_status = "paused"
+            target.last_checked_at = datetime.now(timezone.utc)
+            continue
         if monitor_identity_target(db, target):
             alerts += 1
     return alerts

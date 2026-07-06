@@ -95,6 +95,7 @@ def _case_pack_text(pack: dict) -> str:
     lines = [
         pack["title"],
         f"Generated: {pack['generated_at']}",
+        f"Case ID: {pack['case']['id']}",
         "",
         "Case Overview",
         f"Type: {pack['case']['label']}",
@@ -118,11 +119,27 @@ def _case_pack_text(pack: dict) -> str:
         or ["All recovery steps are marked complete."]
     )
     lines.extend(["", "Evidence"])
-    lines.extend([f"- {item['label'] or item['type']}: {item['content']}" for item in pack["evidence"]] or ["No evidence entered yet."])
+    if pack["evidence"]:
+        for index, item in enumerate(pack["evidence"], start=1):
+            lines.extend(
+                [
+                    f"Evidence {index}: {item['label'] or item['type']}",
+                    f"Type: {item['type']}",
+                    f"Captured: {item['created_at']}",
+                    f"Content: {item['content']}",
+                ]
+            )
+    else:
+        lines.append("No evidence entered yet.")
     lines.extend([
         "",
         "Bank or Platform Dispute Template",
         pack["bank_or_platform_template"],
+        "",
+        "Platform / Bank Request Checklist",
+        "- Preserve account, message, transaction, login, and device records related to this incident.",
+        "- Block further transfers, withdrawals, password resets, or account changes where possible.",
+        "- Provide a written case, claim, or dispute number and next-response timeline.",
         "",
         "Police Report Summary",
         pack["police_report_summary"],
