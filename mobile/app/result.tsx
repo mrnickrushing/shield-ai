@@ -342,6 +342,7 @@ export default function Result() {
       if (scan.scan_type === "phone") nextScan = await ShieldAPI.scanPhone(input);
       if (scan.scan_type === "marketplace") nextScan = await ShieldAPI.scanMarketplace(input, "correction");
       if (scan.scan_type === "social") nextScan = await ShieldAPI.scanSocial(input, "correction");
+      if (scan.scan_type === "voice") nextScan = await ShieldAPI.scanVoice(input);
       if (nextScan?.id) router.replace(`/result?id=${nextScan.id}`);
     } catch {
       Alert.alert("Re-scan failed", "We could not run the corrected scan right now.");

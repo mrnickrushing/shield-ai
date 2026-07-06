@@ -31,6 +31,7 @@ from app.schemas.schemas import (
     ScanFeedbackDetailOut,
     ScanOut,
     SocialScanCreate,
+    VoiceScanCreate,
 )
 from app.services import ocr, scan_service
 
@@ -217,6 +218,35 @@ def create_message_scan(
     db.refresh(scan)
 
     scan_service.process_message_scan(db, scan, payload.message_text, payload.platform_hint)
+    db.add(ApiUsage(user_id=user.id, provider="anthropic"))
+    db.commit()
+    db.refresh(scan)
+    return scan
+
+
+@router.post("/voice", response_model=ScanOut, status_code=status.HTTP_201_CREATED)
+def create_voice_scan(
+    payload: VoiceScanCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_user_write),
+):
+    """Analyze a voicemail / call transcript (transcribed on-device for privacy)."""
+    transcript = payload.transcript.strip()
+    if len(transcript) < 10:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "Transcript is too short to analyze — record a longer portion of the voicemail.",
+        )
+    _check_quota(db, user)
+    scan = ScanHistory(
+        user_id=user.id, scan_type=ScanType.voice, raw_input=transcript[:500],
+        status=ScanStatus.pending,
+    )
+    db.add(scan)
+    db.commit()
+    db.refresh(scan)
+
+    scan_service.process_voice_scan(db, scan, transcript, payload.caller_number)
     db.add(ApiUsage(user_id=user.id, provider="anthropic"))
     db.commit()
     db.refresh(scan)

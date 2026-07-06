@@ -15,6 +15,8 @@ import {
   View,
 } from "react-native";
 
+import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from "expo-speech-recognition";
+
 import { GlowBackground } from "@/components/GlowBackground";
 import { GradientButton } from "@/components/GradientButton";
 import { CornerBrackets, ScanBeam } from "@/components/ScanBeam";
@@ -117,6 +119,7 @@ type ScanMode =
   | "image"
   | "qr"
   | "message"
+  | "voice"
   | "email"
   | "phone"
   | "marketplace"
@@ -137,6 +140,7 @@ const MODE_ORDER: ScanMode[] = [
   "image",
   "qr",
   "message",
+  "voice",
   "email",
   "phone",
   "marketplace",
@@ -179,6 +183,15 @@ const MODE_META: Record<ScanMode, ModeMeta> = {
     accent: colors.high,
     cta: "Analyze Message",
     bestFor: ["Delivery texts", "Work-from-home offers", "Account warnings"],
+  },
+  voice: {
+    label: "Voicemail",
+    title: "Play a voicemail — we listen for the script",
+    subtitle: "Hold your phone near the speaker (or read it aloud). Transcription happens on your device, then we score IRS threats, callback pressure, and voice-clone family-emergency patterns.",
+    icon: "mic-outline",
+    accent: colors.teal,
+    cta: "Analyze Voicemail",
+    bestFor: ["IRS & SSA threats", "Grandparent scams", "Fake fraud departments"],
   },
   email: {
     label: "Email",
@@ -333,6 +346,9 @@ export default function ScanScreen() {
   const [emailSubject, setEmailSubject] = useState("");
   const [emailBody, setEmailBody] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
+  const [voiceTranscript, setVoiceTranscript] = useState("");
+  const [voiceCaller, setVoiceCaller] = useState("");
+  const [listening, setListening] = useState(false);
   const [marketplaceText, setMarketplaceText] = useState("");
   const [marketplacePlatform, setMarketplacePlatform] = useState("");
   const [socialText, setSocialText] = useState("");
@@ -368,6 +384,49 @@ export default function ScanScreen() {
   };
 
   const navigate = (scan: { id: string }) => router.push(`/result?id=${scan.id}`);
+
+  // On-device voicemail transcription: audio never leaves the phone, only
+  // the resulting text is sent for analysis.
+  useSpeechRecognitionEvent("result", (event) => {
+    const text = event.results?.[0]?.transcript ?? "";
+    if (text) setVoiceTranscript(text);
+  });
+  useSpeechRecognitionEvent("end", () => setListening(false));
+  useSpeechRecognitionEvent("error", (event) => {
+    setListening(false);
+    if (event.error !== "aborted") {
+      setError("Transcription stopped — you can also type or paste the voicemail text.");
+    }
+  });
+
+  const startListening = async () => {
+    setError(null);
+    const perms = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+    if (!perms.granted) {
+      setError("Microphone access is needed to transcribe a voicemail. You can also type it below.");
+      return;
+    }
+    setVoiceTranscript("");
+    setListening(true);
+    ExpoSpeechRecognitionModule.start({
+      lang: "en-US",
+      interimResults: true,
+      continuous: true,
+      // Voicemail played from another device is far-field audio; keep iOS
+      // from ducking or filtering it as background noise.
+      iosCategory: { category: "playAndRecord", categoryOptions: ["defaultToSpeaker"], mode: "measurement" },
+    });
+  };
+
+  const stopListening = () => {
+    ExpoSpeechRecognitionModule.stop();
+    setListening(false);
+  };
+
+  const runVoice = () => {
+    if (listening) stopListening();
+    return wrap(() => ShieldAPI.scanVoice(voiceTranscript.trim(), voiceCaller.trim() || undefined));
+  };
 
   const wrap = async (fn: () => Promise<{ id: string }>) => {
     setError(null);
@@ -722,6 +781,64 @@ export default function ScanScreen() {
                 })}
               </View>
               <PrimaryButton loading={loading} label={active.cta} onPress={runMessage} disabled={!messageText.trim()} icon="flash-outline" />
+            </>
+          )}
+
+          {mode === "voice" && (
+            <>
+              <Pressable
+                onPress={listening ? stopListening : startListening}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: spacing.sm,
+                  backgroundColor: listening ? `${colors.critical}22` : `${active.accent}18`,
+                  borderColor: listening ? colors.critical : active.accent,
+                  borderWidth: 1,
+                  borderRadius: radius.lg,
+                  paddingVertical: spacing.md,
+                  marginBottom: spacing.md,
+                }}
+              >
+                <Ionicons
+                  name={listening ? "stop-circle" : "mic"}
+                  size={22}
+                  color={listening ? colors.critical : active.accent}
+                />
+                <Text style={{ color: listening ? colors.critical : active.accent, fontWeight: "800", fontSize: 15 }}>
+                  {listening ? "Listening… tap to stop" : "Tap, then play the voicemail"}
+                </Text>
+              </Pressable>
+
+              <FieldLabel>Transcript</FieldLabel>
+              <TextInput
+                placeholder="The transcript appears here as it listens — or type/paste the voicemail yourself…"
+                placeholderTextColor={colors.textMuted}
+                multiline
+                value={voiceTranscript}
+                onChangeText={setVoiceTranscript}
+                style={multilineStyle}
+              />
+              <FieldLabel>Caller Number (optional)</FieldLabel>
+              <TextInput
+                placeholder="+1 (555) 123-4567"
+                placeholderTextColor={colors.textMuted}
+                keyboardType="phone-pad"
+                value={voiceCaller}
+                onChangeText={setVoiceCaller}
+                style={inputStyle}
+              />
+              <Text style={{ color: colors.textMuted, fontSize: 12, marginBottom: spacing.sm }}>
+                Audio is transcribed on your device — the recording never leaves your phone.
+              </Text>
+              <PrimaryButton
+                loading={loading}
+                label={active.cta}
+                onPress={runVoice}
+                disabled={voiceTranscript.trim().length < 10}
+                icon="flash-outline"
+              />
             </>
           )}
 

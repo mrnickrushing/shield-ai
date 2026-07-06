@@ -12,9 +12,16 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.db.session import get_db
-from app.models.models import BreachRecord, IdentityAlert, User
-from app.schemas.schemas import BreachCheckRequest, BreachCheckResult, IdentityAlertOut
-from app.services import breach_check
+from app.models.models import BreachRecord, BrokerOptOut, IdentityAlert, User
+from app.schemas.schemas import (
+    BreachCheckRequest,
+    BreachCheckResult,
+    BrokerExposureItem,
+    BrokerExposureSummary,
+    BrokerStatusUpdate,
+    IdentityAlertOut,
+)
+from app.services import breach_check, broker_catalog
 
 router = APIRouter(prefix="/identity", tags=["identity"])
 
@@ -168,3 +175,84 @@ def mark_alert_read(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Alert not found")
     alert.is_read = True
     db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Data-broker exposure (premium): guided find-yourself-and-opt-out checklist
+# ---------------------------------------------------------------------------
+
+@router.get("/brokers", response_model=BrokerExposureSummary)
+def broker_exposure(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    display_name = user.profile.display_name if user.profile else ""
+    statuses = {
+        row.broker_key: row
+        for row in db.query(BrokerOptOut).filter(BrokerOptOut.user_id == user.id).all()
+    }
+
+    items: list[dict] = []
+    resolved = in_progress = not_started = 0
+    for entry in broker_catalog.catalog_for(display_name):
+        row = statuses.get(entry["key"])
+        entry["status"] = row.status if row else "not_started"
+        entry["notes"] = row.notes if row else ""
+        entry["requested_at"] = row.requested_at if row else None
+        entry["updated_at"] = row.updated_at if row else None
+        if entry["status"] in broker_catalog.RESOLVED_STATUSES:
+            resolved += 1
+        elif entry["status"] == "not_started":
+            not_started += 1
+        else:
+            in_progress += 1
+        items.append(entry)
+
+    total = len(items)
+    exposure_score = round(100 * (total - resolved) / total) if total else 0
+    return {
+        "total": total,
+        "resolved": resolved,
+        "in_progress": in_progress,
+        "not_started": not_started,
+        "exposure_score": exposure_score,
+        "brokers": items,
+    }
+
+
+@router.put("/brokers/{broker_key}", response_model=BrokerExposureItem)
+def update_broker_status(
+    broker_key: str,
+    payload: BrokerStatusUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    entry = next((b for b in broker_catalog.BROKERS if b["key"] == broker_key), None)
+    if entry is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Unknown broker")
+    if payload.status not in broker_catalog.VALID_STATUSES:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            f"status must be one of: {', '.join(sorted(broker_catalog.VALID_STATUSES))}",
+        )
+
+    row = (
+        db.query(BrokerOptOut)
+        .filter(BrokerOptOut.user_id == user.id, BrokerOptOut.broker_key == broker_key)
+        .first()
+    )
+    if row is None:
+        row = BrokerOptOut(user_id=user.id, broker_key=broker_key)
+        db.add(row)
+    row.status = payload.status
+    row.notes = payload.notes[:2000]
+    row.updated_at = datetime.now(timezone.utc)
+    if payload.status == "requested" and row.requested_at is None:
+        row.requested_at = row.updated_at
+    db.commit()
+    db.refresh(row)
+
+    display_name = user.profile.display_name if user.profile else ""
+    rendered = next(b for b in broker_catalog.catalog_for(display_name) if b["key"] == broker_key)
+    rendered.update(
+        status=row.status, notes=row.notes,
+        requested_at=row.requested_at, updated_at=row.updated_at,
+    )
+    return rendered

@@ -28,9 +28,13 @@ const PREMIUM_FEATURES = [
   "Priority AI analysis",
 ];
 
+const BILLING_SETUP_MESSAGE =
+  "Subscription plans are not configured for this app yet. You can still use limited protection while billing is fixed.";
+
 export default function Paywall() {
   const router = useRouter();
   const isPremium = useIsPremium();
+  const userId = useAuth((s) => s.user?.id);
   const setRcPremium = useAuth((s) => s.setRcPremium);
   const refreshUser = useAuth((s) => s.refreshUser);
   const logout = useAuth((s) => s.logout);
@@ -45,13 +49,18 @@ export default function Paywall() {
     setLoadingOffering(true);
     setError(null);
     try {
-      setOffering(await getDefaultOffering());
-    } catch {
+      const nextOffering = await getDefaultOffering(userId);
+      setOffering(nextOffering);
+      if (!nextOffering || nextOffering.availablePackages.length === 0) {
+        setError(BILLING_SETUP_MESSAGE);
+      }
+    } catch (e) {
+      if (__DEV__) console.warn("Failed to load RevenueCat offerings", e);
       setError("Couldn't load subscription options. Check your connection and try again.");
     } finally {
       setLoadingOffering(false);
     }
-  }, []);
+  }, [userId]);
 
   useEffect(() => {
     loadOffering();
@@ -64,7 +73,9 @@ export default function Paywall() {
 
   const monthlyPkg = offering?.monthly ?? null;
   const annualPkg = offering?.annual ?? null;
-  const selectedPkg = annual ? annualPkg : monthlyPkg;
+  const fallbackPkg = offering?.availablePackages[0] ?? null;
+  const selectedPkg = annual ? annualPkg ?? fallbackPkg : monthlyPkg ?? fallbackPkg;
+  const hasPurchasablePackage = Boolean(selectedPkg);
 
   const monthlyPrice = monthlyPkg?.product.priceString ?? "$4.99";
   const annualPrice = annualPkg?.product.priceString ?? "$35.99";
@@ -142,10 +153,10 @@ export default function Paywall() {
           <ActivityIndicator color={colors.primaryBright} />
           <Text style={{ color: colors.textMuted, fontSize: 13, marginTop: spacing.sm }}>Loading plans…</Text>
         </Surface>
-      ) : !offering ? (
+      ) : !offering || offering.availablePackages.length === 0 ? (
         <Surface style={{ marginBottom: spacing.lg, alignItems: "center" }}>
           <Text style={{ color: colors.textMuted, fontSize: 14, textAlign: "center", marginBottom: spacing.md }}>
-            Subscription options aren&apos;t available right now.
+            Subscription plans aren&apos;t configured in RevenueCat yet.
           </Text>
           <Button label="Try Again" variant="secondary" onPress={loadOffering} />
         </Surface>
@@ -206,16 +217,26 @@ export default function Paywall() {
 
       {/* CTA */}
       <FadeIn delay={200}>
-        <Button
-          label={busy === "purchase" ? "Starting…" : "Start Free Trial →"}
-          onPress={() => buy(selectedPkg)}
-          loading={busy === "purchase"}
-          disabled={!selectedPkg || busy !== null}
-          gradient={gradients.primary}
-          style={{ marginBottom: spacing.sm }}
-        />
+        {hasPurchasablePackage ? (
+          <Button
+            label={busy === "purchase" ? "Starting…" : "Start Free Trial →"}
+            onPress={() => buy(selectedPkg)}
+            loading={busy === "purchase"}
+            disabled={busy !== null}
+            gradient={gradients.primary}
+            style={{ marginBottom: spacing.sm }}
+          />
+        ) : (
+          <Button
+            label="Continue with Limited Protection"
+            onPress={() => router.replace("/(tabs)/dashboard")}
+            disabled={busy !== null}
+            variant="secondary"
+            style={{ marginBottom: spacing.sm }}
+          />
+        )}
         <Text style={{ color: colors.primaryBright, fontSize: 12, marginBottom: spacing.md, textAlign: "center" }}>
-          Cancel anytime · No charge for 7 days
+          {hasPurchasablePackage ? "Cancel anytime · No charge for 7 days" : "Premium billing is temporarily unavailable"}
         </Text>
 
         <Pressable onPress={restore} disabled={busy !== null} style={{ padding: spacing.sm, alignItems: "center" }}>

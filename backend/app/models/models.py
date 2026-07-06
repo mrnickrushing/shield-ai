@@ -38,6 +38,7 @@ class ScanType(str, enum.Enum):
     marketplace = "marketplace"
     social = "social"
     vertical = "vertical"
+    voice = "voice"
 
 
 class ScanStatus(str, enum.Enum):
@@ -378,6 +379,24 @@ class IdentityAlert(Base):
     detail: Mapped[dict] = mapped_column(JSON, default=dict)
     is_read: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class BrokerOptOut(Base):
+    """Per-user progress on removing themselves from a data-broker site."""
+    __tablename__ = "broker_opt_outs"
+    __table_args__ = (
+        UniqueConstraint("user_id", "broker_key", name="uq_broker_opt_out_user_broker"),
+    )
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    broker_key: Mapped[str] = mapped_column(String)
+    # not_started -> found (user confirmed a listing) -> requested -> removed
+    # or straight to not_listed when they searched and found nothing.
+    status: Mapped[str] = mapped_column(String, default="not_started")
+    notes: Mapped[str] = mapped_column(Text, default="")
+    requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
 
 class MonitoredIdentity(Base):

@@ -327,3 +327,25 @@ def get_shared_case_pack(
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="shield-ai-case-pack-{incident.id}.pdf"'},
     )
+
+
+@router.get("/incidents/{incident_id}/documents/{doc_type}")
+def generate_incident_document(
+    incident_id: str,
+    doc_type: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Concierge documents: bank dispute, FTC complaint, police narrative."""
+    from app.services import concierge_docs
+
+    incident = db.get(Incident, incident_id)
+    if not incident or incident.user_id != user.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Incident not found")
+    try:
+        return concierge_docs.generate_document(db, incident, user, doc_type)
+    except ValueError:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            f"Unknown document type. Available: {', '.join(concierge_docs.DOC_TYPES)}",
+        )
