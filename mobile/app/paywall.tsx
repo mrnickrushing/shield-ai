@@ -31,6 +31,7 @@ const PREMIUM_FEATURES = [
 export default function Paywall() {
   const router = useRouter();
   const isPremium = useIsPremium();
+  const userId = useAuth((s) => s.user?.id);
   const setRcPremium = useAuth((s) => s.setRcPremium);
   const refreshUser = useAuth((s) => s.refreshUser);
   const logout = useAuth((s) => s.logout);
@@ -45,13 +46,18 @@ export default function Paywall() {
     setLoadingOffering(true);
     setError(null);
     try {
-      setOffering(await getDefaultOffering());
-    } catch {
+      const nextOffering = await getDefaultOffering(userId);
+      setOffering(nextOffering);
+      if (!nextOffering) {
+        setError("Subscription options aren't configured for this app build yet. Try again in a moment.");
+      }
+    } catch (e) {
+      if (__DEV__) console.warn("Failed to load RevenueCat offerings", e);
       setError("Couldn't load subscription options. Check your connection and try again.");
     } finally {
       setLoadingOffering(false);
     }
-  }, []);
+  }, [userId]);
 
   useEffect(() => {
     loadOffering();
@@ -64,7 +70,8 @@ export default function Paywall() {
 
   const monthlyPkg = offering?.monthly ?? null;
   const annualPkg = offering?.annual ?? null;
-  const selectedPkg = annual ? annualPkg : monthlyPkg;
+  const fallbackPkg = offering?.availablePackages[0] ?? null;
+  const selectedPkg = annual ? annualPkg ?? fallbackPkg : monthlyPkg ?? fallbackPkg;
 
   const monthlyPrice = monthlyPkg?.product.priceString ?? "$4.99";
   const annualPrice = annualPkg?.product.priceString ?? "$35.99";
