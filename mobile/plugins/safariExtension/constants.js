@@ -3,7 +3,14 @@ const ENTITLEMENTS_FILE_NAME = `${EXTENSION_NAME}.entitlements`;
 const INFO_PLIST_FILE_NAME = `${EXTENSION_NAME}-Info.plist`;
 const HANDLER_SWIFT_FILE_NAME = "SafariWebExtensionHandler.swift";
 // Web-extension payload files, shipped in the appex's Resources.
-const RESOURCE_FILE_NAMES = ["manifest.json", "background.js", "content.js"];
+const RESOURCE_FILE_NAMES = [
+  "manifest.json",
+  "background.js",
+  "content.js",
+  "icon-48.png",
+  "icon-96.png",
+  "icon-128.png",
+];
 
 // Same App Group the other extensions use; the main app syncs
 // url-reputation-snapshot.json into it (see mobile/app/lib/safariBlocklistSync.ts).

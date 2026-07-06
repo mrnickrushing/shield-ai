@@ -3,6 +3,11 @@
   "name": "Shield AI Safe Browsing",
   "version": "1.0",
   "description": "Warns you before you enter a site the Shield AI community has flagged as dangerous.",
+  "icons": {
+    "48": "icon-48.png",
+    "96": "icon-96.png",
+    "128": "icon-128.png"
+  },
   "background": {
     "scripts": ["background.js"],
     "persistent": false
