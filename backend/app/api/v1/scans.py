@@ -41,6 +41,18 @@ def _check_quota(db: Session, user: User) -> None:
     check_daily_scan_quota(db, user)
 
 
+@router.get("/url-check")
+def url_check(url: str, user: User = Depends(get_user)):
+    """Fast reputation verdict for the live Safe Browser.
+
+    Runs on every WebView navigation, so it bypasses the daily scan quota and
+    writes no scan history. Registered before /{scan_id} so this path wins.
+    """
+    from app.services.url_check import check_url
+
+    return check_url(url)
+
+
 @router.post("/link", response_model=ScanOut, status_code=status.HTTP_201_CREATED)
 def create_link_scan(
     payload: LinkScanCreate,

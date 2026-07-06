@@ -95,6 +95,15 @@ export type UserProfile = {
   large_text_mode: boolean;
 };
 
+export type UrlVerdict = {
+  url: string;
+  domain: string;
+  verdict: "safe" | "low" | "suspicious" | "high" | "critical";
+  score: number;
+  reason: string;
+  cached: boolean;
+};
+
 export type Incident = {
   id: string;
   incident_type: string;
@@ -255,6 +264,10 @@ export const ShieldAPI = {
     `${API_URL}/api/v1/auth/google/start?return_url=${encodeURIComponent(return_url)}`,
   updateProfile: (patch: { display_name?: string; large_text_mode?: boolean; simple_language_mode?: boolean }) => api.patch<UserProfile>("/auth/me", patch).then((r) => r.data),
   scanLink: (url: string) => api.post<Scan>("/scans/link", { url }).then((r) => r.data),
+  // Live Safe Browser: fast verdict, no history/quota. Short timeout — it
+  // sits in the navigation path and the browser fails open to "unverified".
+  checkUrl: (url: string) =>
+    api.get<UrlVerdict>("/scans/url-check", { params: { url }, timeout: 8000 }).then((r) => r.data),
   // Claude vision + OCR + URL enrichment routinely runs past the default
   // 30s timeout, which surfaces as a response-less error here — give image
   // scans more headroom than the rest of the API.
