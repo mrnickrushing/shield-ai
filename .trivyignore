@@ -1,0 +1,12 @@
+# tar@6.2.1 is a transitive dependency of @expo/cli (Expo SDK 52 dev tooling).
+# It never ships in the app binary or runs on the backend — it's only used on
+# developer machines/CI to extract prebuild templates. tar@7 fixes these CVEs
+# but breaks @expo/cli ("tar.extract is undefined"), so it stays pinned at
+# 6.2.1 (see mobile/package.json overrides) until the Expo SDK upgrade.
+CVE-2026-23745
+CVE-2026-23950
+CVE-2026-24842
+CVE-2026-26960
+CVE-2026-29786
+CVE-2026-31802
+CVE-2026-53655
