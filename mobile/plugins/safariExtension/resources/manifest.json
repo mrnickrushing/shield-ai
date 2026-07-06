@@ -1,0 +1,19 @@
+{
+  "manifest_version": 2,
+  "name": "Shield AI Safe Browsing",
+  "version": "1.0",
+  "description": "Warns you before you enter a site the Shield AI community has flagged as dangerous.",
+  "background": {
+    "scripts": ["background.js"],
+    "persistent": false
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["content.js"],
+      "run_at": "document_start",
+      "all_frames": false
+    }
+  ],
+  "permissions": ["nativeMessaging"]
+}

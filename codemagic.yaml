@@ -140,6 +140,9 @@ workflows:
           app-store-connect fetch-signing-files "$BUNDLE_ID.messagefilter" \
             --type IOS_APP_STORE \
             --create
+          app-store-connect fetch-signing-files "$BUNDLE_ID.safari-extension" \
+            --type IOS_APP_STORE \
+            --create
           keychain add-certificates
 
       - name: Set up code signing
@@ -181,6 +184,9 @@ workflows:
 
           # Same for the MessageFilterExtension bundle ID.
           python3 "$CM_BUILD_DIR/scripts/patch_message_filter_extension_profile.py" 2>&1 | tee -a "$LOG"
+
+          # Same for the SafariWebExtension bundle ID.
+          python3 "$CM_BUILD_DIR/scripts/patch_safari_extension_profile.py" 2>&1 | tee -a "$LOG"
 
       - name: Increment build number
         working_directory: mobile/ios
