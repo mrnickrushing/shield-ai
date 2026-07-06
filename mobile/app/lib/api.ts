@@ -73,7 +73,8 @@ export type ScanType =
   | "phone"
   | "marketplace"
   | "social"
-  | "vertical";
+  | "vertical"
+  | "voice";
 
 export type Scan = {
   id: string;
@@ -364,6 +365,8 @@ export const ShieldAPI = {
   scanQR: (qr_content: string) => api.post<Scan>("/scans/qr", { qr_content }).then((r) => r.data),
   scanMessage: (message_text: string, platform_hint?: string) =>
     api.post<Scan>("/scans/message", { message_text, platform_hint }).then((r) => r.data),
+  scanVoice: (transcript: string, caller_number?: string) =>
+    api.post<Scan>("/scans/voice", { transcript, caller_number: caller_number ?? "" }).then((r) => r.data),
   scanEmail: (payload: EmailScanPayload) =>
     api.post<Scan>("/scans/email", payload).then((r) => r.data),
   scanPhone: (phone_number: string) =>

@@ -121,6 +121,11 @@ class MessageScanCreate(BaseModel):
     platform_hint: str = ""
 
 
+class VoiceScanCreate(BaseModel):
+    transcript: str
+    caller_number: str = ""
+
+
 class EmailScanCreate(BaseModel):
     raw_email: str | None = None
     sender_email: str | None = None

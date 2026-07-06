@@ -38,6 +38,7 @@ class ScanType(str, enum.Enum):
     marketplace = "marketplace"
     social = "social"
     vertical = "vertical"
+    voice = "voice"
 
 
 class ScanStatus(str, enum.Enum):
