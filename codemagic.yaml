@@ -57,6 +57,11 @@ workflows:
       app_store_connect: CyberLab ASC Key
 
     environment:
+      groups:
+        # Provides CERTIFICATE_PRIVATE_KEY (secure app variable) — required by
+        # `app-store-connect fetch-signing-files`; without it the signing step
+        # fails immediately on push-triggered builds.
+        - appstore_credentials
       vars:
         BUNDLE_ID: com.shieldai.app
         EXPO_PUBLIC_API_URL: https://api.shieldai.rushingtechnologies.com
