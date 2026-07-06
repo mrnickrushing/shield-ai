@@ -105,6 +105,14 @@ export type UrlVerdict = {
   cached: boolean;
 };
 
+export type ConciergeDocument = {
+  doc_type: string;
+  title: string;
+  body: string;
+  personalized: boolean;
+  generated_at: string;
+};
+
 export type WeeklyReport = {
   period_days: number;
   since: string;
@@ -447,6 +455,8 @@ export const ShieldAPI = {
     api.get(`/recovery/incidents/${id}/case-pack`, { params: { format } }).then((r) => r.data),
   createCasePackShare: (id: string) =>
     api.post<{ url: string; pdf_url: string; expires_at: string }>(`/recovery/incidents/${id}/share`).then((r) => r.data),
+  generateIncidentDocument: (incident_id: string, doc_type: "bank_dispute" | "ftc_complaint" | "police_report") =>
+    api.get<ConciergeDocument>(`/recovery/incidents/${incident_id}/documents/${doc_type}`, { timeout: 60000 }).then((r) => r.data),
 
   // Family protection
   listContacts: () =>
