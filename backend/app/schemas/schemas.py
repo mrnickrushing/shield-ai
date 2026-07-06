@@ -383,6 +383,34 @@ class IdentityAlertOut(BaseModel):
         from_attributes = True
 
 
+class BrokerStatusUpdate(BaseModel):
+    status: str
+    notes: str = ""
+
+
+class BrokerExposureItem(BaseModel):
+    key: str
+    name: str
+    priority: int
+    search_url: str
+    opt_out_url: str
+    instructions: str
+    expected_days: int
+    status: str = "not_started"
+    notes: str = ""
+    requested_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+class BrokerExposureSummary(BaseModel):
+    total: int
+    resolved: int
+    in_progress: int
+    not_started: int
+    exposure_score: int  # 0 (fully cleaned) – 100 (nothing done)
+    brokers: list[BrokerExposureItem]
+
+
 class MonitoredIdentityCreate(BaseModel):
     target_type: str = Field(pattern="^(email|phone|username|domain)$")
     value: str = Field(min_length=3, max_length=255)

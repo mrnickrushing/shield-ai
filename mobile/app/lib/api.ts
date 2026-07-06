@@ -220,6 +220,31 @@ export type IdentityAlert = {
   created_at: string;
 };
 
+export type BrokerStatus = "not_started" | "not_listed" | "found" | "requested" | "removed";
+
+export type BrokerExposureItem = {
+  key: string;
+  name: string;
+  priority: number;
+  search_url: string;
+  opt_out_url: string;
+  instructions: string;
+  expected_days: number;
+  status: BrokerStatus;
+  notes: string;
+  requested_at: string | null;
+  updated_at: string | null;
+};
+
+export type BrokerExposureSummary = {
+  total: number;
+  resolved: number;
+  in_progress: number;
+  not_started: number;
+  exposure_score: number;
+  brokers: BrokerExposureItem[];
+};
+
 export type MonitoredIdentity = {
   id: string;
   target_type: "email" | "phone" | "username" | "domain";
@@ -434,6 +459,10 @@ export const ShieldAPI = {
     api.get<IdentityAlert[]>("/identity/alerts").then((r) => r.data),
   markAlertRead: (id: string) =>
     api.post(`/identity/alerts/${id}/read`),
+  brokerExposure: () =>
+    api.get<BrokerExposureSummary>("/identity/brokers").then((r) => r.data),
+  updateBrokerStatus: (broker_key: string, status: BrokerStatus, notes?: string) =>
+    api.put<BrokerExposureItem>(`/identity/brokers/${broker_key}`, { status, notes: notes ?? "" }).then((r) => r.data),
 
   // Real-time monitoring
   listMonitoringTargets: () =>
