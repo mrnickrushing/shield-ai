@@ -73,7 +73,8 @@ export type ScanType =
   | "phone"
   | "marketplace"
   | "social"
-  | "vertical";
+  | "vertical"
+  | "voice";
 
 export type Scan = {
   id: string;
@@ -110,6 +111,20 @@ export type ConciergeDocument = {
   body: string;
   personalized: boolean;
   generated_at: string;
+};
+
+export type WeeklyReport = {
+  period_days: number;
+  since: string;
+  generated_at: string;
+  scans_total: number;
+  threats_caught: number;
+  sites_blocked: number;
+  sites_warned: number;
+  calls_labeled: number;
+  texts_junked: number;
+  new_breach_alerts: number;
+  summary: string;
 };
 
 export type Incident = {
@@ -226,6 +241,31 @@ export type IdentityAlert = {
   detail: Record<string, unknown>;
   is_read: boolean;
   created_at: string;
+};
+
+export type BrokerStatus = "not_started" | "not_listed" | "found" | "requested" | "removed";
+
+export type BrokerExposureItem = {
+  key: string;
+  name: string;
+  priority: number;
+  search_url: string;
+  opt_out_url: string;
+  instructions: string;
+  expected_days: number;
+  status: BrokerStatus;
+  notes: string;
+  requested_at: string | null;
+  updated_at: string | null;
+};
+
+export type BrokerExposureSummary = {
+  total: number;
+  resolved: number;
+  in_progress: number;
+  not_started: number;
+  exposure_score: number;
+  brokers: BrokerExposureItem[];
 };
 
 export type MonitoredIdentity = {
@@ -358,6 +398,8 @@ export const ShieldAPI = {
   scanQR: (qr_content: string) => api.post<Scan>("/scans/qr", { qr_content }).then((r) => r.data),
   scanMessage: (message_text: string, platform_hint?: string) =>
     api.post<Scan>("/scans/message", { message_text, platform_hint }).then((r) => r.data),
+  scanVoice: (transcript: string, caller_number?: string) =>
+    api.post<Scan>("/scans/voice", { transcript, caller_number: caller_number ?? "" }).then((r) => r.data),
   scanEmail: (payload: EmailScanPayload) =>
     api.post<Scan>("/scans/email", payload).then((r) => r.data),
   scanPhone: (phone_number: string) =>
@@ -444,6 +486,10 @@ export const ShieldAPI = {
     api.get<IdentityAlert[]>("/identity/alerts").then((r) => r.data),
   markAlertRead: (id: string) =>
     api.post(`/identity/alerts/${id}/read`),
+  brokerExposure: () =>
+    api.get<BrokerExposureSummary>("/identity/brokers").then((r) => r.data),
+  updateBrokerStatus: (broker_key: string, status: BrokerStatus, notes?: string) =>
+    api.put<BrokerExposureItem>(`/identity/brokers/${broker_key}`, { status, notes: notes ?? "" }).then((r) => r.data),
 
   // Real-time monitoring
   listMonitoringTargets: () =>
@@ -458,6 +504,8 @@ export const ShieldAPI = {
     api.post("/monitoring/extension-events", payload),
   monitoringSummary: () =>
     api.get("/monitoring/summary").then((r) => r.data),
+  weeklyReport: () =>
+    api.get<WeeklyReport>("/monitoring/report/weekly").then((r) => r.data),
 
   // Community reporting
   submitReport: (payload: { scan_id?: string; report_type: CommunityReportType; artifact_text?: string; category?: string; platform_hint?: string }) =>
@@ -470,6 +518,9 @@ export const ShieldAPI = {
   // Phone reputation — Call Directory Extension sync
   syncPhoneReputation: () =>
     api.get<PhoneReputationSync>("/phone-reputation/sync").then((r) => r.data),
+  // URL reputation — Safari Web Extension sync
+  syncUrlReputation: () =>
+    api.get<{ version: string; domains: string[] }>("/url-reputation/sync").then((r) => r.data),
 
   // Developer API key management
   createApiKey: (name: string, scopes = ["scan:read", "scan:write"]) =>

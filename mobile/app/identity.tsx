@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
@@ -116,6 +117,27 @@ export default function IdentityScreen() {
             <Text style={{ color: colors.textMuted, fontSize: 14, lineHeight: 21 }}>
               See if your email or password appeared in a known breach, and review the alerts we&apos;ve already flagged for you.
             </Text>
+          </Surface>
+        </FadeIn>
+
+        <FadeIn delay={30}>
+          <Surface
+            accent={colors.purple}
+            onPress={() => router.push("/exposure" as any)}
+            style={{ marginBottom: spacing.lg }}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
+              <View style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: withAlpha(colors.purple, "22"), alignItems: "center", justifyContent: "center" }}>
+                <Ionicons name="eye-off-outline" size={19} color={colors.purple} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: colors.text, fontWeight: "800", fontSize: 15 }}>Erase yourself from data brokers</Text>
+                <Text style={{ color: colors.textMuted, fontSize: 12 }}>
+                  Guided removal from 16 people-search sites
+                </Text>
+              </View>
+              <Text style={{ color: colors.purple, fontWeight: "800", fontSize: 12 }}>Start →</Text>
+            </View>
           </Surface>
         </FadeIn>
 

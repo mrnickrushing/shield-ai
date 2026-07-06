@@ -180,6 +180,21 @@ export default function Dashboard() {
             onPress={() => router.push("/(tabs)/scan" as any)}
           />
         </View>
+        {/* Weekly protection report */}
+        <GlassCard
+          accent={colors.teal}
+          onPress={() => router.push("/report" as any)}
+          style={{ marginBottom: spacing.md }}
+        >
+          <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, padding: spacing.md }}>
+            <Ionicons name="stats-chart" size={18} color={colors.teal} />
+            <Text style={{ color: colors.text, fontWeight: "700", fontSize: 13, flex: 1 }}>
+              Your Weekly Protection Report
+            </Text>
+            <Text style={{ color: colors.teal, fontWeight: "800", fontSize: 12 }}>View →</Text>
+          </View>
+        </GlassCard>
+
         {unreadAlerts > 0 && (
           <GlassCard
             accent={colors.purple}

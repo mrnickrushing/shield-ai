@@ -218,6 +218,70 @@ def process_qr_scan(db: Session, scan: ScanHistory, qr_content: str) -> RiskRepo
     return _finalize(db, scan, report_data, evidence)
 
 
+def process_voice_scan(db: Session, scan: ScanHistory, transcript: str, caller_number: str = "") -> RiskReport:
+    """Analyze a voicemail / call transcript (transcribed on-device).
+
+    Runs the full message pipeline over the transcript, adds voicemail-specific
+    callback-pressure signals, and folds in the caller's community reputation
+    when a number is provided.
+    """
+    scan.status = ScanStatus.processing
+    scan.raw_input = transcript[:2000]
+    db.commit()
+
+    msg_ev = message_analyzer.analyze_voicemail(transcript, caller_hint=caller_number)
+    text_score, text_flags, text_category = risk_engine.score_text_evidence(transcript)
+    sig_score, sig_flags = risk_engine.score_message_signals(msg_ev["signals"])
+
+    det_flags = list(dict.fromkeys(text_flags + sig_flags + msg_ev["flags"]))
+    det_score = min(text_score + sig_score, 100)
+    category = msg_ev["category"] if msg_ev["category"] != "unknown" else text_category
+
+    phone_evidence: dict = {}
+    if caller_number.strip():
+        phone_evidence = phone_lookup.analyze_phone(caller_number)
+        if int(phone_evidence.get("signals", {}).get("spam_score", 0)) > 70:
+            msg_ev["signals"]["caller_reported_as_scam"] = True
+            extra_score, extra_flags = risk_engine.score_message_signals(
+                {"caller_reported_as_scam": True}
+            )
+            det_score = min(det_score + extra_score, 100)
+            det_flags = list(dict.fromkeys(det_flags + extra_flags))
+
+    url_evidence: dict = {}
+    if msg_ev["extracted_urls"]:
+        url_evidence = url_enrichment.enrich(msg_ev["extracted_urls"][0])
+        u_score, u_flags = risk_engine.score_url_evidence(url_evidence)
+        det_score = min(det_score + u_score, 100)
+        det_flags = list(dict.fromkeys(det_flags + u_flags))
+
+    ti_boost, ti_flags = threat_intel.check_patterns(db, transcript, "message")
+    det_score = min(det_score + ti_boost, 100)
+    det_flags = list(dict.fromkeys(det_flags + ti_flags))
+
+    full_evidence = {**msg_ev, "caller": phone_evidence, "url": url_evidence}
+    llm = ai_analyzer.analyze(
+        transcript[:4000],
+        full_evidence,
+        artifact_type="message",
+        system_hint=(
+            "The content is a transcribed voicemail or phone call. Focus on phone-scam "
+            "tactics: government/bank impersonation, callback pressure, gift-card or wire "
+            "demands, and AI voice-clone family-emergency scripts."
+        ),
+    )
+    report_data = risk_engine.combine(det_score, det_flags, category, llm, artifact_type="message")
+
+    db.add(MessageScan(
+        scan_id=scan.id,
+        message_text=transcript[:10000],
+        platform_hint="voicemail",
+        detected_entities=msg_ev.get("signals", {}),
+        extracted_urls=msg_ev.get("extracted_urls", []),
+    ))
+    return _finalize(db, scan, report_data, full_evidence)
+
+
 def process_message_scan(db: Session, scan: ScanHistory, message_text: str, platform_hint: str = "") -> RiskReport:
     """Analyze a pasted SMS, chat message, or marketplace thread."""
     scan.status = ScanStatus.processing

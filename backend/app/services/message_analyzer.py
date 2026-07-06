@@ -177,3 +177,41 @@ def analyze_message(text: str, platform_hint: str = "") -> dict:
         "category": category,
         "extracted_urls": urls,
     }
+
+
+# Voicemail-specific pressure tactics: scripted robocalls and live scammers
+# rely on callback urgency and secrecy in ways normal voicemails don't.
+VOICEMAIL_SCAM_PATTERNS = [
+    r"call (us|me|this number) back (immediately|right away|as soon as|before)",
+    r"(final|last) (notice|attempt|warning) (before|prior to)",
+    r"press \d+ (to|now)", r"extension \d+",
+    r"do not (ignore|disregard) this (message|call)",
+    r"legal (action|proceedings|enforcement) (will|has) (be|been)",
+    r"this (call|matter) is (time.?sensitive|urgent)",
+    r"keep this (call|conversation) (private|confidential)",
+    r"before (a )?(warrant|lien|charges?) (is|are) (issued|filed)",
+    r"verify your (identity|information) (over the phone|when you call)",
+]
+
+
+def analyze_voicemail(transcript: str, caller_hint: str = "") -> dict:
+    """Deterministic analysis of a voicemail / call transcript.
+
+    Reuses the full message pattern library (impersonation, tech support,
+    family emergency, prizes…) and layers on voicemail-specific callback
+    pressure signals.
+    """
+    result = analyze_message(transcript, platform_hint="voicemail")
+    low = transcript.lower()
+
+    if any(re.search(p, low) for p in VOICEMAIL_SCAM_PATTERNS):
+        result["signals"]["voicemail_scam_signals"] = True
+        result["flags"].append(
+            "Voicemail uses scripted callback pressure (urgent call-back demand, legal threats, or secrecy)."
+        )
+        if result["category"] == "unknown":
+            result["category"] = "social_engineering"
+
+    result["artifact_type"] = "voice"
+    result["signals"]["caller_hint"] = caller_hint
+    return result

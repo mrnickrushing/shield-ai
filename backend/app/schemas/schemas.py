@@ -121,6 +121,11 @@ class MessageScanCreate(BaseModel):
     platform_hint: str = ""
 
 
+class VoiceScanCreate(BaseModel):
+    transcript: str
+    caller_number: str = ""
+
+
 class EmailScanCreate(BaseModel):
     raw_email: str | None = None
     sender_email: str | None = None
@@ -381,6 +386,34 @@ class IdentityAlertOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class BrokerStatusUpdate(BaseModel):
+    status: str
+    notes: str = ""
+
+
+class BrokerExposureItem(BaseModel):
+    key: str
+    name: str
+    priority: int
+    search_url: str
+    opt_out_url: str
+    instructions: str
+    expected_days: int
+    status: str = "not_started"
+    notes: str = ""
+    requested_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+class BrokerExposureSummary(BaseModel):
+    total: int
+    resolved: int
+    in_progress: int
+    not_started: int
+    exposure_score: int  # 0 (fully cleaned) – 100 (nothing done)
+    brokers: list[BrokerExposureItem]
 
 
 class MonitoredIdentityCreate(BaseModel):

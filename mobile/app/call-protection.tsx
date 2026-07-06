@@ -6,6 +6,7 @@ import { Linking, Platform, Pressable, ScrollView, Text, View } from "react-nati
 
 import { Button, Eyebrow, FadeIn, Surface } from "@/components/ui";
 import { syncCallProtection } from "@/lib/callDirectorySync";
+import { syncSafariBlocklist } from "@/lib/safariBlocklistSync";
 import { colors, spacing, withAlpha } from "@/theme/theme";
 
 const CALL_STEPS = [
@@ -37,7 +38,15 @@ export default function CallProtectionScreen() {
   const [protectedCount, setProtectedCount] = useState(0);
 
   const syncMutation = useMutation({
-    mutationFn: syncCallProtection,
+    // One tap refreshes both offline blocklists: scam numbers for the call
+    // directory and flagged domains for the Safari extension.
+    mutationFn: async () => {
+      const [calls] = await Promise.all([
+        syncCallProtection(),
+        syncSafariBlocklist().catch(() => null),
+      ]);
+      return calls;
+    },
     onSuccess: (result) => {
       if (result.synced) {
         setLastSyncedAt(new Date());

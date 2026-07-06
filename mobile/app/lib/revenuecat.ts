@@ -14,6 +14,7 @@ export const REVENUECAT_IOS_API_KEY = "appl_MySwPRnfnUCwjjdlNvYbORTDQbE";
 export const ENTITLEMENT_PREMIUM = "premium";
 
 let configured = false;
+let configuredAppUserId: string | null = null;
 
 /** True on platforms where the native Purchases module exists. */
 export function purchasesSupported(): boolean {
@@ -26,16 +27,35 @@ export function purchasesSupported(): boolean {
  */
 export async function configureRevenueCat(appUserId: string): Promise<void> {
   if (!purchasesSupported()) return;
+  await ensureRevenueCatConfigured(appUserId);
+}
+
+/**
+ * Configure Purchases before any RevenueCat call. Offerings do not require a
+ * logged-in app user, but purchases should be aliased to the backend user as
+ * soon as we know it.
+ */
+export async function ensureRevenueCatConfigured(appUserId?: string | null): Promise<void> {
+  if (!purchasesSupported()) return;
   if (!configured) {
     if (__DEV__) Purchases.setLogLevel(LOG_LEVEL.DEBUG);
-    Purchases.configure({ apiKey: REVENUECAT_IOS_API_KEY, appUserID: appUserId });
+    Purchases.configure(
+      appUserId
+        ? { apiKey: REVENUECAT_IOS_API_KEY, appUserID: appUserId }
+        : { apiKey: REVENUECAT_IOS_API_KEY }
+    );
     configured = true;
+    configuredAppUserId = appUserId ?? null;
     return;
   }
+
+  if (!appUserId || configuredAppUserId === appUserId) return;
+
   const currentId = await Purchases.getAppUserID();
   if (currentId !== appUserId) {
     await Purchases.logIn(appUserId);
   }
+  configuredAppUserId = appUserId;
 }
 
 export async function logOutRevenueCat(): Promise<void> {
@@ -43,6 +63,7 @@ export async function logOutRevenueCat(): Promise<void> {
   try {
     const isAnonymous = await Purchases.isAnonymous();
     if (!isAnonymous) await Purchases.logOut();
+    configuredAppUserId = null;
   } catch {
     // Never block app logout on RevenueCat state.
   }
@@ -54,7 +75,8 @@ export function hasPremium(info: CustomerInfo | null): boolean {
 
 /** Fetch entitlement state; null when unavailable (offline, unsupported platform). */
 export async function getCustomerInfo(): Promise<CustomerInfo | null> {
-  if (!purchasesSupported() || !configured) return null;
+  if (!purchasesSupported()) return null;
+  await ensureRevenueCatConfigured(configuredAppUserId);
   try {
     return await Purchases.getCustomerInfo();
   } catch {
@@ -62,10 +84,11 @@ export async function getCustomerInfo(): Promise<CustomerInfo | null> {
   }
 }
 
-export async function getDefaultOffering(): Promise<PurchasesOffering | null> {
-  if (!purchasesSupported() || !configured) return null;
+export async function getDefaultOffering(appUserId?: string | null): Promise<PurchasesOffering | null> {
+  if (!purchasesSupported()) return null;
+  await ensureRevenueCatConfigured(appUserId);
   const offerings = await Purchases.getOfferings();
-  return offerings.current ?? null;
+  return offerings.current ?? Object.values(offerings.all)[0] ?? null;
 }
 
 export function addCustomerInfoListener(listener: (info: CustomerInfo) => void): void {
