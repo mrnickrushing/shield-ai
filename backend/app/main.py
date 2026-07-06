@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1 import admin, auth, billing, community, developer, education, family, identity, notifications, phone_reputation, recovery, scans, verticals
+from app.api.v1 import admin, auth, billing, community, developer, education, family, identity, message_filter, notifications, phone_reputation, recovery, scans, verticals
 from app.core.config import settings
 
 
@@ -41,6 +41,16 @@ app.include_router(phone_reputation.router, prefix=settings.API_V1_PREFIX)
 app.include_router(developer.router, prefix=settings.API_V1_PREFIX)
 app.include_router(admin.router, prefix=settings.API_V1_PREFIX)
 app.include_router(billing.router, prefix=settings.API_V1_PREFIX)
+app.include_router(message_filter.router, prefix=settings.API_V1_PREFIX)
+
+
+@app.get("/.well-known/apple-app-site-association", tags=["system"], include_in_schema=False)
+def apple_app_site_association():
+    # Required for the messagefilter associated domain: iOS verifies this file
+    # before it will send deferred SMS queries to /api/v1/message-filter.
+    return {
+        "messagefilter": {"apps": ["PH4AKDQ4Q7.com.shieldai.app.messagefilter"]},
+    }
 
 
 @app.get("/health", tags=["system"])

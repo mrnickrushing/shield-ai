@@ -8,10 +8,16 @@ import { Button, Eyebrow, FadeIn, Surface } from "@/components/ui";
 import { syncCallProtection } from "@/lib/callDirectorySync";
 import { colors, spacing, withAlpha } from "@/theme/theme";
 
-const STEPS = [
+const CALL_STEPS = [
   "Open the Settings app",
   "Go to Phone → Call Blocking & Identification",
   "Turn on Shield AI",
+];
+
+const TEXT_STEPS = [
+  "Open the Settings app",
+  "Go to Messages → Unknown & Spam",
+  "Under SMS Filtering, select Shield AI",
 ];
 
 function timeAgo(date: Date | null): string {
@@ -72,15 +78,17 @@ export default function CallProtectionScreen() {
                 <Ionicons name="call-outline" size={22} color={colors.high} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={{ color: colors.text, fontWeight: "800", fontSize: 17 }}>Call Protection</Text>
+                <Text style={{ color: colors.text, fontWeight: "800", fontSize: 17 }}>Call &amp; Text Protection</Text>
                 <Text style={{ color: colors.textMuted, fontSize: 12 }}>
-                  Labels scam and spam calls system-wide
+                  Labels scam calls and filters scam texts system-wide
                 </Text>
               </View>
             </View>
             <Text style={{ color: colors.textMuted, fontSize: 13, lineHeight: 19 }}>
               Numbers repeatedly reported as high-risk by the Shield AI community get labeled
               &ldquo;Scam Likely&rdquo; right on your iPhone&apos;s incoming call screen — no app needs to be open.
+              Texts from unknown senders are screened the same way, and scam texts are filed into
+              your Junk folder before they ever buzz your phone.
             </Text>
           </Surface>
         </FadeIn>
@@ -124,12 +132,12 @@ export default function CallProtectionScreen() {
               </Surface>
             </FadeIn>
 
-            <Eyebrow style={{ marginBottom: spacing.sm }}>Finish setup</Eyebrow>
+            <Eyebrow style={{ marginBottom: spacing.sm }}>Finish setup — calls</Eyebrow>
             <Surface style={{ marginBottom: spacing.lg }}>
               <Text style={{ color: colors.textMuted, fontSize: 13, marginBottom: spacing.md }}>
                 Apple requires you to turn this on yourself — Shield AI can&apos;t do it for you:
               </Text>
-              {STEPS.map((step, i) => (
+              {CALL_STEPS.map((step, i) => (
                 <View key={step} style={{ flexDirection: "row", gap: spacing.sm, marginBottom: spacing.sm }}>
                   <View
                     style={{
@@ -142,6 +150,38 @@ export default function CallProtectionScreen() {
                     }}
                   >
                     <Text style={{ color: colors.primaryBright, fontSize: 11, fontWeight: "800" }}>{i + 1}</Text>
+                  </View>
+                  <Text style={{ color: colors.text, fontSize: 13, flex: 1, lineHeight: 19 }}>{step}</Text>
+                </View>
+              ))}
+              <Button
+                label="Open Settings"
+                icon="settings-outline"
+                onPress={() => Linking.openSettings()}
+                variant="secondary"
+                style={{ marginTop: spacing.sm }}
+              />
+            </Surface>
+
+            <Eyebrow style={{ marginBottom: spacing.sm }}>Finish setup — texts</Eyebrow>
+            <Surface style={{ marginBottom: spacing.lg }}>
+              <Text style={{ color: colors.textMuted, fontSize: 13, marginBottom: spacing.md }}>
+                Turn on text filtering the same way. Texts from your saved contacts are never
+                touched — Apple only lets filters screen unknown senders:
+              </Text>
+              {TEXT_STEPS.map((step, i) => (
+                <View key={step} style={{ flexDirection: "row", gap: spacing.sm, marginBottom: spacing.sm }}>
+                  <View
+                    style={{
+                      width: 22,
+                      height: 22,
+                      borderRadius: 11,
+                      backgroundColor: withAlpha(colors.teal, "22"),
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Text style={{ color: colors.teal, fontSize: 11, fontWeight: "800" }}>{i + 1}</Text>
                   </View>
                   <Text style={{ color: colors.text, fontSize: 13, flex: 1, lineHeight: 19 }}>{step}</Text>
                 </View>

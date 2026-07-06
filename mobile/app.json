@@ -83,7 +83,8 @@
         }
       ],
       "./plugins/withCallDirectoryExtension.js",
-      "./plugins/withWidgetExtension.js"
+      "./plugins/withWidgetExtension.js",
+      "./plugins/withMessageFilterExtension.js"
     ],
     "runtimeVersion": "0.2.0",
     "updates": {
