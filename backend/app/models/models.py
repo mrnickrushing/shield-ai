@@ -124,7 +124,51 @@ class Device(Base):
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
     platform: Mapped[str] = mapped_column(String, default="")
     push_token: Mapped[str] = mapped_column(String, default="")
+    label: Mapped[str] = mapped_column(String, default="")
+    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class AuthSession(Base):
+    __tablename__ = "auth_sessions"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    refresh_token_hash: Mapped[str] = mapped_column(String, unique=True, index=True)
+    user_agent: Mapped[str] = mapped_column(String, default="")
+    ip_address: Mapped[str] = mapped_column(String, default="")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    last_used_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class NotificationPreference(Base):
+    __tablename__ = "notification_preferences"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), unique=True, index=True)
+    push_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    email_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    proactive_monitoring: Mapped[bool] = mapped_column(Boolean, default=True)
+    quiet_hours_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    quiet_hours_start: Mapped[str] = mapped_column(String, default="22:00")
+    quiet_hours_end: Mapped[str] = mapped_column(String, default="07:00")
+    minimum_severity: Mapped[str] = mapped_column(String, default="suspicious")
+    topics: Mapped[dict] = mapped_column(JSON, default=dict)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class PrivacyPreference(Base):
+    __tablename__ = "privacy_preferences"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), unique=True, index=True)
+    retention_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    require_device_unlock: Mapped[bool] = mapped_column(Boolean, default=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
 
 class ScanHistory(Base):
@@ -160,6 +204,20 @@ class RiskReport(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     scan: Mapped[ScanHistory] = relationship(back_populates="report")
+
+
+class ScanFeedbackDetail(Base):
+    __tablename__ = "scan_feedback_details"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    scan_id: Mapped[str] = mapped_column(ForeignKey("scan_history.id"), index=True)
+    feedback: Mapped[str] = mapped_column(String)
+    reason: Mapped[str] = mapped_column(Text, default="")
+    corrected_context: Mapped[str] = mapped_column(Text, default="")
+    evidence: Mapped[str] = mapped_column(Text, default="")
+    review_status: Mapped[str] = mapped_column(String, default="pending")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
 
 class LinkScan(Base):
@@ -322,6 +380,48 @@ class IdentityAlert(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
 
+class MonitoredIdentity(Base):
+    __tablename__ = "monitored_identities"
+    __table_args__ = (
+        UniqueConstraint("user_id", "target_type", "value", name="uq_monitored_identity_user_target"),
+    )
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    target_type: Mapped[str] = mapped_column(String)
+    value: Mapped[str] = mapped_column(String)
+    label: Mapped[str] = mapped_column(String, default="")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    last_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_status: Mapped[str] = mapped_column(String, default="pending")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class BrowserTelemetryEvent(Base):
+    __tablename__ = "browser_telemetry_events"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    url: Mapped[str] = mapped_column(Text, default="")
+    domain: Mapped[str] = mapped_column(String, default="", index=True)
+    verdict: Mapped[str] = mapped_column(String, default="")
+    action: Mapped[str] = mapped_column(String, default="")
+    reason: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class ExtensionTelemetryEvent(Base):
+    __tablename__ = "extension_telemetry_events"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
+    extension_type: Mapped[str] = mapped_column(String)
+    event_type: Mapped[str] = mapped_column(String)
+    counts: Mapped[dict] = mapped_column(JSON, default=dict)
+    detail: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
 # ---------------------------------------------------------------------------
 # Phase 4 — recovery, family, education
 # ---------------------------------------------------------------------------
@@ -356,6 +456,18 @@ class IncidentEvidence(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     incident: Mapped[Incident] = relationship(back_populates="evidence")
+
+
+class CasePackShare(Base):
+    __tablename__ = "case_pack_shares"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    incident_id: Mapped[str] = mapped_column(ForeignKey("incidents.id"), index=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    token_hash: Mapped[str] = mapped_column(String, unique=True, index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class TrustedContact(Base):

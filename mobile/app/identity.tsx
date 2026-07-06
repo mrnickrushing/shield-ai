@@ -12,7 +12,7 @@ import {
 } from "react-native";
 
 import { Button, Eyebrow, FadeIn, GlowOrb, Surface } from "@/components/ui";
-import { ShieldAPI, BreachResult, IdentityAlert } from "@/lib/api";
+import { ShieldAPI, BreachResult, IdentityAlert, MonitoredIdentity } from "@/lib/api";
 import { colors, radius, spacing, withAlpha } from "@/theme/theme";
 
 const SEVERITY_COLORS: Record<string, string> = {
@@ -28,6 +28,8 @@ export default function IdentityScreen() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [monitorTarget, setMonitorTarget] = useState("");
+  const [monitorType, setMonitorType] = useState<"email" | "phone" | "username" | "domain">("email");
   const [breachResult, setBreachResult] = useState<BreachResult | null>(null);
   const [pwndResult, setPwndResult] = useState<{
     pwned_count: number;
@@ -38,6 +40,11 @@ export default function IdentityScreen() {
   const { data: alerts } = useQuery({
     queryKey: ["identity-alerts"],
     queryFn: () => ShieldAPI.listIdentityAlerts(),
+    staleTime: 60_000,
+  });
+  const { data: monitoredTargets } = useQuery({
+    queryKey: ["monitoring-targets"],
+    queryFn: () => ShieldAPI.listMonitoringTargets(),
     staleTime: 60_000,
   });
 
@@ -60,6 +67,17 @@ export default function IdentityScreen() {
   const markRead = useMutation({
     mutationFn: (id: string) => ShieldAPI.markAlertRead(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["identity-alerts"] }),
+  });
+  const addMonitor = useMutation({
+    mutationFn: () => ShieldAPI.addMonitoringTarget({ target_type: monitorType, value: monitorTarget.trim() }),
+    onSuccess: () => {
+      setMonitorTarget("");
+      queryClient.invalidateQueries({ queryKey: ["monitoring-targets"] });
+    },
+  });
+  const removeMonitor = useMutation({
+    mutationFn: (id: string) => ShieldAPI.removeMonitoringTarget(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["monitoring-targets"] }),
   });
 
   const inputStyle = {
@@ -192,6 +210,78 @@ export default function IdentityScreen() {
                 </Text>
               </View>
             )}
+          </Surface>
+        </FadeIn>
+
+        <FadeIn delay={80}>
+          <Surface style={{ marginBottom: spacing.md }}>
+            <Text style={{ color: colors.text, fontSize: 16, fontWeight: "700", marginBottom: spacing.sm }}>
+              Continuous Monitoring
+            </Text>
+            <Text style={{ color: colors.textMuted, fontSize: 13, marginBottom: spacing.sm }}>
+              Add identities once and Shield AI will re-check them on a schedule.
+            </Text>
+            <View style={{ flexDirection: "row", gap: spacing.xs, marginBottom: spacing.sm }}>
+              {(["email", "phone", "username", "domain"] as const).map((type) => {
+                const selected = monitorType === type;
+                return (
+                  <Pressable
+                    key={type}
+                    onPress={() => setMonitorType(type)}
+                    style={{
+                      flex: 1,
+                      paddingVertical: spacing.sm,
+                      borderRadius: radius.md,
+                      alignItems: "center",
+                      backgroundColor: selected ? withAlpha(colors.primaryBright, "20") : colors.bg,
+                      borderWidth: 1,
+                      borderColor: selected ? colors.primaryBright : colors.border,
+                    }}
+                  >
+                    <Text style={{ color: selected ? colors.primaryBright : colors.textMuted, fontWeight: "800", fontSize: 11, textTransform: "uppercase" }}>{type}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <TextInput
+              placeholder={monitorType === "email" ? "email@example.com" : monitorType === "domain" ? "example.com" : "Target to monitor"}
+              placeholderTextColor={colors.textMuted}
+              autoCapitalize="none"
+              value={monitorTarget}
+              onChangeText={setMonitorTarget}
+              style={inputStyle}
+            />
+            <Button
+              label="Add Monitor"
+              onPress={() => addMonitor.mutate()}
+              disabled={!monitorTarget.trim()}
+              loading={addMonitor.isPending}
+              style={{ marginBottom: spacing.md }}
+            />
+            {(monitoredTargets ?? []).filter((target) => target.is_active).map((target: MonitoredIdentity) => (
+              <View
+                key={target.id}
+                style={{
+                  backgroundColor: colors.bg,
+                  borderRadius: radius.md,
+                  padding: spacing.md,
+                  marginBottom: spacing.xs,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: spacing.sm,
+                }}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: colors.text, fontWeight: "700" }}>{target.value}</Text>
+                  <Text style={{ color: colors.textMuted, fontSize: 12 }}>
+                    {target.target_type} · {target.last_status} · {target.last_checked_at ? new Date(target.last_checked_at).toLocaleString() : "not checked yet"}
+                  </Text>
+                </View>
+                <Pressable onPress={() => removeMonitor.mutate(target.id)} hitSlop={10}>
+                  <Text style={{ color: colors.critical, fontWeight: "800" }}>Remove</Text>
+                </Pressable>
+              </View>
+            ))}
           </Surface>
         </FadeIn>
 

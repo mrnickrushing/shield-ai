@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, Share, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Pressable, ScrollView, Share, Text, TextInput, View } from "react-native";
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withDelay, withSpring, withTiming } from "react-native-reanimated";
 
 import { GlowBackground } from "@/components/GlowBackground";
@@ -201,6 +201,11 @@ function extractTargetUrl(scan: Scan) {
 export default function Result() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
+  const [feedbackMode, setFeedbackMode] = useState<"helpful" | "not_accurate" | null>(null);
+  const [feedbackReason, setFeedbackReason] = useState("");
+  const [correctedContext, setCorrectedContext] = useState("");
+  const [feedbackEvidence, setFeedbackEvidence] = useState("");
+  const [submittingFeedback, setSubmittingFeedback] = useState(false);
   const { data: scan, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ["scan", id],
     queryFn: () => ShieldAPI.getScan(id!),
@@ -285,6 +290,65 @@ export default function Result() {
         : "No major threat signal dominated this scan.";
 
   const bloom = VERDICT_BLOOM[report.risk_level] ?? colors.bgBloom;
+  const canRescanWithContext = ["link", "message", "email", "phone", "marketplace", "social", "qr"].includes(scan.scan_type);
+
+  const submitHelpfulFeedback = async () => {
+    setSubmittingFeedback(true);
+    try {
+      await ShieldAPI.feedback(scan.id, "helpful");
+      setFeedbackMode("helpful");
+      Alert.alert("Feedback saved", "Thanks. This helps calibrate future reports.");
+    } catch {
+      Alert.alert("Feedback failed", "We could not save feedback right now.");
+    } finally {
+      setSubmittingFeedback(false);
+    }
+  };
+
+  const submitCorrection = async () => {
+    if (!feedbackReason.trim() && !correctedContext.trim() && !feedbackEvidence.trim()) {
+      Alert.alert("Add context", "Tell us what was wrong or paste the evidence we should review.");
+      return;
+    }
+    setSubmittingFeedback(true);
+    try {
+      await ShieldAPI.feedbackDetail(scan.id, {
+        feedback: report.risk_level === "safe" || report.risk_level === "low" ? "missed_scam" : "false_positive",
+        reason: feedbackReason.trim(),
+        corrected_context: correctedContext.trim(),
+        evidence: feedbackEvidence.trim(),
+      });
+      Alert.alert("Submitted for review", "Your correction was sent to the Shield AI review queue.");
+    } catch {
+      Alert.alert("Feedback failed", "We could not submit the correction right now.");
+    } finally {
+      setSubmittingFeedback(false);
+    }
+  };
+
+  const rescanWithContext = async () => {
+    const input = correctedContext.trim() || scan.raw_input;
+    if (!input) {
+      Alert.alert("Add corrected context", "Paste the corrected message, URL, phone number, or details to scan again.");
+      return;
+    }
+    setSubmittingFeedback(true);
+    try {
+      let nextScan: Scan | null = null;
+      if (scan.scan_type === "link") nextScan = await ShieldAPI.scanLink(input);
+      if (scan.scan_type === "qr") nextScan = await ShieldAPI.scanQR(input);
+      if (scan.scan_type === "message") nextScan = await ShieldAPI.scanMessage(input, "correction");
+      if (scan.scan_type === "email") nextScan = await ShieldAPI.scanEmail({ body_text: input });
+      if (scan.scan_type === "phone") nextScan = await ShieldAPI.scanPhone(input);
+      if (scan.scan_type === "marketplace") nextScan = await ShieldAPI.scanMarketplace(input, "correction");
+      if (scan.scan_type === "social") nextScan = await ShieldAPI.scanSocial(input, "correction");
+      if (nextScan?.id) router.replace(`/result?id=${nextScan.id}`);
+    } catch {
+      Alert.alert("Re-scan failed", "We could not run the corrected scan right now.");
+    } finally {
+      setSubmittingFeedback(false);
+    }
+  };
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ paddingBottom: spacing.xl }}>
@@ -451,9 +515,19 @@ export default function Result() {
           </View>
         ) : null}
 
+        <View style={{ marginBottom: spacing.lg }}>
+          <Text style={{ color: colors.text, fontSize: 18, fontWeight: "800", marginBottom: spacing.sm }}>
+            Improve this verdict
+          </Text>
+          <Text style={{ color: colors.textMuted, fontSize: 13, lineHeight: 19, marginBottom: spacing.sm }}>
+            Confirm the verdict or send a correction with context for analyst review and future model tuning.
+          </Text>
+        </View>
+
         <View style={{ flexDirection: "row", gap: spacing.sm, marginBottom: spacing.sm }}>
           <Pressable
-            onPress={() => ShieldAPI.feedback(scan.id, "helpful")}
+            onPress={submitHelpfulFeedback}
+            disabled={submittingFeedback}
             style={{
               flex: 1,
               padding: spacing.md,
@@ -467,20 +541,78 @@ export default function Result() {
             <Text style={{ color: colors.safe, fontWeight: "800" }}>Helpful</Text>
           </Pressable>
           <Pressable
-            onPress={() => ShieldAPI.feedback(scan.id, "false_positive")}
+            onPress={() => setFeedbackMode(feedbackMode === "not_accurate" ? null : "not_accurate")}
+            disabled={submittingFeedback}
             style={{
               flex: 1,
               padding: spacing.md,
               borderRadius: radius.md,
-              backgroundColor: colors.glassDeep,
+              backgroundColor: feedbackMode === "not_accurate" ? `${colors.suspicious}1f` : colors.glassDeep,
               borderWidth: 1,
-              borderColor: colors.border,
+              borderColor: feedbackMode === "not_accurate" ? `${colors.suspicious}55` : colors.border,
               alignItems: "center",
             }}
           >
-            <Text style={{ color: colors.textMuted, fontWeight: "700" }}>Not accurate</Text>
+            <Text style={{ color: feedbackMode === "not_accurate" ? colors.suspicious : colors.textMuted, fontWeight: "700" }}>Not accurate</Text>
           </Pressable>
         </View>
+
+        {feedbackMode === "not_accurate" && (
+          <View
+            style={{
+              backgroundColor: colors.glassDeep,
+              borderRadius: radius.lg,
+              padding: spacing.md,
+              borderWidth: 1,
+              borderColor: colors.border,
+              marginBottom: spacing.lg,
+            }}
+          >
+            <Text style={{ color: colors.text, fontWeight: "800", marginBottom: spacing.sm }}>What should we fix?</Text>
+            <TextInput
+              placeholder="Example: This was from my bank, or this was actually a scam."
+              placeholderTextColor={colors.textMuted}
+              value={feedbackReason}
+              onChangeText={setFeedbackReason}
+              multiline
+              style={{ backgroundColor: colors.bg, borderColor: colors.border, borderWidth: 1, borderRadius: radius.md, color: colors.text, padding: spacing.md, minHeight: 78, textAlignVertical: "top", marginBottom: spacing.sm }}
+            />
+            <TextInput
+              placeholder="Corrected context or original text to re-scan"
+              placeholderTextColor={colors.textMuted}
+              value={correctedContext}
+              onChangeText={setCorrectedContext}
+              multiline
+              style={{ backgroundColor: colors.bg, borderColor: colors.border, borderWidth: 1, borderRadius: radius.md, color: colors.text, padding: spacing.md, minHeight: 90, textAlignVertical: "top", marginBottom: spacing.sm }}
+            />
+            <TextInput
+              placeholder="Evidence to attach for review (headers, URLs, usernames, transaction IDs)"
+              placeholderTextColor={colors.textMuted}
+              value={feedbackEvidence}
+              onChangeText={setFeedbackEvidence}
+              multiline
+              style={{ backgroundColor: colors.bg, borderColor: colors.border, borderWidth: 1, borderRadius: radius.md, color: colors.text, padding: spacing.md, minHeight: 90, textAlignVertical: "top", marginBottom: spacing.md }}
+            />
+            <View style={{ gap: spacing.sm }}>
+              <Pressable
+                onPress={submitCorrection}
+                disabled={submittingFeedback}
+                style={{ backgroundColor: colors.primaryBright, borderRadius: radius.md, padding: spacing.md, alignItems: "center", opacity: submittingFeedback ? 0.6 : 1 }}
+              >
+                <Text style={{ color: "#08111f", fontWeight: "900" }}>{submittingFeedback ? "Submitting..." : "Submit Correction"}</Text>
+              </Pressable>
+              {canRescanWithContext && (
+                <Pressable
+                  onPress={rescanWithContext}
+                  disabled={submittingFeedback}
+                  style={{ backgroundColor: colors.glassDeep, borderRadius: radius.md, padding: spacing.md, alignItems: "center", borderWidth: 1, borderColor: colors.border, opacity: submittingFeedback ? 0.6 : 1 }}
+                >
+                  <Text style={{ color: colors.primaryBright, fontWeight: "800" }}>Re-scan With Corrected Context</Text>
+                </Pressable>
+              )}
+            </View>
+          </View>
+        )}
 
         <Pressable
           onPress={() => {

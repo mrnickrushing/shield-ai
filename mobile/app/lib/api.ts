@@ -136,6 +136,60 @@ export type Notification = {
   created_at: string;
 };
 
+export type NotificationPreferences = {
+  push_enabled: boolean;
+  email_enabled: boolean;
+  proactive_monitoring: boolean;
+  quiet_hours_enabled: boolean;
+  quiet_hours_start: string;
+  quiet_hours_end: string;
+  minimum_severity: "all" | "low" | "suspicious" | "high" | "critical";
+  topics: Record<string, boolean>;
+  updated_at?: string;
+};
+
+export type PrivacyPreferences = {
+  retention_days: number | null;
+  require_device_unlock: boolean;
+  updated_at?: string;
+};
+
+export type DeviceSession = {
+  id: string;
+  platform: string;
+  label: string;
+  push_token: string;
+  created_at: string;
+  last_seen_at: string | null;
+  revoked_at: string | null;
+};
+
+export type AuthSession = {
+  id: string;
+  user_agent: string;
+  ip_address: string;
+  is_active: boolean;
+  created_at: string;
+  last_used_at: string;
+  expires_at: string;
+  revoked_at: string | null;
+};
+
+export type AccountExport = {
+  exported_at: string;
+  user: UserProfile;
+  scans: Scan[];
+  incidents: Incident[];
+  notifications: Notification[];
+  community_reports: CommunityReportOut[];
+  identity_alerts: IdentityAlert[];
+  devices: DeviceSession[];
+  sessions: AuthSession[];
+  privacy_preferences: PrivacyPreferences;
+  notification_preferences: NotificationPreferences | null;
+  scan_feedback_details: unknown[];
+};
+
 export type BreachInfo = {
   name: string;
   title: string;
@@ -163,6 +217,17 @@ export type IdentityAlert = {
   email: string;
   detail: Record<string, unknown>;
   is_read: boolean;
+  created_at: string;
+};
+
+export type MonitoredIdentity = {
+  id: string;
+  target_type: "email" | "phone" | "username" | "domain";
+  value: string;
+  label: string;
+  is_active: boolean;
+  last_checked_at: string | null;
+  last_status: string;
   created_at: string;
 };
 
@@ -263,6 +328,15 @@ export const ShieldAPI = {
   googleAuthStartUrl: (return_url: string) =>
     `${API_URL}/api/v1/auth/google/start?return_url=${encodeURIComponent(return_url)}`,
   updateProfile: (patch: { display_name?: string; large_text_mode?: boolean; simple_language_mode?: boolean }) => api.patch<UserProfile>("/auth/me", patch).then((r) => r.data),
+  exportAccountData: () => api.get<AccountExport>("/auth/me/export").then((r) => r.data),
+  getPrivacyPreferences: () => api.get<PrivacyPreferences>("/auth/me/privacy").then((r) => r.data),
+  updatePrivacyPreferences: (payload: PrivacyPreferences) => api.put<PrivacyPreferences>("/auth/me/privacy", payload).then((r) => r.data),
+  listSessions: () => api.get<AuthSession[]>("/auth/me/sessions").then((r) => r.data),
+  revokeSession: (id: string) => api.delete(`/auth/me/sessions/${id}`),
+  listDevices: () => api.get<DeviceSession[]>("/auth/me/devices").then((r) => r.data),
+  revokeDevice: (id: string) => api.delete(`/auth/me/devices/${id}`),
+  purgeScanHistory: () => api.delete<{ deleted_scans: number }>("/auth/me/scan-history").then((r) => r.data),
+  deleteAccount: () => api.delete("/auth/me"),
   scanLink: (url: string) => api.post<Scan>("/scans/link", { url }).then((r) => r.data),
   // Live Safe Browser: fast verdict, no history/quota. Short timeout — it
   // sits in the navigation path and the browser fails open to "unverified".
@@ -288,6 +362,8 @@ export const ShieldAPI = {
   getScan: (id: string) => api.get<Scan>(`/scans/${id}`).then((r) => r.data),
   feedback: (id: string, feedback: "helpful" | "false_positive") =>
     api.post(`/scans/${id}/feedback`, { feedback }),
+  feedbackDetail: (id: string, payload: { feedback: "helpful" | "false_positive" | "missed_scam"; reason?: string; corrected_context?: string; evidence?: string }) =>
+    api.post(`/scans/${id}/feedback-detail`, payload).then((r) => r.data),
 
   // Shield Labs — portfolio verticals
   listVerticals: () => api.get<VerticalInfo[]>("/verticals").then((r) => r.data),
@@ -298,7 +374,11 @@ export const ShieldAPI = {
 
   // Notifications
   registerDevice: (push_token: string, platform: "ios" | "android") =>
-    api.post("/notifications/devices", { push_token, platform }),
+    api.post("/notifications/devices", { push_token, platform, label: `${platform.toUpperCase()} Device` }),
+  getNotificationPreferences: () =>
+    api.get<NotificationPreferences>("/notifications/preferences").then((r) => r.data),
+  updateNotificationPreferences: (payload: NotificationPreferences) =>
+    api.put<NotificationPreferences>("/notifications/preferences", payload).then((r) => r.data),
   listNotifications: (unread_only = false) =>
     api.get<Notification[]>("/notifications", { params: { unread_only } }).then((r) => r.data),
   markNotificationRead: (id: string) =>
@@ -321,6 +401,10 @@ export const ShieldAPI = {
     api.post(`/recovery/incidents/${incident_id}/evidence`, payload).then((r) => r.data),
   getIncidentSummary: (id: string) =>
     api.get(`/recovery/incidents/${id}/summary`).then((r) => r.data),
+  getIncidentCasePack: (id: string, format: "json" | "text" | "pdf" = "json") =>
+    api.get(`/recovery/incidents/${id}/case-pack`, { params: { format } }).then((r) => r.data),
+  createCasePackShare: (id: string) =>
+    api.post<{ url: string; pdf_url: string; expires_at: string }>(`/recovery/incidents/${id}/share`).then((r) => r.data),
 
   // Family protection
   listContacts: () =>
@@ -350,6 +434,20 @@ export const ShieldAPI = {
     api.get<IdentityAlert[]>("/identity/alerts").then((r) => r.data),
   markAlertRead: (id: string) =>
     api.post(`/identity/alerts/${id}/read`),
+
+  // Real-time monitoring
+  listMonitoringTargets: () =>
+    api.get<MonitoredIdentity[]>("/monitoring/targets").then((r) => r.data),
+  addMonitoringTarget: (payload: { target_type: "email" | "phone" | "username" | "domain"; value: string; label?: string }) =>
+    api.post<MonitoredIdentity>("/monitoring/targets", payload).then((r) => r.data),
+  removeMonitoringTarget: (id: string) =>
+    api.delete(`/monitoring/targets/${id}`),
+  recordBrowserEvent: (payload: { url: string; domain?: string; verdict: string; action: "viewed" | "blocked" | "allowed" | "trusted" | "override"; reason?: string }) =>
+    api.post("/monitoring/browser-events", payload),
+  recordExtensionEvent: (payload: { extension_type: "message_filter" | "call_directory" | "widget" | "share"; event_type: string; counts?: Record<string, unknown>; detail?: Record<string, unknown> }) =>
+    api.post("/monitoring/extension-events", payload),
+  monitoringSummary: () =>
+    api.get("/monitoring/summary").then((r) => r.data),
 
   // Community reporting
   submitReport: (payload: { scan_id?: string; report_type: CommunityReportType; artifact_text?: string; category?: string; platform_hint?: string }) =>

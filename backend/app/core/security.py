@@ -24,7 +24,7 @@ def verify_password(plain: str, hashed: str) -> bool:
         return False
 
 
-def _create_token(subject: str, expires_delta: timedelta, token_type: str) -> str:
+def _create_token(subject: str, expires_delta: timedelta, token_type: str, session_id: str | None = None) -> str:
     now = datetime.now(timezone.utc)
     payload: dict[str, Any] = {
         "sub": subject,
@@ -32,6 +32,8 @@ def _create_token(subject: str, expires_delta: timedelta, token_type: str) -> st
         "exp": now + expires_delta,
         "type": token_type,
     }
+    if session_id:
+        payload["sid"] = session_id
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
@@ -41,9 +43,9 @@ def create_access_token(subject: str) -> str:
     )
 
 
-def create_refresh_token(subject: str) -> str:
+def create_refresh_token(subject: str, session_id: str | None = None) -> str:
     return _create_token(
-        subject, timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS), "refresh"
+        subject, timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS), "refresh", session_id
     )
 
 

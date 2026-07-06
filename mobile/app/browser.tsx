@@ -77,6 +77,10 @@ export default function BrowserScreen() {
     }
   }, []);
 
+  const recordTelemetry = useCallback((url: string, verdict: string, action: "viewed" | "blocked" | "allowed" | "trusted" | "override", reason = "") => {
+    ShieldAPI.recordBrowserEvent({ url, domain: hostOf(url), verdict, action, reason }).catch(() => {});
+  }, []);
+
   const navigateTo = useCallback(
     async (rawUrl: string) => {
       const url = normalize(rawUrl);
@@ -89,6 +93,7 @@ export default function BrowserScreen() {
 
       if (verdict && DANGEROUS.has(verdict.verdict) && !overrides.current.has(url)) {
         setBlocked(verdict);
+        recordTelemetry(url, verdict.verdict, "blocked", verdict.reason);
         return;
       }
       setPage({
@@ -96,8 +101,9 @@ export default function BrowserScreen() {
         verdict: verdict?.verdict ?? "unverified",
         reason: verdict?.reason ?? "Couldn't verify this site right now.",
       });
+      recordTelemetry(url, verdict?.verdict ?? "unverified", verdict ? "allowed" : "viewed", verdict?.reason ?? "");
     },
-    [getVerdict]
+    [getVerdict, recordTelemetry]
   );
 
   useEffect(() => {
@@ -133,6 +139,7 @@ export default function BrowserScreen() {
   const overrideAndOpen = () => {
     if (!blocked) return;
     overrides.current.add(normalize(blocked.url));
+    recordTelemetry(blocked.url, blocked.verdict, "override", blocked.reason);
     navigateTo(blocked.url);
   };
 
@@ -228,7 +235,7 @@ export default function BrowserScreen() {
         >
           <Text style={{ color: RISK_COLORS[page.verdict], fontSize: 12 }} numberOfLines={2}>
             {page.verdict === "suspicious" ? "⚠ Be careful on this site: " : "◌ "}
-            {page.reason} Never enter passwords or payment details you aren't sure about.
+            {page.reason} Never enter passwords or payment details you are not sure about.
           </Text>
         </View>
       )}

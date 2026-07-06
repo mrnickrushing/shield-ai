@@ -7,6 +7,8 @@
 | Project ID | `9410157d-7061-44cc-b069-61934f4fdaf7` |
 | Environment (production) | `fa4cbfd7-0709-4f44-aa3b-37cb7bdb9370` |
 | backend service | `10fb5bf0-8827-4de7-85ff-a4bc056079b4` (repo `mrnickrushing/shield-ai`, root `/backend`) |
+| backend-worker service | `71110c4b-5f9e-4eae-87bf-9254ae2908b4` (Celery worker) |
+| backend-beat service | `5148eca9-c13e-45fb-842c-8ac185ae0111` (Celery scheduler) |
 | web-admin service | `93354528-3abf-4912-a6d1-04d373dd26f8` (repo `mrnickrushing/shield-ai`, root `/web`) |
 | postgres service | `382b3679-47fd-485b-bad0-95590802f803` (image `postgres:16`, volume mounted) |
 | redis service | `37692301-eaa1-422c-80be-9bc19a10f331` (image `redis:7`) |
@@ -69,3 +71,33 @@ UPDATE users SET is_admin = true WHERE email = 'you@example.com';
 
 ## Mobile app API URL
 Set `EXPO_PUBLIC_API_URL=https://api.shieldai.rushingtechnologies.com` for production builds.
+
+## Real-time monitoring workers
+
+The API only serves requests and the SSE alert stream. Continuous monitoring requires two long-running backend processes using the same backend image and env vars:
+
+```bash
+celery -A app.workers.celery_app.celery_app worker --loglevel=info
+celery -A app.workers.celery_app.celery_app beat --loglevel=info
+```
+
+Railway setup:
+
+1. Add a `backend-worker` service from the same repo/root (`/backend`) and override the start command to the worker command above.
+2. Add a `backend-beat` service from the same repo/root and override the start command to the beat command above.
+3. Attach the same production variables as the API service, especially `DATABASE_URL`, `REDIS_URL`, `CELERY_BROKER_URL`, `CELERY_RESULT_BACKEND`, `SECRET_KEY`, and provider API keys.
+
+Beat schedules:
+
+| Task | Frequency | Purpose |
+|---|---:|---|
+| `monitoring.identity_targets` | hourly | Re-check enrolled emails/phones/usernames/domains |
+| `monitoring.scan_pattern_followups` | hourly | Follow up on high-risk scan patterns |
+| `monitoring.recovery_reminders` | daily | Remind users about stale open recovery cases |
+| `privacy.apply_retention` | daily | Enforce account retention preferences |
+
+Local full-stack mode now includes `api`, `worker`, and `beat`:
+
+```bash
+docker compose -f infra/docker-compose.yml up --build
+```

@@ -165,6 +165,15 @@ export default function RecoveryScreen() {
 
         <FadeIn delay={140}>
           <Button label="Add Evidence" icon="arrow-forward" onPress={() => setPhase("evidence")} style={{ marginTop: spacing.sm }} />
+          {incidentId && (
+            <Button
+              label="Open Case Pack"
+              icon="document-text-outline"
+              variant="secondary"
+              onPress={() => router.push(`/incident?id=${incidentId}`)}
+              style={{ marginTop: spacing.sm }}
+            />
+          )}
         </FadeIn>
       </ScrollView>
     );
@@ -205,7 +214,7 @@ export default function RecoveryScreen() {
           onPress={() => (incidentId ? router.replace(`/incident?id=${incidentId}`) : router.back())}
           style={{ padding: spacing.md, alignItems: "center" }}
         >
-          <Text style={{ color: colors.primaryBright, fontSize: 15 }}>View Full Report →</Text>
+          <Text style={{ color: colors.primaryBright, fontSize: 15 }}>View Recovery Case Pack →</Text>
         </Pressable>
       </FadeIn>
     </ScrollView>

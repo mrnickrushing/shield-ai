@@ -185,9 +185,15 @@ export default function Profile() {
         <FadeIn delay={140}>
           <Eyebrow style={{ marginBottom: spacing.sm }}>Advanced</Eyebrow>
           <LinkRow
+            icon="shield-checkmark-outline"
+            label="Privacy & Data"
+            description="Export data, purge scan history, and manage account controls."
+            onPress={() => router.push("/privacy")}
+          />
+          <LinkRow
             icon="notifications-outline"
             label="Notifications"
-            description="Review alerts and updates we've sent you."
+            description="Review alerts and tune proactive monitoring."
             onPress={() => router.push("/notifications")}
           />
           <LinkRow

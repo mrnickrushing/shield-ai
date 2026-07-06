@@ -7,6 +7,7 @@ import { StatusBar } from "expo-status-bar";
 import React, { useEffect } from "react";
 import { Platform } from "react-native";
 
+import { LiveAlertBridge } from "@/components/LiveAlertBridge";
 import { ShieldAPI } from "@/lib/api";
 import { addCustomerInfoListener, configureRevenueCat, getCustomerInfo, hasPremium } from "@/lib/revenuecat";
 import { useAuth } from "@/state/auth";
@@ -93,6 +94,7 @@ export default function RootLayout() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="result" options={{ title: "Risk Report" }} />
         <Stack.Screen name="profile" options={{ title: "Profile" }} />
+        <Stack.Screen name="privacy" options={{ title: "Privacy & Data" }} />
         <Stack.Screen name="recovery" options={{ title: "Scam Recovery" }} />
         <Stack.Screen name="incident" options={{ title: "Recovery Case" }} />
         <Stack.Screen name="education" options={{ title: "Education Center" }} />
@@ -107,6 +109,7 @@ export default function RootLayout() {
         <Stack.Screen name="labs" options={{ title: "Shield Labs" }} />
         <Stack.Screen name="vertical/[key]" options={{ title: "Shield Labs" }} />
       </Stack>
+      <LiveAlertBridge />
     </QueryClientProvider>
   );
 }

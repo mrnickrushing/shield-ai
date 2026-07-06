@@ -122,6 +122,149 @@ def test_update_profile():
     assert r.json()["display_name"] == "New Name"
 
 
+def test_account_export_purge_and_delete_controls():
+    headers = _auth_headers()
+    privacy = client.put(
+        "/api/v1/auth/me/privacy",
+        json={"retention_days": 30, "require_device_unlock": True},
+        headers=headers,
+    )
+    assert privacy.status_code == 200, privacy.text
+    assert privacy.json()["require_device_unlock"] is True
+
+    sessions = client.get("/api/v1/auth/me/sessions", headers=headers)
+    assert sessions.status_code == 200, sessions.text
+    assert len(sessions.json()) >= 1
+
+    device = client.post(
+        "/api/v1/notifications/devices",
+        json={"push_token": "ExponentPushToken[privacy]", "platform": "ios", "label": "Test iPhone"},
+        headers=headers,
+    )
+    assert device.status_code == 204, device.text
+    devices = client.get("/api/v1/auth/me/devices", headers=headers)
+    assert devices.status_code == 200, devices.text
+    assert devices.json()[0]["label"] == "Test iPhone"
+    revoke_device = client.delete(f"/api/v1/auth/me/devices/{devices.json()[0]['id']}", headers=headers)
+    assert revoke_device.status_code == 204, revoke_device.text
+
+    scan = client.post(
+        "/api/v1/scans/message",
+        json={"message_text": "You won a prize. Click now.", "platform_hint": "sms"},
+        headers=headers,
+    )
+    assert scan.status_code == 201, scan.text
+    scan_id = scan.json()["id"]
+    incident = client.post(
+        "/api/v1/recovery/incidents",
+        json={"incident_type": "gift_card", "linked_scan_id": scan_id, "title": "Gift card scam"},
+        headers=headers,
+    )
+    assert incident.status_code == 201, incident.text
+    report = client.post(
+        "/api/v1/community/reports",
+        json={"scan_id": scan_id, "report_type": "missed_scam", "artifact_text": "Correction details"},
+        headers=headers,
+    )
+    assert report.status_code == 201, report.text
+    feedback = client.post(
+        f"/api/v1/scans/{scan_id}/feedback-detail",
+        json={"feedback": "missed_scam", "reason": "Missed this", "corrected_context": "Corrected", "evidence": "Evidence"},
+        headers=headers,
+    )
+    assert feedback.status_code == 201, feedback.text
+    assert feedback.json()["review_status"] == "pending"
+
+    case_pack = client.get(f"/api/v1/recovery/incidents/{incident.json()['id']}/case-pack?format=json", headers=headers)
+    assert case_pack.status_code == 200, case_pack.text
+    assert case_pack.json()["case"]["id"] == incident.json()["id"]
+    case_pack_pdf = client.get(f"/api/v1/recovery/incidents/{incident.json()['id']}/case-pack?format=pdf", headers=headers)
+    assert case_pack_pdf.status_code == 200, case_pack_pdf.text
+    assert case_pack_pdf.headers["content-type"] == "application/pdf"
+    assert case_pack_pdf.content.startswith(b"%PDF")
+    share = client.post(f"/api/v1/recovery/incidents/{incident.json()['id']}/share", headers=headers)
+    assert share.status_code == 200, share.text
+    shared = client.get(share.json()["url"])
+    assert shared.status_code == 200, shared.text
+    assert "Shield AI Recovery Case Pack" in shared.text
+
+    export = client.get("/api/v1/auth/me/export", headers=headers)
+    assert export.status_code == 200, export.text
+    exported = export.json()
+    assert exported["user"]["email"]
+    assert exported["privacy_preferences"]["retention_days"] == 30
+    assert len(exported["sessions"]) >= 1
+    assert any(item["id"] == scan_id for item in exported["scans"])
+    assert len(exported["incidents"]) >= 1
+    assert len(exported["community_reports"]) >= 1
+    assert len(exported["scan_feedback_details"]) >= 1
+
+    purge = client.delete("/api/v1/auth/me/scan-history", headers=headers)
+    assert purge.status_code == 200, purge.text
+    assert purge.json()["deleted_scans"] >= 1
+    scans = client.get("/api/v1/scans", headers=headers)
+    assert scans.status_code == 200
+    assert scans.json() == []
+    incidents = client.get("/api/v1/recovery/incidents", headers=headers)
+    assert incidents.status_code == 200
+    assert incidents.json()[0]["linked_scan_id"] is None
+
+    delete = client.delete("/api/v1/auth/me", headers=headers)
+    assert delete.status_code == 204, delete.text
+    me = client.get("/api/v1/auth/me", headers=headers)
+    assert me.status_code == 401
+
+
+def test_notification_preferences_round_trip():
+    headers = _auth_headers()
+    current = client.get("/api/v1/notifications/preferences", headers=headers)
+    assert current.status_code == 200, current.text
+    payload = current.json()
+    payload["push_enabled"] = False
+    payload["minimum_severity"] = "high"
+    payload["topics"]["community"] = True
+    updated = client.put("/api/v1/notifications/preferences", json=payload, headers=headers)
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["push_enabled"] is False
+    assert updated.json()["minimum_severity"] == "high"
+    assert updated.json()["topics"]["community"] is True
+
+
+def test_realtime_monitoring_targets_and_telemetry():
+    headers = _auth_headers()
+    target = client.post(
+        "/api/v1/monitoring/targets",
+        json={"target_type": "email", "value": "monitor@example.com", "label": "Primary"},
+        headers=headers,
+    )
+    assert target.status_code == 201, target.text
+    listed = client.get("/api/v1/monitoring/targets", headers=headers)
+    assert listed.status_code == 200, listed.text
+    assert listed.json()[0]["value"] == "monitor@example.com"
+
+    browser = client.post(
+        "/api/v1/monitoring/browser-events",
+        json={"url": "https://bad.example/login", "domain": "bad.example", "verdict": "critical", "action": "blocked", "reason": "test"},
+        headers=headers,
+    )
+    assert browser.status_code == 201, browser.text
+    notifications = client.get("/api/v1/notifications", headers=headers).json()
+    assert any(n["title"] == "Safe Browser risk detected" for n in notifications)
+
+    extension = client.post(
+        "/api/v1/monitoring/extension-events",
+        json={"extension_type": "call_directory", "event_type": "blocked", "counts": {"blocked": 1}},
+        headers=headers,
+    )
+    assert extension.status_code == 201, extension.text
+    summary = client.get("/api/v1/monitoring/summary", headers=headers)
+    assert summary.status_code == 200, summary.text
+    assert summary.json()["monitored_targets"] >= 1
+
+    removed = client.delete(f"/api/v1/monitoring/targets/{target.json()['id']}", headers=headers)
+    assert removed.status_code == 204, removed.text
+
+
 def test_link_scan_requires_auth():
     r = client.post("/api/v1/scans/link", json={"url": "http://example.com"})
     assert r.status_code in (401, 403)

@@ -18,6 +18,7 @@ from app.models.models import (
     MarketplaceScan,
     MessageScan,
     Notification,
+    NotificationPreference,
     PhoneScan,
     QRScan,
     RiskReport,
@@ -42,6 +43,8 @@ from app.services import (
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+SEVERITY_RANK = {"safe": 0, "low": 1, "suspicious": 2, "high": 3, "critical": 4}
 
 def _finalize(db: Session, scan: ScanHistory, report_data: dict, evidence: dict) -> RiskReport:
     report = RiskReport(
@@ -83,9 +86,18 @@ def _push_to_devices(db: Session, user_id: str, title: str, body: str, scan_id: 
     """Send Expo push notifications to all registered devices for the user."""
     from app.core.config import settings
 
+    pref = db.query(NotificationPreference).filter(NotificationPreference.user_id == user_id).first()
+    if pref and not pref.push_enabled:
+        return
+    scan = db.get(ScanHistory, scan_id)
+    risk_level = str(scan.report.risk_level.value if scan and scan.report and hasattr(scan.report.risk_level, "value") else scan.report.risk_level if scan and scan.report else "")
+    minimum = pref.minimum_severity if pref else "all"
+    if minimum != "all" and SEVERITY_RANK.get(risk_level, 0) < SEVERITY_RANK.get(minimum, 0):
+        return
+
     tokens = [
         d.push_token
-        for d in db.query(Device).filter(Device.user_id == user_id).all()
+        for d in db.query(Device).filter(Device.user_id == user_id, Device.revoked_at.is_(None)).all()
         if d.push_token
     ]
     if not tokens:

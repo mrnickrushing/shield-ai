@@ -12,6 +12,7 @@ from app.db.session import get_db
 from app.models.models import (
     ApiUsage,
     RiskReport,
+    ScanFeedbackDetail,
     ScanHistory,
     ScanStatus,
     ScanType,
@@ -26,6 +27,8 @@ from app.schemas.schemas import (
     PhoneScanCreate,
     QRScanCreate,
     ScanFeedback,
+    ScanFeedbackDetailCreate,
+    ScanFeedbackDetailOut,
     ScanOut,
     SocialScanCreate,
 )
@@ -143,6 +146,33 @@ def submit_feedback(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Report not found")
     report.user_feedback = payload.feedback
     db.commit()
+
+
+@router.post("/{scan_id}/feedback-detail", response_model=ScanFeedbackDetailOut, status_code=status.HTTP_201_CREATED)
+def submit_feedback_detail(
+    scan_id: str,
+    payload: ScanFeedbackDetailCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_user_write),
+):
+    scan = db.get(ScanHistory, scan_id)
+    if not scan or scan.user_id != user.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Scan not found")
+    report = db.query(RiskReport).filter(RiskReport.scan_id == scan_id).first()
+    if report:
+        report.user_feedback = "false_positive" if payload.feedback in ("false_positive", "missed_scam") else "helpful"
+    detail = ScanFeedbackDetail(
+        user_id=user.id,
+        scan_id=scan_id,
+        feedback=payload.feedback,
+        reason=payload.reason,
+        corrected_context=payload.corrected_context,
+        evidence=payload.evidence,
+    )
+    db.add(detail)
+    db.commit()
+    db.refresh(detail)
+    return detail
 
 
 # ---------------------------------------------------------------------------

@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1 import admin, auth, billing, community, developer, education, family, identity, message_filter, notifications, phone_reputation, recovery, scans, verticals
+from app.api.v1 import admin, auth, billing, community, developer, education, family, identity, message_filter, monitoring, notifications, phone_reputation, recovery, scans, verticals
 from app.core.config import settings
 
 
@@ -42,6 +42,7 @@ app.include_router(developer.router, prefix=settings.API_V1_PREFIX)
 app.include_router(admin.router, prefix=settings.API_V1_PREFIX)
 app.include_router(billing.router, prefix=settings.API_V1_PREFIX)
 app.include_router(message_filter.router, prefix=settings.API_V1_PREFIX)
+app.include_router(monitoring.router, prefix=settings.API_V1_PREFIX)
 
 
 @app.get("/.well-known/apple-app-site-association", tags=["system"], include_in_schema=False)

@@ -6,7 +6,7 @@ import { ActivityIndicator, ScrollView, Share, Text, View } from "react-native";
 
 import { Button, Eyebrow, FadeIn, Surface } from "@/components/ui";
 import { ShieldAPI } from "@/lib/api";
-import { colors, spacing } from "@/theme/theme";
+import { colors, radius, spacing, withAlpha } from "@/theme/theme";
 
 const INCIDENT_LABELS: Record<string, string> = {
   bank_transfer: "Bank Transfer Fraud",
@@ -28,14 +28,7 @@ export default function IncidentScreen() {
     queryFn: () => ShieldAPI.getWizardSteps((incident as any).incident_type),
     enabled: !!incident,
   });
-  const getSummary = useMutation({
-    mutationFn: () => ShieldAPI.getIncidentSummary(id),
-    onSuccess: async (data: any) => {
-      try {
-        await Share.share({ message: data.summary, title: "Scam Incident Report" });
-      } catch {}
-    },
-  });
+  const createShare = useMutation({ mutationFn: () => ShieldAPI.createCasePackShare(id) });
 
   if (isLoading) {
     return (
@@ -50,6 +43,17 @@ export default function IncidentScreen() {
   const completed = new Set<string>(inc.steps_completed ?? []);
   const totalCount = (steps as any[])?.length ?? 0;
   const progress = totalCount > 0 ? completed.size / totalCount : 0;
+
+  const shareCasePack = async () => {
+    const [casePack, share] = await Promise.all([
+      ShieldAPI.getIncidentCasePack(id, "text"),
+      createShare.mutateAsync(),
+    ]);
+    await Share.share({
+      message: [casePack, "", `Secure link: ${share.url}`, `PDF: ${share.pdf_url}`, `Expires: ${new Date(share.expires_at).toLocaleString()}`].join("\n"),
+      title: "Shield AI Recovery Case Pack",
+    });
+  };
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxl }}>
@@ -88,6 +92,36 @@ export default function IncidentScreen() {
         </Surface>
       </FadeIn>
 
+      <FadeIn delay={120}>
+        <Surface accent={colors.primaryBright} style={{ marginBottom: spacing.md }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md, marginBottom: spacing.md }}>
+            <View style={{ width: 42, height: 42, borderRadius: radius.md, backgroundColor: withAlpha(colors.primaryBright, "1f"), alignItems: "center", justifyContent: "center" }}>
+              <Ionicons name="document-text-outline" size={20} color={colors.primaryBright} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: colors.text, fontSize: 16, fontWeight: "800" }}>Recovery Case Pack</Text>
+              <Text style={{ color: colors.textMuted, fontSize: 13, lineHeight: 18 }}>
+                Timeline, evidence summary, dispute template, police summary, and next actions.
+              </Text>
+            </View>
+          </View>
+          <View style={{ flexDirection: "row", gap: spacing.sm }}>
+            <View style={{ flex: 1, backgroundColor: colors.bg, borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: colors.border }}>
+              <Text style={{ color: colors.primaryBright, fontWeight: "900", fontSize: 18 }}>{completed.size}</Text>
+              <Text style={{ color: colors.textMuted, fontSize: 12 }}>done</Text>
+            </View>
+            <View style={{ flex: 1, backgroundColor: colors.bg, borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: colors.border }}>
+              <Text style={{ color: colors.suspicious, fontWeight: "900", fontSize: 18 }}>{Math.max(0, totalCount - completed.size)}</Text>
+              <Text style={{ color: colors.textMuted, fontSize: 12 }}>remaining</Text>
+            </View>
+            <View style={{ flex: 1, backgroundColor: colors.bg, borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: colors.border }}>
+              <Text style={{ color: colors.safe, fontWeight: "900", fontSize: 18 }}>{inc.linked_scan_id ? "Yes" : "No"}</Text>
+              <Text style={{ color: colors.textMuted, fontSize: 12 }}>scan link</Text>
+            </View>
+          </View>
+        </Surface>
+      </FadeIn>
+
       <FadeIn delay={140}>
         <Surface
           onPress={() => router.push("/recovery")}
@@ -98,10 +132,10 @@ export default function IncidentScreen() {
         </Surface>
 
         <Button
-          label="Export Incident Report"
+          label="Share Case Pack"
           icon="share-outline"
-          onPress={() => getSummary.mutate()}
-          loading={getSummary.isPending}
+          onPress={shareCasePack}
+          loading={createShare.isPending}
         />
         <Text style={{ color: colors.textMuted, fontSize: 12, textAlign: "center", marginTop: spacing.sm }}>
           Formatted for bank, police, or platform reports

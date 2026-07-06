@@ -47,5 +47,16 @@ services:
       - redis
       - db
 
+  beat:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    command: celery -A app.workers.celery_app.celery_app beat --loglevel=info
+    env_file:
+      - ../backend/.env
+    depends_on:
+      - redis
+      - db
+
 volumes:
   pgdata:

@@ -91,6 +91,27 @@ class ScanFeedback(BaseModel):
     feedback: str = Field(pattern="^(helpful|false_positive)$")
 
 
+class ScanFeedbackDetailCreate(BaseModel):
+    feedback: str = Field(pattern="^(helpful|false_positive|missed_scam)$")
+    reason: str = Field(default="", max_length=4000)
+    corrected_context: str = Field(default="", max_length=12000)
+    evidence: str = Field(default="", max_length=12000)
+
+
+class ScanFeedbackDetailOut(BaseModel):
+    id: str
+    scan_id: str
+    feedback: str
+    reason: str
+    corrected_context: str
+    evidence: str
+    review_status: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
 class QRScanCreate(BaseModel):
     qr_content: str
 
@@ -126,6 +147,64 @@ class SocialScanCreate(BaseModel):
 class DeviceRegister(BaseModel):
     push_token: str
     platform: str = Field(pattern="^(ios|android)$")
+    label: str = ""
+
+
+class DeviceOut(BaseModel):
+    id: str
+    platform: str
+    label: str = ""
+    push_token: str
+    created_at: datetime
+    last_seen_at: datetime | None = None
+    revoked_at: datetime | None = None
+
+    class Config:
+        from_attributes = True
+
+
+class AuthSessionOut(BaseModel):
+    id: str
+    user_agent: str
+    ip_address: str
+    is_active: bool
+    created_at: datetime
+    last_used_at: datetime
+    expires_at: datetime
+    revoked_at: datetime | None = None
+
+    class Config:
+        from_attributes = True
+
+
+class NotificationPreferenceIn(BaseModel):
+    push_enabled: bool = True
+    email_enabled: bool = False
+    proactive_monitoring: bool = True
+    quiet_hours_enabled: bool = True
+    quiet_hours_start: str = "22:00"
+    quiet_hours_end: str = "07:00"
+    minimum_severity: str = Field(default="suspicious", pattern="^(all|low|suspicious|high|critical)$")
+    topics: dict = {}
+
+
+class NotificationPreferenceOut(NotificationPreferenceIn):
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class PrivacyPreferenceIn(BaseModel):
+    retention_days: int | None = Field(default=90, ge=1, le=3650)
+    require_device_unlock: bool = False
+
+
+class PrivacyPreferenceOut(PrivacyPreferenceIn):
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
 
 
 # ---------------------------------------------------------------------------
@@ -302,6 +381,41 @@ class IdentityAlertOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class MonitoredIdentityCreate(BaseModel):
+    target_type: str = Field(pattern="^(email|phone|username|domain)$")
+    value: str = Field(min_length=3, max_length=255)
+    label: str = ""
+
+
+class MonitoredIdentityOut(BaseModel):
+    id: str
+    target_type: str
+    value: str
+    label: str
+    is_active: bool
+    last_checked_at: datetime | None = None
+    last_status: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class BrowserTelemetryCreate(BaseModel):
+    url: str = Field(max_length=4000)
+    domain: str = Field(default="", max_length=255)
+    verdict: str = Field(default="unverified", max_length=32)
+    action: str = Field(default="viewed", pattern="^(viewed|blocked|allowed|trusted|override)$")
+    reason: str = Field(default="", max_length=2000)
+
+
+class ExtensionTelemetryCreate(BaseModel):
+    extension_type: str = Field(pattern="^(message_filter|call_directory|widget|share)$")
+    event_type: str = Field(max_length=64)
+    counts: dict = {}
+    detail: dict = {}
 
 
 # ---------------------------------------------------------------------------
