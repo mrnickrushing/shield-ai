@@ -508,6 +508,9 @@ export const ShieldAPI = {
   // Phone reputation — Call Directory Extension sync
   syncPhoneReputation: () =>
     api.get<PhoneReputationSync>("/phone-reputation/sync").then((r) => r.data),
+  // URL reputation — Safari Web Extension sync
+  syncUrlReputation: () =>
+    api.get<{ version: string; domains: string[] }>("/url-reputation/sync").then((r) => r.data),
 
   // Developer API key management
   createApiKey: (name: string, scopes = ["scan:read", "scan:write"]) =>

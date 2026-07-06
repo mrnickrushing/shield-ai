@@ -23,6 +23,20 @@ public class CallDirectorySyncModule: Module {
       return true
     }
 
+    // Also used by the Safari Web Extension: writes the flagged-domain list
+    // (from GET /url-reputation/sync) where SafariWebExtensionHandler reads it.
+    AsyncFunction("writeUrlBlocklistSnapshot") { (domains: [String]) -> Bool in
+      guard let containerURL = FileManager.default.containerURL(
+        forSecurityApplicationGroupIdentifier: Self.appGroupIdentifier
+      ) else {
+        throw CallDirectorySyncException.missingAppGroup
+      }
+      let fileURL = containerURL.appendingPathComponent("url-reputation-snapshot.json")
+      let data = try JSONSerialization.data(withJSONObject: domains)
+      try data.write(to: fileURL, options: .atomic)
+      return true
+    }
+
     AsyncFunction("reloadCallDirectoryExtension") { (promise: Promise) in
       CXCallDirectoryManager.sharedInstance.reloadExtension(
         withIdentifier: Self.extensionBundleIdentifier
