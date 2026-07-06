@@ -8,6 +8,7 @@ import React, { useEffect } from "react";
 import { Platform } from "react-native";
 
 import { ShieldAPI } from "@/lib/api";
+import { addCustomerInfoListener, configureRevenueCat, getCustomerInfo, hasPremium } from "@/lib/revenuecat";
 import { useAuth } from "@/state/auth";
 import { colors } from "@/theme/theme";
 
@@ -66,6 +67,20 @@ export default function RootLayout() {
     if (!user?.id) return;
     registerDeviceForPush().catch(() => {});
   }, [user?.id]);
+
+  const setRcPremium = useAuth((s) => s.setRcPremium);
+  useEffect(() => {
+    if (!user?.id) return;
+    (async () => {
+      try {
+        await configureRevenueCat(user.id);
+        addCustomerInfoListener((info) => setRcPremium(hasPremium(info)));
+        setRcPremium(hasPremium(await getCustomerInfo()));
+      } catch {
+        // Entitlements fall back to the backend's is_premium flag.
+      }
+    })();
+  }, [user?.id, setRcPremium]);
 
   return (
     <QueryClientProvider client={queryClient}>

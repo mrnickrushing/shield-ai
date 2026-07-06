@@ -1,12 +1,17 @@
 import { create } from "zustand";
 
 import { ShieldAPI, UserProfile, clearTokens, getAccessToken, saveTokens } from "@/lib/api";
+import { logOutRevenueCat } from "@/lib/revenuecat";
 
 type ProfilePatch = { display_name?: string; large_text_mode?: boolean; simple_language_mode?: boolean };
 
 type AuthState = {
   user: UserProfile | null;
   hydrated: boolean;
+  /** True when the RevenueCat `premium` entitlement is active on this device. */
+  rcPremium: boolean;
+  setRcPremium: (active: boolean) => void;
+  refreshUser: () => Promise<void>;
   hydrate: () => Promise<void>;
   acceptTokens: (accessToken: string, refreshToken: string) => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
@@ -16,9 +21,23 @@ type AuthState = {
   logout: () => Promise<void>;
 };
 
+/** Premium if either source says so: RevenueCat (instant after purchase) or the backend (webhook-synced). */
+export const useIsPremium = () => useAuth((s) => s.rcPremium || Boolean(s.user?.is_premium));
+
 export const useAuth = create<AuthState>((set) => ({
   user: null,
   hydrated: false,
+  rcPremium: false,
+
+  setRcPremium: (active) => set({ rcPremium: active }),
+
+  refreshUser: async () => {
+    try {
+      set({ user: await ShieldAPI.me() });
+    } catch {
+      // Keep the cached user on transient network errors.
+    }
+  },
 
   hydrate: async () => {
     const token = await getAccessToken();
@@ -63,6 +82,7 @@ export const useAuth = create<AuthState>((set) => ({
 
   logout: async () => {
     await clearTokens();
-    set({ user: null });
+    await logOutRevenueCat();
+    set({ user: null, rcPremium: false });
   },
 }));

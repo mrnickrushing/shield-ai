@@ -58,7 +58,7 @@ export default function Login() {
     setLoading(true);
     try {
       await loginWithSocial(provider, token, emailHint?.trim().toLowerCase(), displayName?.trim());
-      router.replace("/(tabs)/dashboard");
+      router.replace("/");
     } catch (e: any) {
       setError(
         extractErrorMessage(
@@ -127,7 +127,7 @@ export default function Login() {
       }
 
       await acceptTokens(accessToken, refreshToken);
-      router.replace("/(tabs)/dashboard");
+      router.replace("/");
     } catch (e: any) {
       setError(extractErrorMessage(e, "Google sign-in failed."));
     } finally {
@@ -164,7 +164,7 @@ export default function Login() {
         await register(normalizedEmail, password, trimmedName);
         await SecureStore.setItemAsync("pendingTour", "true");
       }
-      router.replace(mode === "email_register" ? "/paywall" : "/(tabs)/dashboard");
+      router.replace("/");
     } catch (e: any) {
       setError(extractErrorMessage(e, "Something went wrong. Try again."));
     } finally {
