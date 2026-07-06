@@ -11,14 +11,12 @@ from urllib.parse import urlparse
 from sqlalchemy.orm import Session
 
 from app.models.models import (
-    Device,
     EmailScan,
     ImageScan,
     LinkScan,
     MarketplaceScan,
     MessageScan,
     Notification,
-    NotificationPreference,
     PhoneScan,
     QRScan,
     RiskReport,
@@ -38,13 +36,12 @@ from app.services import (
     threat_intel,
     url_enrichment,
 )
+from app.services.notification_delivery import send_push_to_devices
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-SEVERITY_RANK = {"safe": 0, "low": 1, "suspicious": 2, "high": 3, "critical": 4}
 
 def _finalize(db: Session, scan: ScanHistory, report_data: dict, evidence: dict) -> RiskReport:
     report = RiskReport(
@@ -74,54 +71,17 @@ def _finalize(db: Session, scan: ScanHistory, report_data: dict, evidence: dict)
     db.refresh(report)
 
     # Best-effort push to registered devices — never let this fail the scan
-    try:
-        _push_to_devices(db, scan.user_id, notif.title, notif.body, scan.id)
-    except Exception:
-        pass
+    send_push_to_devices(
+        db,
+        scan.user_id,
+        notif.title,
+        notif.body,
+        severity=str(report_data["risk_level"]),
+        topic="account",
+        data={"scan_id": scan.id, "type": "scan_complete"},
+    )
 
     return report
-
-
-def _push_to_devices(db: Session, user_id: str, title: str, body: str, scan_id: str) -> None:
-    """Send Expo push notifications to all registered devices for the user."""
-    from app.core.config import settings
-
-    pref = db.query(NotificationPreference).filter(NotificationPreference.user_id == user_id).first()
-    if pref and not pref.push_enabled:
-        return
-    scan = db.get(ScanHistory, scan_id)
-    risk_level = str(scan.report.risk_level.value if scan and scan.report and hasattr(scan.report.risk_level, "value") else scan.report.risk_level if scan and scan.report else "")
-    minimum = pref.minimum_severity if pref else "all"
-    if minimum != "all" and SEVERITY_RANK.get(risk_level, 0) < SEVERITY_RANK.get(minimum, 0):
-        return
-
-    tokens = [
-        d.push_token
-        for d in db.query(Device).filter(Device.user_id == user_id, Device.revoked_at.is_(None)).all()
-        if d.push_token
-    ]
-    if not tokens:
-        return
-
-    try:
-        import httpx
-
-        messages = [
-            {"to": t, "title": title, "body": body, "data": {"scan_id": scan_id}, "sound": "default"}
-            for t in tokens
-        ]
-        headers = {"Content-Type": "application/json"}
-        if settings.EXPO_ACCESS_TOKEN:
-            headers["Authorization"] = f"Bearer {settings.EXPO_ACCESS_TOKEN}"
-
-        httpx.post(
-            "https://exp.host/--/api/v2/push/send",
-            json=messages,
-            headers=headers,
-            timeout=5.0,
-        )
-    except Exception:
-        pass
 
 
 # ---------------------------------------------------------------------------

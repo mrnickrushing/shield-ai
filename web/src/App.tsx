@@ -4,6 +4,7 @@ import { AdminAPI, clearToken, hydrateToken, setToken } from "./api";
 import DashboardPage from "./pages/Dashboard";
 import PatternsPage from "./pages/Patterns";
 import ReportsPage from "./pages/Reports";
+import FeedbackPage from "./pages/Feedback";
 import UsersPage from "./pages/Users";
 import MarketingPage from "./pages/Marketing";
 import SupportPage from "./pages/Support";
@@ -96,6 +97,7 @@ function AdminLayout({ onLogout, children }: { onLogout: () => void; children: R
         </div>
         <NavItem to="/admin" label="Dashboard" />
         <NavItem to="/admin/reports" label="Community Reports" />
+        <NavItem to="/admin/feedback" label="Feedback Review" />
         <NavItem to="/admin/patterns" label="Scam Patterns" />
         <NavItem to="/admin/users" label="Users" />
         <div style={{ marginTop: 32, borderTop: `1px solid ${C.border}`, paddingTop: 16 }}>
@@ -154,6 +156,7 @@ function AdminApp() {
       <Routes>
         <Route index element={<DashboardPage />} />
         <Route path="reports" element={<ReportsPage />} />
+        <Route path="feedback" element={<FeedbackPage />} />
         <Route path="patterns" element={<PatternsPage />} />
         <Route path="users" element={<UsersPage />} />
         <Route path="*" element={<Navigate to="/admin" replace />} />

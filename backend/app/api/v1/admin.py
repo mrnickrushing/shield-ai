@@ -19,6 +19,15 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_admin
+from app.db.session import get_db
+from app.models.models import ApiKey, CommunityReport, RiskReport, ScamPattern, ScanFeedbackDetail, ScanHistory, User
+from app.schemas.schemas import (
+    AdminStatsOut,
+    AdminUserOut,
+    CommunityReportAdminOut,
+    ScamPatternCreate,
+    ScamPatternOut,
+)
 
 
 class _UserFlagsPatch(BaseModel):
@@ -43,15 +52,12 @@ class _PatternPatch(BaseModel):
     category: str | None = None
     pattern_data: dict | None = None
     artifact_types: list[str] | None = None
-from app.db.session import get_db
-from app.models.models import ApiKey, CommunityReport, ScamPattern, ScanHistory, User
-from app.schemas.schemas import (
-    AdminStatsOut,
-    AdminUserOut,
-    CommunityReportAdminOut,
-    ScamPatternCreate,
-    ScamPatternOut,
-)
+
+
+class _FeedbackReviewPatch(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    review_status: str
+
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -67,6 +73,7 @@ def get_stats(
         total_scans=db.query(ScanHistory).count(),
         scans_today=db.query(ScanHistory).filter(ScanHistory.created_at >= today).count(),
         open_community_reports=db.query(CommunityReport).filter(CommunityReport.status == "pending").count(),
+        pending_feedback_reviews=db.query(ScanFeedbackDetail).filter(ScanFeedbackDetail.review_status == "pending").count(),
         active_scam_patterns=db.query(ScamPattern).filter(ScamPattern.is_active.is_(True)).count(),
         active_api_keys=db.query(ApiKey).filter(ApiKey.is_active.is_(True)).count(),
     )
@@ -118,6 +125,81 @@ def list_community_reports(
     if status_filter:
         q = q.filter(CommunityReport.status == status_filter)
     return q.order_by(CommunityReport.created_at.desc()).limit(min(limit, 500)).all()
+
+
+@router.get("/feedback")
+def list_feedback_reviews(
+    status_filter: str | None = "pending",
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    if limit < 1:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "limit must be >= 1")
+    q = (
+        db.query(ScanFeedbackDetail, ScanHistory, RiskReport)
+        .join(ScanHistory, ScanHistory.id == ScanFeedbackDetail.scan_id)
+        .outerjoin(RiskReport, RiskReport.scan_id == ScanHistory.id)
+    )
+    if status_filter:
+        q = q.filter(ScanFeedbackDetail.review_status == status_filter)
+    rows = q.order_by(ScanFeedbackDetail.created_at.desc()).limit(min(limit, 500)).all()
+    return [
+        {
+            "id": feedback.id,
+            "user_id": feedback.user_id,
+            "scan_id": feedback.scan_id,
+            "scan_type": str(scan.scan_type.value if hasattr(scan.scan_type, "value") else scan.scan_type),
+            "raw_input": scan.raw_input,
+            "feedback": feedback.feedback,
+            "reason": feedback.reason,
+            "corrected_context": feedback.corrected_context,
+            "evidence": feedback.evidence,
+            "review_status": feedback.review_status,
+            "created_at": feedback.created_at,
+            "risk_level": str(report.risk_level.value if report and hasattr(report.risk_level, "value") else report.risk_level if report else ""),
+            "threat_category": report.threat_category if report else "",
+            "risk_score": report.risk_score if report else None,
+        }
+        for feedback, scan, report in rows
+    ]
+
+
+@router.patch("/feedback/{feedback_id}")
+def update_feedback_review(
+    feedback_id: str,
+    payload: _FeedbackReviewPatch,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    if payload.review_status not in {"pending", "reviewed", "promoted", "rejected"}:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Invalid review_status")
+    feedback = db.get(ScanFeedbackDetail, feedback_id)
+    if not feedback:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Feedback not found")
+    feedback.review_status = payload.review_status
+    db.commit()
+    return {"ok": True, "review_status": feedback.review_status}
+
+
+@router.post("/feedback/{feedback_id}/pattern", response_model=ScamPatternOut, status_code=status.HTTP_201_CREATED)
+def promote_feedback_to_pattern(
+    feedback_id: str,
+    payload: ScamPatternCreate,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    feedback = db.get(ScanFeedbackDetail, feedback_id)
+    if not feedback:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Feedback not found")
+    if db.query(ScamPattern).filter(ScamPattern.name == payload.name).first():
+        raise HTTPException(status.HTTP_409_CONFLICT, f"Pattern '{payload.name}' already exists")
+    pattern = ScamPattern(**payload.model_dump())
+    db.add(pattern)
+    feedback.review_status = "promoted"
+    db.commit()
+    db.refresh(pattern)
+    return pattern
 
 
 @router.patch("/reports/{report_id}", response_model=CommunityReportAdminOut)

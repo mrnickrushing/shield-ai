@@ -1,7 +1,7 @@
 """Real-time monitoring routes."""
 import asyncio
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
@@ -9,12 +9,37 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
+from app.core.config import settings
 from app.db.session import SessionLocal, get_db
 from app.models.models import BrowserTelemetryEvent, ExtensionTelemetryEvent, IdentityAlert, MonitoredIdentity, Notification, User
 from app.schemas.schemas import BrowserTelemetryCreate, ExtensionTelemetryCreate, MonitoredIdentityCreate, MonitoredIdentityOut
 from app.services import monitoring
 
 router = APIRouter(prefix="/monitoring", tags=["monitoring"])
+
+
+def _payment_required(feature: str) -> None:
+    raise HTTPException(
+        status.HTTP_402_PAYMENT_REQUIRED,
+        f"{feature} requires Shield AI Premium.",
+    )
+
+
+def _enforce_monitor_entitlement(db: Session, user: User, target_type: str) -> None:
+    if user.is_premium:
+        return
+    active_count = (
+        db.query(MonitoredIdentity)
+        .filter(MonitoredIdentity.user_id == user.id, MonitoredIdentity.is_active.is_(True))
+        .count()
+    )
+    if target_type != "email" or active_count >= settings.FREE_TIER_MONITOR_TARGETS:
+        _payment_required("Continuous multi-target monitoring")
+
+
+def _require_live_protection(user: User) -> None:
+    if not user.is_premium:
+        _payment_required("Live browser and extension protection")
 
 
 @router.get("/targets", response_model=list[MonitoredIdentityOut])
@@ -29,6 +54,7 @@ def list_targets(db: Session = Depends(get_db), user: User = Depends(get_current
 
 @router.post("/targets", response_model=MonitoredIdentityOut, status_code=status.HTTP_201_CREATED)
 def add_target(payload: MonitoredIdentityCreate, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    _enforce_monitor_entitlement(db, user, payload.target_type)
     value = payload.value.strip().lower()
     target = MonitoredIdentity(
         user_id=user.id,
@@ -57,6 +83,7 @@ def remove_target(target_id: str, db: Session = Depends(get_db), user: User = De
 
 @router.post("/browser-events", status_code=status.HTTP_201_CREATED)
 def record_browser_event(payload: BrowserTelemetryCreate, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    _require_live_protection(user)
     event = monitoring.record_browser_event(
         db,
         user_id=user.id,
@@ -72,6 +99,7 @@ def record_browser_event(payload: BrowserTelemetryCreate, db: Session = Depends(
 
 @router.post("/extension-events", status_code=status.HTTP_201_CREATED)
 def record_extension_event(payload: ExtensionTelemetryCreate, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    _require_live_protection(user)
     event = monitoring.record_extension_event(
         db,
         user_id=user.id,
@@ -86,12 +114,14 @@ def record_extension_event(payload: ExtensionTelemetryCreate, db: Session = Depe
 
 @router.get("/summary")
 def monitoring_summary(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    since = datetime.now(timezone.utc) - timedelta(hours=24)
     return {
         "monitored_targets": db.query(MonitoredIdentity).filter(MonitoredIdentity.user_id == user.id, MonitoredIdentity.is_active.is_(True)).count(),
         "unread_notifications": db.query(Notification).filter(Notification.user_id == user.id, Notification.is_read.is_(False)).count(),
         "identity_alerts": db.query(IdentityAlert).filter(IdentityAlert.user_id == user.id, IdentityAlert.is_read.is_(False)).count(),
-        "browser_events_24h": db.query(BrowserTelemetryEvent).filter(BrowserTelemetryEvent.user_id == user.id).count(),
-        "extension_events_24h": db.query(ExtensionTelemetryEvent).filter(ExtensionTelemetryEvent.user_id == user.id).count(),
+        "browser_events_24h": db.query(BrowserTelemetryEvent).filter(BrowserTelemetryEvent.user_id == user.id, BrowserTelemetryEvent.created_at >= since).count(),
+        "extension_events_24h": db.query(ExtensionTelemetryEvent).filter(ExtensionTelemetryEvent.user_id == user.id, ExtensionTelemetryEvent.created_at >= since).count(),
+        "premium_required_for_live_protection": not user.is_premium,
         "server_time": datetime.now(timezone.utc).isoformat(),
     }
 

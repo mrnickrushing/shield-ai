@@ -36,6 +36,7 @@ export type AdminStats = {
   total_scans: number;
   scans_today: number;
   open_community_reports: number;
+  pending_feedback_reviews: number;
   active_scam_patterns: number;
   active_api_keys: number;
 };
@@ -77,6 +78,23 @@ export type ScamPattern = {
   created_at: string;
 };
 
+export type FeedbackReview = {
+  id: string;
+  user_id: string;
+  scan_id: string;
+  scan_type: string;
+  raw_input: string;
+  feedback: string;
+  reason: string;
+  corrected_context: string;
+  evidence: string;
+  review_status: string;
+  created_at: string;
+  risk_level: string;
+  threat_category: string;
+  risk_score: number | null;
+};
+
 type UpdateUserPayload = Partial<Pick<AdminUser, "is_premium" | "is_admin" | "is_developer" | "is_active">>;
 type CreatePatternPayload = {
   name: string;
@@ -103,6 +121,13 @@ export const AdminAPI = {
     api.get<CommunityReport[]>("/admin/reports", { params: statusFilter ? { status_filter: statusFilter } : {} }),
   reviewReport: (id: string, status: string, analyst_notes: string) =>
     api.patch<CommunityReport>(`/admin/reports/${id}`, { status, analyst_notes }),
+
+  feedback: (statusFilter?: string) =>
+    api.get<FeedbackReview[]>("/admin/feedback", { params: statusFilter ? { status_filter: statusFilter } : {} }),
+  reviewFeedback: (id: string, review_status: string) =>
+    api.patch(`/admin/feedback/${id}`, { review_status }),
+  promoteFeedbackToPattern: (id: string, payload: CreatePatternPayload) =>
+    api.post<ScamPattern>(`/admin/feedback/${id}/pattern`, payload),
 
   patterns: () => api.get<ScamPattern[]>("/admin/patterns"),
   createPattern: (payload: CreatePatternPayload | Partial<ScamPattern>) =>
