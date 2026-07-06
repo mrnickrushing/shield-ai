@@ -1,37 +1,120 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import React, { useCallback, useEffect, useState } from "react";
+import { ActivityIndicator, Linking, Pressable, ScrollView, Text, View } from "react-native";
+import { PurchasesOffering, PurchasesPackage } from "react-native-purchases";
 
 import { Button, Eyebrow, FadeIn, GlowOrb, Surface } from "@/components/ui";
+import {
+  getDefaultOffering,
+  hasPremium,
+  purchasePackage,
+  purchasesSupported,
+  restorePurchases,
+} from "@/lib/revenuecat";
+import { useAuth, useIsPremium } from "@/state/auth";
 import { colors, gradients, radius, spacing, withAlpha } from "@/theme/theme";
 
-const FREE_FEATURES = [
-  "5 scans per day",
-  "Link, QR, and screenshot scans",
-  "Basic risk reports",
-  "Education lessons",
-];
+const TERMS_URL = "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/";
+const PRIVACY_URL = "https://shieldai.rushingtechnologies.com/privacy";
 
 const PREMIUM_FEATURES = [
-  "Unlimited scans — every type",
+  "Unlimited scans — links, texts, calls, QR, screenshots",
+  "Live Safe Browser with real-time site protection",
+  "Scam call & text filtering on your iPhone",
   "Identity breach monitoring",
   "Family alert sharing",
-  "Priority AI analysis",
   "Scam recovery wizard",
-  "Community scam intelligence",
-  "Biometric app lock",
-  "Weekly threat digest",
+  "Priority AI analysis",
 ];
 
 export default function Paywall() {
   const router = useRouter();
+  const isPremium = useIsPremium();
+  const setRcPremium = useAuth((s) => s.setRcPremium);
+  const refreshUser = useAuth((s) => s.refreshUser);
+  const logout = useAuth((s) => s.logout);
+
   const [annual, setAnnual] = useState(true);
+  const [offering, setOffering] = useState<PurchasesOffering | null>(null);
+  const [loadingOffering, setLoadingOffering] = useState(true);
+  const [busy, setBusy] = useState<"purchase" | "restore" | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const monthlyPrice = annual ? "2.99" : "4.99";
-  const annualTotal = "35.99";
+  const loadOffering = useCallback(async () => {
+    setLoadingOffering(true);
+    setError(null);
+    try {
+      setOffering(await getDefaultOffering());
+    } catch {
+      setError("Couldn't load subscription options. Check your connection and try again.");
+    } finally {
+      setLoadingOffering(false);
+    }
+  }, []);
 
-  const done = () => router.replace("/(tabs)/dashboard");
+  useEffect(() => {
+    loadOffering();
+  }, [loadOffering]);
+
+  // Entitlement can arrive from a purchase, a restore, or the backend webhook.
+  useEffect(() => {
+    if (isPremium) router.replace("/(tabs)/dashboard");
+  }, [isPremium, router]);
+
+  const monthlyPkg = offering?.monthly ?? null;
+  const annualPkg = offering?.annual ?? null;
+  const selectedPkg = annual ? annualPkg : monthlyPkg;
+
+  const monthlyPrice = monthlyPkg?.product.priceString ?? "$4.99";
+  const annualPrice = annualPkg?.product.priceString ?? "$35.99";
+  const annualPerMonth = annualPkg ? `${(annualPkg.product.price / 12).toFixed(2)}` : "3.00";
+
+  const finishIfPremium = async (info: Awaited<ReturnType<typeof purchasePackage>>) => {
+    if (info && hasPremium(info)) {
+      setRcPremium(true);
+      refreshUser();
+      router.replace("/(tabs)/dashboard");
+      return true;
+    }
+    return false;
+  };
+
+  const buy = async (pkg: PurchasesPackage | null) => {
+    if (!pkg) return;
+    setError(null);
+    setBusy("purchase");
+    try {
+      const info = await purchasePackage(pkg); // null = user cancelled
+      if (info && !(await finishIfPremium(info))) {
+        setError("Purchase completed but the subscription isn't active yet. Try Restore Purchases in a moment.");
+      }
+    } catch (e: any) {
+      setError(e?.message ?? "Purchase failed. You haven't been charged.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const restore = async () => {
+    setError(null);
+    setBusy("restore");
+    try {
+      const info = await restorePurchases();
+      if (!(await finishIfPremium(info))) {
+        setError("No active subscription found for this Apple ID.");
+      }
+    } catch (e: any) {
+      setError(e?.message ?? "Restore failed. Try again.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const signOut = async () => {
+    await logout();
+    router.replace("/login");
+  };
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ padding: spacing.lg, paddingBottom: 64 }}>
@@ -43,70 +126,91 @@ export default function Paywall() {
           </View>
           <Text style={{ color: colors.text, fontSize: 28, fontWeight: "900", letterSpacing: -0.8, textAlign: "center" }}>Shield AI Premium</Text>
           <Text style={{ color: colors.textMuted, fontSize: 15, textAlign: "center", marginTop: 8, lineHeight: 22 }}>
-            Full protection, unlimited scans,{"\n"}and everything to keep you safe.
+            Start your 7-day free trial to unlock{"\n"}full protection.
           </Text>
         </View>
       </FadeIn>
 
-      {/* Billing toggle */}
-      <FadeIn delay={60}>
-        <View style={{ flexDirection: "row", backgroundColor: colors.surface, borderRadius: radius.lg, padding: 4, marginBottom: spacing.lg }}>
-          <Pressable onPress={() => setAnnual(false)} style={{ flex: 1, paddingVertical: spacing.sm, borderRadius: radius.md, backgroundColor: !annual ? colors.primary : "transparent", alignItems: "center" }}>
-            <Text style={{ color: !annual ? "#fff" : colors.textMuted, fontWeight: "700" }}>Monthly</Text>
-          </Pressable>
-          <Pressable onPress={() => setAnnual(true)} style={{ flex: 1, paddingVertical: spacing.sm, borderRadius: radius.md, backgroundColor: annual ? colors.primary : "transparent", alignItems: "center" }}>
-            <View style={{ flexDirection: "row", gap: 6, alignItems: "center" }}>
-              <Text style={{ color: annual ? "#fff" : colors.textMuted, fontWeight: "700" }}>Annual</Text>
-              {annual && (
-                <View style={{ backgroundColor: colors.safe, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 1 }}>
-                  <Text style={{ color: "#000", fontSize: 10, fontWeight: "800" }}>SAVE 40%</Text>
-                </View>
-              )}
-            </View>
-          </Pressable>
-        </View>
-      </FadeIn>
-
-      {/* Price hero */}
-      <FadeIn delay={100}>
-        <Surface accent={colors.primaryBright} glow={withAlpha(colors.primary, "30")} style={{ alignItems: "center", marginBottom: spacing.lg }}>
-          <Text style={{ color: colors.primaryBright, fontSize: 48, fontWeight: "900", letterSpacing: -1 }}>${monthlyPrice}</Text>
-          <Text style={{ color: colors.textMuted, fontSize: 14 }}>per month{annual ? ` · $${annualTotal}/year` : ""}</Text>
-          <Text style={{ color: colors.safe, fontSize: 13, fontWeight: "700", marginTop: 4 }}>7-day free trial included</Text>
+      {!purchasesSupported() ? (
+        <Surface style={{ marginBottom: spacing.lg }}>
+          <Text style={{ color: colors.textMuted, fontSize: 14, textAlign: "center" }}>
+            Subscriptions are managed through the App Store and are available on iPhone.
+          </Text>
         </Surface>
-      </FadeIn>
+      ) : loadingOffering ? (
+        <Surface style={{ marginBottom: spacing.lg, alignItems: "center", paddingVertical: spacing.xl }}>
+          <ActivityIndicator color={colors.primaryBright} />
+          <Text style={{ color: colors.textMuted, fontSize: 13, marginTop: spacing.sm }}>Loading plans…</Text>
+        </Surface>
+      ) : !offering ? (
+        <Surface style={{ marginBottom: spacing.lg, alignItems: "center" }}>
+          <Text style={{ color: colors.textMuted, fontSize: 14, textAlign: "center", marginBottom: spacing.md }}>
+            Subscription options aren&apos;t available right now.
+          </Text>
+          <Button label="Try Again" variant="secondary" onPress={loadOffering} />
+        </Surface>
+      ) : (
+        <>
+          {/* Billing toggle */}
+          <FadeIn delay={60}>
+            <View style={{ flexDirection: "row", backgroundColor: colors.surface, borderRadius: radius.lg, padding: 4, marginBottom: spacing.lg }}>
+              <Pressable onPress={() => setAnnual(false)} style={{ flex: 1, paddingVertical: spacing.sm, borderRadius: radius.md, backgroundColor: !annual ? colors.primary : "transparent", alignItems: "center" }}>
+                <Text style={{ color: !annual ? "#fff" : colors.textMuted, fontWeight: "700" }}>Monthly</Text>
+              </Pressable>
+              <Pressable onPress={() => setAnnual(true)} style={{ flex: 1, paddingVertical: spacing.sm, borderRadius: radius.md, backgroundColor: annual ? colors.primary : "transparent", alignItems: "center" }}>
+                <View style={{ flexDirection: "row", gap: 6, alignItems: "center" }}>
+                  <Text style={{ color: annual ? "#fff" : colors.textMuted, fontWeight: "700" }}>Annual</Text>
+                  {annual && (
+                    <View style={{ backgroundColor: colors.safe, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 1 }}>
+                      <Text style={{ color: "#000", fontSize: 10, fontWeight: "800" }}>SAVE 40%</Text>
+                    </View>
+                  )}
+                </View>
+              </Pressable>
+            </View>
+          </FadeIn>
 
-      {/* Premium features — recommended tier, gets an accent */}
+          {/* Price hero */}
+          <FadeIn delay={100}>
+            <Surface accent={colors.primaryBright} glow={withAlpha(colors.primary, "30")} style={{ alignItems: "center", marginBottom: spacing.lg }}>
+              <Text style={{ color: colors.primaryBright, fontSize: 48, fontWeight: "900", letterSpacing: -1 }}>
+                {annual ? annualPrice : monthlyPrice}
+              </Text>
+              <Text style={{ color: colors.textMuted, fontSize: 14 }}>
+                {annual ? `per year · ~${annualPerMonth}/month` : "per month"}
+              </Text>
+              <Text style={{ color: colors.safe, fontSize: 13, fontWeight: "700", marginTop: 4 }}>7-day free trial included</Text>
+            </Surface>
+          </FadeIn>
+        </>
+      )}
+
+      {/* Features */}
       <FadeIn delay={140}>
         <Eyebrow style={{ marginBottom: spacing.sm }}>PREMIUM INCLUDES</Eyebrow>
         <Surface accent={colors.purple} style={{ marginBottom: spacing.lg, gap: spacing.sm }}>
           {PREMIUM_FEATURES.map((f) => (
             <View key={f} style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
               <Ionicons name="checkmark-circle" size={20} color={colors.safe} />
-              <Text style={{ color: colors.text, fontSize: 15 }}>{f}</Text>
+              <Text style={{ color: colors.text, fontSize: 15, flex: 1 }}>{f}</Text>
             </View>
           ))}
         </Surface>
       </FadeIn>
 
-      {/* Free tier */}
-      <FadeIn delay={180}>
-        <Eyebrow style={{ marginBottom: spacing.sm }}>FREE TIER</Eyebrow>
-        <Surface style={{ marginBottom: spacing.xl, gap: spacing.sm }}>
-          {FREE_FEATURES.map((f) => (
-            <View key={f} style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
-              <Ionicons name="checkmark-circle-outline" size={20} color={colors.textMuted} />
-              <Text style={{ color: colors.textMuted, fontSize: 15 }}>{f}</Text>
-            </View>
-          ))}
-        </Surface>
-      </FadeIn>
+      {error && (
+        <View style={{ backgroundColor: withAlpha(colors.critical, "22"), borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.md }}>
+          <Text style={{ color: colors.critical, textAlign: "center", fontSize: 13 }}>{error}</Text>
+        </View>
+      )}
 
       {/* CTA */}
-      <FadeIn delay={220}>
+      <FadeIn delay={200}>
         <Button
-          label="Start Free Trial →"
-          onPress={done}
+          label={busy === "purchase" ? "Starting…" : "Start Free Trial →"}
+          onPress={() => buy(selectedPkg)}
+          loading={busy === "purchase"}
+          disabled={!selectedPkg || busy !== null}
           gradient={gradients.primary}
           style={{ marginBottom: spacing.sm }}
         />
@@ -114,13 +218,28 @@ export default function Paywall() {
           Cancel anytime · No charge for 7 days
         </Text>
 
-        <Pressable onPress={done} style={{ padding: spacing.md, alignItems: "center" }}>
-          <Text style={{ color: colors.textMuted, fontSize: 14 }}>Continue with Free</Text>
+        <Pressable onPress={restore} disabled={busy !== null} style={{ padding: spacing.sm, alignItems: "center" }}>
+          <Text style={{ color: colors.text, fontSize: 14, fontWeight: "600" }}>
+            {busy === "restore" ? "Restoring…" : "Restore Purchases"}
+          </Text>
         </Pressable>
 
-        <Text style={{ color: colors.textMuted, fontSize: 11, textAlign: "center", marginTop: spacing.sm }}>
-          Subscription auto-renews. Cancel anytime in Settings.
+        <View style={{ flexDirection: "row", justifyContent: "center", gap: spacing.lg, marginTop: spacing.sm }}>
+          <Pressable onPress={() => Linking.openURL(TERMS_URL)}>
+            <Text style={{ color: colors.textMuted, fontSize: 12, textDecorationLine: "underline" }}>Terms of Use</Text>
+          </Pressable>
+          <Pressable onPress={() => Linking.openURL(PRIVACY_URL)}>
+            <Text style={{ color: colors.textMuted, fontSize: 12, textDecorationLine: "underline" }}>Privacy Policy</Text>
+          </Pressable>
+        </View>
+
+        <Text style={{ color: colors.textMuted, fontSize: 11, textAlign: "center", marginTop: spacing.md }}>
+          Subscription auto-renews after the trial. Cancel anytime in Settings.
         </Text>
+
+        <Pressable onPress={signOut} style={{ padding: spacing.md, alignItems: "center", marginTop: spacing.sm }}>
+          <Text style={{ color: colors.textMuted, fontSize: 13 }}>Sign out</Text>
+        </Pressable>
       </FadeIn>
     </ScrollView>
   );
