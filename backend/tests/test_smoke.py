@@ -913,6 +913,27 @@ def test_admin_requires_is_admin_flag():
     assert r.status_code == 403
 
 
+def test_education_catalog_public_and_completion_protected():
+    lessons_r = client.get("/api/v1/education/lessons")
+    assert lessons_r.status_code == 200, lessons_r.text
+    lessons = lessons_r.json()
+    assert len(lessons) >= 15
+    assert any(lesson["slug"] == "bank-impersonation" for lesson in lessons)
+    assert all(lesson["completed"] is False for lesson in lessons)
+
+    phishing_r = client.get("/api/v1/education/lessons", params={"threat_category": "phishing"})
+    assert phishing_r.status_code == 200, phishing_r.text
+    assert phishing_r.json()
+    assert all(lesson["threat_category"] == "phishing" for lesson in phishing_r.json())
+
+    detail_r = client.get(f"/api/v1/education/lessons/{lessons[0]['slug']}")
+    assert detail_r.status_code == 200, detail_r.text
+    assert detail_r.json()["slug"] == lessons[0]["slug"]
+
+    complete_r = client.post(f"/api/v1/education/lessons/{lessons[0]['id']}/complete", json={"answers": []})
+    assert complete_r.status_code in (401, 403)
+
+
 def test_scam_pattern_crud_admin():
     # Create an admin user by directly setting the flag via DB
     email = f"admin+{uuid.uuid4().hex}@example.com"

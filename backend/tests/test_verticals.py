@@ -1,8 +1,8 @@
 """Vertical apps — scaffold tests (unit + endpoint).
 
 Verifies the shared Verdict Engine runs each vertical end-to-end without an LLM
-key (deterministic fallback), and that the catalog + scan endpoints are wired and
-auth-gated like the rest of the API.
+key (deterministic fallback), and that the public catalog + protected scan
+endpoints are wired.
 """
 import os
 
@@ -109,13 +109,14 @@ def test_run_vertical_contract_flags_auto_renewal():
 # Endpoint tests
 # ---------------------------------------------------------------------------
 
-def test_catalog_requires_auth():
+def test_catalog_is_public():
     r = client.get("/api/v1/verticals")
-    assert r.status_code in (401, 403)
+    assert r.status_code == 200, r.text
+    assert len(r.json()) == 6
 
 
 def test_catalog_lists_six(_=None):
-    r = client.get("/api/v1/verticals", headers=_auth_headers())
+    r = client.get("/api/v1/verticals")
     assert r.status_code == 200, r.text
     data = r.json()
     assert len(data) == 6

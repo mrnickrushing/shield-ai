@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, get_optional_current_user
 from app.db.session import get_db
 from app.models.models import EducationLesson, EducationProgress, User
 from app.schemas.schemas import LessonOut, QuizSubmit
@@ -14,13 +14,13 @@ router = APIRouter(prefix="/education", tags=["education"])
 
 
 @router.get("/lessons")
-def list_lessons(threat_category: str | None = None, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+def list_lessons(threat_category: str | None = None, db: Session = Depends(get_db), user: User | None = Depends(get_optional_current_user)):
     education_service.seed_lessons(db)
-    return education_service.get_lessons_for_user(db, user.id, threat_category)
+    return education_service.get_lessons_for_user(db, user.id if user else None, threat_category)
 
 
 @router.get("/lessons/{lesson_id}", response_model=LessonOut)
-def get_lesson(lesson_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+def get_lesson(lesson_id: str, db: Session = Depends(get_db), user: User | None = Depends(get_optional_current_user)):
     education_service.seed_lessons(db)
     lesson = db.get(EducationLesson, lesson_id)
     if not lesson:

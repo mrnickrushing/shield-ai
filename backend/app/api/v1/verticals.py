@@ -10,7 +10,6 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import (
-    get_user_from_api_key_or_jwt as get_user,
     get_user_from_api_key_or_jwt_write as get_user_write,
 )
 from app.core.config import settings
@@ -25,7 +24,7 @@ router = APIRouter(prefix="/verticals", tags=["verticals"])
 
 
 @router.get("", response_model=list[VerticalInfo])
-def catalog(user: User = Depends(get_user)):
+def catalog():
     """List every vertical app in the portfolio for the Shield Labs hub."""
     return [
         VerticalInfo(

@@ -70,24 +70,206 @@ DEFAULT_LESSONS = [
             {"question": "Which 2FA method is most resistant to SIM swap attacks?", "options": ["SMS text message code", "Authenticator app (TOTP)", "Security question", "Email verification code"], "answer_index": 1},
         ],
     },
+    {
+        "slug": "bank-impersonation",
+        "title": "When Your Bank Calls You",
+        "summary": "Learn how bank impersonators create panic and how to verify safely.",
+        "content": "## The script\n\nA caller says they are from your bank's fraud department. They may already know your name, partial card number, or recent transaction. The goal is to make you act before you verify.\n\n## Red flags\n\n- They ask for a one-time passcode.\n- They tell you to move money to a safe account.\n- They say not to hang up or not to call the bank.\n- They pressure you to install a remote access app.\n\n## Safe move\n\nHang up. Call the number on the back of your card or in your banking app. Never use a number the caller gives you.",
+        "threat_category": "bank_scam",
+        "difficulty": "beginner",
+        "estimated_minutes": 3,
+        "quiz_questions": [
+            {"question": "A caller from your bank asks for the code texted to your phone. What should you do?", "options": ["Read it if they know your name", "Hang up and call the bank directly", "Ask them to email you", "Give only the first three digits"], "answer_index": 1},
+        ],
+    },
+    {
+        "slug": "safe-account-scam",
+        "title": "The Safe Account Lie",
+        "summary": "Why no real bank or police officer will tell you to transfer money to protect it.",
+        "content": "## The lie\n\nScammers claim your money is at risk and must be moved to a safe account. The safe account is controlled by the criminal.\n\n## What makes it convincing\n\nThey may spoof a bank number, transfer you to a fake supervisor, or mention real fraud trends.\n\n## The rule\n\nBanks reverse fraud internally. Police do not ask citizens to move money as part of an investigation.",
+        "threat_category": "bank_scam",
+        "difficulty": "beginner",
+        "estimated_minutes": 3,
+        "quiz_questions": [
+            {"question": "Who controls the safe account in this scam?", "options": ["Your bank", "The police", "The scammer", "A government escrow service"], "answer_index": 2},
+        ],
+    },
+    {
+        "slug": "remote-access-warning",
+        "title": "Remote Access App Warning Signs",
+        "summary": "Spot fake support sessions before someone takes control of your device.",
+        "content": "## The setup\n\nA fake support agent asks you to install AnyDesk, TeamViewer, ScreenConnect, or another remote tool. Once connected, they can see your screen and guide you into payments or account changes.\n\n## Stop signs\n\n- You did not initiate support.\n- They ask you to log into banking while connected.\n- They tell you to ignore security warnings.\n- They ask you to hide the session from family or bank staff.\n\n## What to do\n\nDisconnect, uninstall the remote app, change passwords from a different device, and call your bank if any financial account was opened.",
+        "threat_category": "tech_support",
+        "difficulty": "beginner",
+        "estimated_minutes": 4,
+        "quiz_questions": [
+            {"question": "A support caller asks you to open your bank account while screen sharing. What is the safest response?", "options": ["Continue if they sound professional", "Disconnect immediately", "Only show the balance", "Use a private browser window"], "answer_index": 1},
+        ],
+    },
+    {
+        "slug": "crypto-investment-scams",
+        "title": "Fake Crypto Investment Platforms",
+        "summary": "Recognize pig-butchering and fake trading dashboards before deposits grow.",
+        "content": "## How it starts\n\nA friendly stranger, dating match, or social contact introduces a trading platform. Early profits appear on a dashboard, but withdrawals require fees, taxes, or more deposits.\n\n## Red flags\n\n- Guaranteed returns.\n- A mentor tells you exactly when to trade.\n- You must use a specific unknown app or site.\n- Withdrawal requires a fee paid outside the platform.\n\n## The truth\n\nThe dashboard is often fake. The money usually goes straight to the criminal's wallet.",
+        "threat_category": "investment_scam",
+        "difficulty": "intermediate",
+        "estimated_minutes": 5,
+        "quiz_questions": [
+            {"question": "A platform says you must pay taxes before withdrawing profits. What does that indicate?", "options": ["Normal brokerage policy", "A strong scam signal", "A bank requirement", "A way to increase returns"], "answer_index": 1},
+        ],
+    },
+    {
+        "slug": "job-check-scam",
+        "title": "Fake Job Check Scams",
+        "summary": "Identify job offers that use fake checks, equipment purchases, and reshipping tasks.",
+        "content": "## The setup\n\nA remote job offer arrives quickly. The company sends a check for equipment or asks you to buy supplies from a specific vendor. Later, the check bounces and you owe the bank.\n\n## Red flags\n\n- Interview only by chat.\n- Pay is unusually high for simple tasks.\n- They send money before real onboarding.\n- You are asked to send money, crypto, gift cards, or packages onward.\n\n## Safer path\n\nVerify the company domain, call a public company number, and never spend funds from a new check until it fully clears.",
+        "threat_category": "job_scam",
+        "difficulty": "beginner",
+        "estimated_minutes": 4,
+        "quiz_questions": [
+            {"question": "Why is a fake job check dangerous even after your bank shows funds available?", "options": ["The check can still bounce later", "The employer can reverse direct deposit", "Taxes are due instantly", "The check lowers your credit score"], "answer_index": 0},
+        ],
+    },
+    {
+        "slug": "marketplace-safety",
+        "title": "Marketplace Buyer and Seller Safety",
+        "summary": "Avoid overpayment, shipping-label, and off-platform payment scams.",
+        "content": "## Common marketplace scams\n\nA buyer overpays and asks for a refund. A seller pushes payment outside the platform. A fake email says funds are held until you provide tracking.\n\n## Safer habits\n\n- Keep payment and messages inside the platform.\n- Do not refund overpayments from a different payment method.\n- Meet in public exchange zones when local.\n- Be suspicious of urgent shipping requests from new accounts.",
+        "threat_category": "marketplace_scam",
+        "difficulty": "beginner",
+        "estimated_minutes": 3,
+        "quiz_questions": [
+            {"question": "A buyer sends too much money and asks you to refund the difference by Zelle. What should you do?", "options": ["Refund immediately", "Cancel/report the transaction", "Ship faster", "Ask for their bank login"], "answer_index": 1},
+        ],
+    },
+    {
+        "slug": "qr-code-traps",
+        "title": "QR Code Traps",
+        "summary": "Learn when a QR code should be scanned and when it should be treated like a hidden link.",
+        "content": "## Why QR codes are risky\n\nA QR code hides the destination until after scanning. Criminals place stickers over parking meters, menus, package notices, and payment signs.\n\n## Quick checks\n\n- Inspect for stickers or tampering.\n- Preview the URL before opening.\n- Avoid QR codes that lead to payment or login pages from public signs.\n- Use the official app or website when possible.",
+        "threat_category": "url_scam",
+        "difficulty": "beginner",
+        "estimated_minutes": 3,
+        "quiz_questions": [
+            {"question": "A QR code on a parking meter opens a payment page with a strange domain. What should you do?", "options": ["Pay quickly", "Use the city's official app/site instead", "Enter card details but no email", "Scan it twice"], "answer_index": 1},
+        ],
+    },
+    {
+        "slug": "package-delivery-texts",
+        "title": "Fake Package Delivery Texts",
+        "summary": "Spot missed-delivery texts that steal card numbers and account logins.",
+        "content": "## The message\n\nA text says USPS, UPS, FedEx, or DHL needs a small redelivery fee or address confirmation. The link leads to a fake payment page.\n\n## Red flags\n\n- Shortened or unrelated domain.\n- Tiny fee to unlock a package.\n- Requests full card details for a redelivery.\n- Urgent deadline.\n\n## Safer path\n\nOpen the shipper's official app or website and enter the tracking number yourself.",
+        "threat_category": "smishing",
+        "difficulty": "beginner",
+        "estimated_minutes": 3,
+        "quiz_questions": [
+            {"question": "A delivery text asks for a 30 cent fee through a shortened link. What is the safest move?", "options": ["Pay because the fee is small", "Use the official shipper site/app", "Reply STOP", "Forward your card number by text"], "answer_index": 1},
+        ],
+    },
+    {
+        "slug": "ai-voice-clone-family",
+        "title": "AI Voice Clone Family Emergencies",
+        "summary": "Use a family verification plan before reacting to urgent calls.",
+        "content": "## The new version\n\nScammers can imitate a loved one's voice using short clips from social media. The call may claim there was an accident, arrest, kidnapping, or medical emergency.\n\n## Family safety plan\n\n- Pick a private family code word.\n- Call the person back on a known number.\n- Verify with another family member.\n- Do not send money while the caller keeps you on the phone.",
+        "threat_category": "family_scam",
+        "difficulty": "intermediate",
+        "estimated_minutes": 4,
+        "quiz_questions": [
+            {"question": "What is the best first step during a scary emergency call asking for money?", "options": ["Stay on the line", "Send a small test payment", "Verify through a known number or code word", "Post about it online"], "answer_index": 2},
+        ],
+    },
+    {
+        "slug": "recovery-first-hour",
+        "title": "The First Hour After Sending Money",
+        "summary": "What to do immediately after a scam payment to improve recovery odds.",
+        "content": "## Move fast\n\nRecovery odds are best before money settles. The first hour matters.\n\n## First steps\n\n1. Contact your bank, card issuer, payment app, or crypto exchange.\n2. Say you were scammed and request fraud recall, dispute, or freeze.\n3. Preserve messages, receipts, wallet addresses, phone numbers, and emails.\n4. File reports with FTC, IC3, local police, or platform support depending on the scam.\n\n## Avoid recovery scams\n\nAnyone promising guaranteed recovery for an upfront fee is likely another scammer.",
+        "threat_category": "recovery",
+        "difficulty": "beginner",
+        "estimated_minutes": 4,
+        "quiz_questions": [
+            {"question": "Who should you contact first after a bank or payment-app scam?", "options": ["A recovery agent from social media", "Your bank/payment provider", "The scammer", "A random crypto tracing site"], "answer_index": 1},
+        ],
+    },
+    {
+        "slug": "data-broker-exposure",
+        "title": "Reducing Data Broker Exposure",
+        "summary": "Understand why scammers know personal details and how opt-outs help.",
+        "content": "## Why scammers know so much\n\nData brokers collect names, addresses, relatives, phone numbers, and other public or commercial records. Scammers use this detail to sound credible.\n\n## What helps\n\n- Search major broker sites for your listing.\n- Submit opt-out requests.\n- Use unique email aliases where possible.\n- Be cautious when a caller uses personal details as proof.\n\n## Important rule\n\nKnowing your address or relatives does not prove a caller is legitimate.",
+        "threat_category": "identity_protection",
+        "difficulty": "beginner",
+        "estimated_minutes": 3,
+        "quiz_questions": [
+            {"question": "A caller knows your old address. What does that prove?", "options": ["They are legitimate", "They may have public/broker data", "They work for your bank", "They are police"], "answer_index": 1},
+        ],
+    },
+    {
+        "slug": "password-reset-traps",
+        "title": "Password Reset Traps",
+        "summary": "Stop attackers from using you to approve your own account takeover.",
+        "content": "## The trick\n\nAn attacker starts a password reset, then calls or texts pretending to be support. They ask for the reset code sent to you.\n\n## Defense\n\nNever share a reset code. Support teams do not need your one-time code. If you receive a code you did not request, change your password directly from the official site and review account sessions.",
+        "threat_category": "account_security",
+        "difficulty": "beginner",
+        "estimated_minutes": 3,
+        "quiz_questions": [
+            {"question": "What should you do with a password reset code you did not request?", "options": ["Read it to support", "Ignore or secure the account directly", "Post it in chat", "Use it on the caller's link"], "answer_index": 1},
+        ],
+    },
+    {
+        "slug": "invoice-and-business-email",
+        "title": "Invoice and Business Email Compromise",
+        "summary": "Verify payment changes before wiring money or paying invoices.",
+        "content": "## The setup\n\nA real vendor or executive email thread is copied or spoofed. The attacker changes payment instructions, bank routing details, or invoice timing.\n\n## Safer process\n\n- Confirm payment changes by phone using a known number.\n- Require two-person approval for new bank details.\n- Compare domains carefully.\n- Treat urgency and secrecy as warning signs.",
+        "threat_category": "business_email_compromise",
+        "difficulty": "intermediate",
+        "estimated_minutes": 5,
+        "quiz_questions": [
+            {"question": "How should you verify new wire instructions?", "options": ["Reply to the email", "Call a known trusted number", "Trust the PDF", "Ask the sender for their password"], "answer_index": 1},
+        ],
+    },
+    {
+        "slug": "social-media-impersonation",
+        "title": "Social Media Impersonation",
+        "summary": "Recognize cloned profiles, fake giveaways, and friend-in-trouble messages.",
+        "content": "## Common signs\n\nA duplicate account uses a friend's photo, sends a new friend request, then asks for money, codes, votes, or giveaway fees.\n\n## Verification\n\nCheck account history, mutuals, spelling, and recent posts. Contact the person through a different known channel before acting.",
+        "threat_category": "impersonation",
+        "difficulty": "beginner",
+        "estimated_minutes": 3,
+        "quiz_questions": [
+            {"question": "A new profile from a friend asks for a verification code. What should you do?", "options": ["Send the code", "Verify through another channel", "Ask for a selfie only", "Block your real friend"], "answer_index": 1},
+        ],
+    },
+    {
+        "slug": "charity-disaster-scams",
+        "title": "Charity and Disaster Scams",
+        "summary": "Give safely during emergencies without funding impersonators.",
+        "content": "## Why it happens\n\nAfter disasters or viral stories, fake charities appear quickly. They use emotional pressure and urgent donation links.\n\n## Safer giving\n\n- Search the charity independently.\n- Use established donation pages.\n- Avoid gift cards, crypto, or peer-to-peer payments to strangers.\n- Check charity registration and ratings when possible.",
+        "threat_category": "charity_scam",
+        "difficulty": "beginner",
+        "estimated_minutes": 3,
+        "quiz_questions": [
+            {"question": "What is safest before donating through a text link?", "options": ["Donate immediately", "Search and use the charity's official site", "Send gift cards", "Share your bank login"], "answer_index": 1},
+        ],
+    },
 ]
 
 
 def seed_lessons(db: Session) -> None:
-    if db.query(EducationLesson).count() > 0:
-        return
     now = datetime.now(timezone.utc)
+    existing_slugs = {row[0] for row in db.query(EducationLesson.slug).all()}
     for data in DEFAULT_LESSONS:
-        db.add(EducationLesson(id=str(uuid.uuid4()), created_at=now, **data))
+        if data["slug"] not in existing_slugs:
+            db.add(EducationLesson(id=str(uuid.uuid4()), created_at=now, **data))
     db.commit()
 
 
-def get_lessons_for_user(db: Session, user_id: str, threat_category: str | None = None) -> list[dict]:
+def get_lessons_for_user(db: Session, user_id: str | None, threat_category: str | None = None) -> list[dict]:
     q = db.query(EducationLesson)
     if threat_category:
         q = q.filter(EducationLesson.threat_category == threat_category)
     lessons = q.order_by(EducationLesson.estimated_minutes).all()
-    progress_map = {p.lesson_id: p for p in db.query(EducationProgress).filter(EducationProgress.user_id == user_id).all()}
+    progress_map = {}
+    if user_id:
+        progress_map = {p.lesson_id: p for p in db.query(EducationProgress).filter(EducationProgress.user_id == user_id).all()}
     result = []
     for lesson in lessons:
         prog = progress_map.get(lesson.id)
