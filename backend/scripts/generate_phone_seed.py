@@ -25,9 +25,9 @@ from pathlib import Path
 import httpx
 
 DATASET_URL = "https://opendata.fcc.gov/resource/vakf-fz8e.json"
-LOOKBACK_DAYS = 548  # ~18 months: stale caller IDs rotate out of use quickly
-MIN_COMPLAINTS = 5
-MAX_ENTRIES = 300
+LOOKBACK_DAYS = 913  # ~30 months
+MIN_COMPLAINTS = 2  # at least two independent complaints corroborate a number
+MAX_ENTRIES = 10_000
 LABEL = "Spam Risk"
 
 # Legitimate consumer-facing lines that accumulate complaints because scammers
