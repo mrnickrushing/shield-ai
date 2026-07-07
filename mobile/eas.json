@@ -10,6 +10,9 @@
       },
       "ios": {
         "buildConfiguration": "Release"
+      },
+      "android": {
+        "buildType": "app-bundle"
       }
     }
   },
