@@ -540,6 +540,8 @@ class AdminStatsOut(BaseModel):
     pending_feedback_reviews: int
     active_scam_patterns: int
     active_api_keys: int
+    total_api_keys: int
+    revoked_api_keys: int
 
 
 class AdminUserOut(BaseModel):
@@ -548,6 +550,9 @@ class AdminUserOut(BaseModel):
     is_premium: bool
     is_admin: bool
     is_developer: bool
+    is_active: bool
+    active_api_keys: int = 0
+    total_api_keys: int = 0
     created_at: datetime
 
     class Config:

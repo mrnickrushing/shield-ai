@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { AdminAPI, AdminUser } from "../api";
 
-const C = { text: "#F8FAFC", muted: "#94A3B8", surface: "#0B1220", border: "#1E2A45", bg: "#020617", primary: "#3B82F6", safe: "#22c55e" };
+const C = { text: "#F8FAFC", muted: "#94A3B8", surface: "#0B1220", border: "#1E2A45", bg: "#020617", primary: "#3B82F6", safe: "#22c55e", danger: "#ef4444" };
 
 function FlagToggle({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) {
   return (
@@ -33,6 +33,22 @@ export default function UsersPage() {
     }
   };
 
+  const deleteUser = async (u: AdminUser) => {
+    const confirmed = window.confirm(`Permanently delete ${u.email}? This removes the user, sessions, devices, scans, incidents, notifications, and API keys. This cannot be undone.`);
+    if (!confirmed) return;
+    const key = `${u.id}:delete`;
+    if (pending[key]) return;
+    setPending(prev => ({ ...prev, [key]: true }));
+    try {
+      await AdminAPI.deleteUser(u.id);
+      setUsers(prev => prev.filter(x => x.id !== u.id));
+    } catch {
+      setError("Failed to delete user.");
+    } finally {
+      setPending(prev => { const next = { ...prev }; delete next[key]; return next; });
+    }
+  };
+
   const filtered = users.filter(u => u.email.toLowerCase().includes(search.toLowerCase()));
 
   return (
@@ -47,7 +63,7 @@ export default function UsersPage() {
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ borderBottom: `1px solid ${C.border}` }}>
-              {["Email", "Joined", "Flags", "Actions"].map(h => (
+              {["Email", "Joined", "API Keys", "Flags", "Actions"].map(h => (
                 <th key={h} style={{ padding: "12px 16px", textAlign: "left", color: C.muted, fontSize: 12, fontWeight: 700, letterSpacing: 1 }}>{h.toUpperCase()}</th>
               ))}
             </tr>
@@ -57,15 +73,37 @@ export default function UsersPage() {
               <tr key={u.id} style={{ borderBottom: `1px solid ${C.border}` }}>
                 <td style={{ padding: "12px 16px", color: C.text, fontSize: 13 }}>{u.email}</td>
                 <td style={{ padding: "12px 16px", color: C.muted, fontSize: 12 }}>{new Date(u.created_at).toLocaleDateString()}</td>
+                <td style={{ padding: "12px 16px", color: C.muted, fontSize: 12 }}>
+                  <span style={{ color: u.active_api_keys > 0 ? C.safe : C.muted, fontWeight: 700 }}>{u.active_api_keys}</span>
+                  <span> active / {u.total_api_keys} total</span>
+                </td>
                 <td style={{ padding: "12px 16px" }}>
                   {u.is_premium && <span style={{ backgroundColor: "#facc1533", color: "#facc15", borderRadius: 999, padding: "2px 8px", fontSize: 11, marginRight: 4 }}>Premium</span>}
                   {u.is_admin && <span style={{ backgroundColor: C.primary + "33", color: C.primary, borderRadius: 999, padding: "2px 8px", fontSize: 11, marginRight: 4 }}>Admin</span>}
                   {u.is_developer && <span style={{ backgroundColor: C.safe + "33", color: C.safe, borderRadius: 999, padding: "2px 8px", fontSize: 11 }}>Developer</span>}
+                  {!u.is_active && <span style={{ backgroundColor: C.danger + "33", color: C.danger, borderRadius: 999, padding: "2px 8px", fontSize: 11, marginLeft: 4 }}>Inactive</span>}
                 </td>
                 <td style={{ padding: "12px 16px" }}>
                   <FlagToggle label="Premium" value={u.is_premium} onChange={v => update(u, "is_premium", v)} />
                   <FlagToggle label="Admin" value={u.is_admin} onChange={v => update(u, "is_admin", v)} />
                   <FlagToggle label="Dev" value={u.is_developer} onChange={v => update(u, "is_developer", v)} />
+                  <FlagToggle label="Active" value={u.is_active} onChange={v => update(u, "is_active", v)} />
+                  <button
+                    onClick={() => deleteUser(u)}
+                    disabled={Boolean(pending[`${u.id}:delete`])}
+                    style={{
+                      padding: "3px 10px",
+                      borderRadius: 999,
+                      border: `1px solid ${C.danger}`,
+                      backgroundColor: "transparent",
+                      color: C.danger,
+                      cursor: pending[`${u.id}:delete`] ? "not-allowed" : "pointer",
+                      fontSize: 12,
+                      opacity: pending[`${u.id}:delete`] ? 0.6 : 1,
+                    }}
+                  >
+                    Delete
+                  </button>
                 </td>
               </tr>
             ))}

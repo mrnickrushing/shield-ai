@@ -43,6 +43,8 @@ export default function DashboardPage() {
           </div>
           <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginTop: 16 }}>
             <StatCard label="Active API Keys" value={stats.active_api_keys} />
+            <StatCard label="Total API Keys" value={stats.total_api_keys} />
+            <StatCard label="Revoked API Keys" value={stats.revoked_api_keys} accent={stats.revoked_api_keys > 0 ? "#f97316" : C.bright} />
           </div>
         </>
       )}

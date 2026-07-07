@@ -5,6 +5,7 @@ All endpoints require is_admin=True.
 GET  /api/v1/admin/stats                         — aggregate platform stats
 GET  /api/v1/admin/users                         — user list
 PATCH /api/v1/admin/users/{user_id}              — set flags (is_premium, is_admin, is_developer)
+DELETE /api/v1/admin/users/{user_id}             — permanently delete a user account
 GET  /api/v1/admin/reports                       — all community reports (with filter)
 PATCH /api/v1/admin/reports/{report_id}          — update status + analyst notes
 GET  /api/v1/admin/patterns                      — all scam patterns
@@ -28,6 +29,7 @@ from app.schemas.schemas import (
     ScamPatternCreate,
     ScamPatternOut,
 )
+from app.services.account_deletion import delete_user_account
 
 
 class _UserFlagsPatch(BaseModel):
@@ -62,6 +64,26 @@ class _FeedbackReviewPatch(BaseModel):
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 
+def _admin_user_out(db: Session, user: User) -> AdminUserOut:
+    active_api_keys = (
+        db.query(ApiKey)
+        .filter(ApiKey.user_id == user.id, ApiKey.is_active.is_(True))
+        .count()
+    )
+    total_api_keys = db.query(ApiKey).filter(ApiKey.user_id == user.id).count()
+    return AdminUserOut(
+        id=user.id,
+        email=user.email,
+        is_premium=user.is_premium,
+        is_admin=user.is_admin,
+        is_developer=user.is_developer,
+        is_active=user.is_active,
+        active_api_keys=active_api_keys,
+        total_api_keys=total_api_keys,
+        created_at=user.created_at,
+    )
+
+
 @router.get("/stats", response_model=AdminStatsOut)
 def get_stats(
     db: Session = Depends(get_db),
@@ -76,6 +98,8 @@ def get_stats(
         pending_feedback_reviews=db.query(ScanFeedbackDetail).filter(ScanFeedbackDetail.review_status == "pending").count(),
         active_scam_patterns=db.query(ScamPattern).filter(ScamPattern.is_active.is_(True)).count(),
         active_api_keys=db.query(ApiKey).filter(ApiKey.is_active.is_(True)).count(),
+        total_api_keys=db.query(ApiKey).count(),
+        revoked_api_keys=db.query(ApiKey).filter(ApiKey.is_active.is_(False)).count(),
     )
 
 
@@ -87,12 +111,13 @@ def list_users(
 ):
     if limit < 1:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "limit must be >= 1")
-    return (
+    users = (
         db.query(User)
         .order_by(User.created_at.desc())
         .limit(min(limit, 500))
         .all()
     )
+    return [_admin_user_out(db, user) for user in users]
 
 
 @router.patch("/users/{user_id}", response_model=AdminUserOut)
@@ -109,7 +134,26 @@ def update_user_flags(
         setattr(user, key, val)
     db.commit()
     db.refresh(user)
-    return user
+    return _admin_user_out(db, user)
+
+
+@router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_user(
+    user_id: str,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin),
+):
+    user = db.get(User, user_id)
+    if not user:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "User not found")
+    if user.id == admin.id:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Admins cannot delete their own account from the admin console")
+    delete_user_account(
+        db,
+        user,
+        audit_detail={"account_deleted": True, "deleted_by_admin_id": admin.id},
+    )
+    db.commit()
 
 
 @router.get("/reports", response_model=list[CommunityReportAdminOut])

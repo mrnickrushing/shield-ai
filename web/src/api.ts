@@ -39,6 +39,8 @@ export type AdminStats = {
   pending_feedback_reviews: number;
   active_scam_patterns: number;
   active_api_keys: number;
+  total_api_keys: number;
+  revoked_api_keys: number;
 };
 
 export type AdminUser = {
@@ -48,6 +50,8 @@ export type AdminUser = {
   is_admin: boolean;
   is_developer: boolean;
   is_active: boolean;
+  active_api_keys: number;
+  total_api_keys: number;
   created_at: string;
 };
 
@@ -116,6 +120,7 @@ export const AdminAPI = {
   users: () => api.get<AdminUser[]>("/admin/users"),
   updateUser: (id: string, payload: UpdateUserPayload) =>
     api.patch<AdminUser>(`/admin/users/${id}`, payload),
+  deleteUser: (id: string) => api.delete(`/admin/users/${id}`),
 
   reports: (statusFilter?: string) =>
     api.get<CommunityReport[]>("/admin/reports", { params: statusFilter ? { status_filter: statusFilter } : {} }),

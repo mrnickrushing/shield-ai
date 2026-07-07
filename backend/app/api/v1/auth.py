@@ -23,35 +23,19 @@ from app.core.security import (
 )
 from app.db.session import get_db
 from app.models.models import (
-    ApiKey,
-    ApiUsage,
     AuthSession,
     AuditLog,
-    BreachRecord,
-    CasePackShare,
     CommunityReport,
     Device,
-    EmailScan,
-    EducationProgress,
     IdentityAlert,
-    ImageScan,
     Incident,
-    IncidentEvidence,
-    LinkScan,
-    MarketplaceScan,
-    MessageScan,
     Notification,
     NotificationPreference,
-    PhoneScan,
     PrivacyPreference,
     Profile,
-    QRScan,
-    RiskReport,
     ScanHistory,
     ScanFeedbackDetail,
     SocialIdentity,
-    SocialScan,
-    TrustedContact,
     User,
 )
 from app.schemas.schemas import (
@@ -68,21 +52,12 @@ from app.schemas.schemas import (
     UserRegister,
 )
 from app.services.privacy import apply_retention_policy, purge_user_scans
+from app.services.account_deletion import delete_user_account
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 GOOGLE_DISCOVERY_AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token"
 GOOGLE_TOKENINFO_ENDPOINT = "https://oauth2.googleapis.com/tokeninfo"
-SCAN_ARTIFACT_MODELS = (
-    LinkScan,
-    ImageScan,
-    QRScan,
-    MessageScan,
-    EmailScan,
-    PhoneScan,
-    MarketplaceScan,
-    SocialScan,
-)
 
 
 def _hash_token(token: str) -> str:
@@ -656,33 +631,5 @@ def purge_scan_history(db: Session = Depends(get_db), user: User = Depends(get_c
 
 @router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
 def delete_me(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    _delete_user_scans(db, user.id)
-    incident_ids = [row[0] for row in db.query(Incident.id).filter(Incident.user_id == user.id).all()]
-    if incident_ids:
-        db.query(IncidentEvidence).filter(IncidentEvidence.incident_id.in_(incident_ids)).delete(synchronize_session=False)
-        db.query(CasePackShare).filter(CasePackShare.incident_id.in_(incident_ids)).delete(synchronize_session=False)
-    db.query(Incident).filter(Incident.user_id == user.id).delete(synchronize_session=False)
-    db.query(Notification).filter(Notification.user_id == user.id).delete(synchronize_session=False)
-    db.query(Device).filter(Device.user_id == user.id).delete(synchronize_session=False)
-    db.query(AuthSession).filter(AuthSession.user_id == user.id).delete(synchronize_session=False)
-    db.query(NotificationPreference).filter(NotificationPreference.user_id == user.id).delete(synchronize_session=False)
-    db.query(PrivacyPreference).filter(PrivacyPreference.user_id == user.id).delete(synchronize_session=False)
-    db.query(TrustedContact).filter(TrustedContact.user_id == user.id).delete(synchronize_session=False)
-    db.query(EducationProgress).filter(EducationProgress.user_id == user.id).delete(synchronize_session=False)
-    db.query(BreachRecord).filter(BreachRecord.user_id == user.id).delete(synchronize_session=False)
-    db.query(IdentityAlert).filter(IdentityAlert.user_id == user.id).delete(synchronize_session=False)
-    db.query(ScanFeedbackDetail).filter(ScanFeedbackDetail.user_id == user.id).delete(synchronize_session=False)
-    db.query(ApiUsage).filter(ApiUsage.user_id == user.id).delete(synchronize_session=False)
-    db.query(ApiKey).filter(ApiKey.user_id == user.id).delete(synchronize_session=False)
-    db.query(SocialIdentity).filter(SocialIdentity.user_id == user.id).delete(synchronize_session=False)
-    db.query(CommunityReport).filter(CommunityReport.user_id == user.id).update(
-        {CommunityReport.user_id: None},
-        synchronize_session=False,
-    )
-    db.query(AuditLog).filter(AuditLog.user_id == user.id).update(
-        {AuditLog.user_id: None, AuditLog.detail: {"account_deleted": True}},
-        synchronize_session=False,
-    )
-    db.query(Profile).filter(Profile.user_id == user.id).delete(synchronize_session=False)
-    db.delete(user)
+    delete_user_account(db, user)
     db.commit()

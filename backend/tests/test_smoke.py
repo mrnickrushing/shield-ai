@@ -921,11 +921,21 @@ def test_scam_pattern_crud_admin():
     user_id = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"}).json()["id"]
 
     # Promote via DB override
-    from app.models.models import User as UserModel
+    from app.models.models import ApiKey, User as UserModel
     db = TestingSession()
     try:
         user = db.get(UserModel, user_id)
         user.is_admin = True
+        key_user = UserModel(
+            email=f"admin-key-owner-{uuid.uuid4().hex}@example.com",
+            hashed_password="x",
+            is_developer=True,
+        )
+        db.add(key_user)
+        db.flush()
+        db.add(ApiKey(user_id=key_user.id, name="Active", key_hash=f"h-{uuid.uuid4().hex}", key_prefix="shld_active", scopes=["scan:read"]))
+        db.add(ApiKey(user_id=key_user.id, name="Revoked", key_hash=f"h-{uuid.uuid4().hex}", key_prefix="shld_revoked", scopes=["scan:read"], is_active=False))
+        key_user_id = key_user.id
         db.commit()
     finally:
         db.close()
@@ -938,6 +948,23 @@ def test_scam_pattern_crud_admin():
     stats = stats_r.json()
     assert "total_users" in stats
     assert "total_scans" in stats
+    assert stats["active_api_keys"] >= 1
+    assert stats["total_api_keys"] >= 2
+    assert stats["revoked_api_keys"] >= 1
+
+    users_r = client.get("/api/v1/admin/users", headers=admin_headers)
+    assert users_r.status_code == 200, users_r.text
+    key_owner = next(u for u in users_r.json() if u["id"] == key_user_id)
+    assert key_owner["active_api_keys"] == 1
+    assert key_owner["total_api_keys"] == 2
+    assert key_owner["is_active"] is True
+
+    delete_self = client.delete(f"/api/v1/admin/users/{user_id}", headers=admin_headers)
+    assert delete_self.status_code == 400
+
+    delete_user = client.delete(f"/api/v1/admin/users/{key_user_id}", headers=admin_headers)
+    assert delete_user.status_code == 204, delete_user.text
+    assert not any(u["id"] == key_user_id for u in client.get("/api/v1/admin/users", headers=admin_headers).json())
 
     # Create a scam pattern
     pat_r = client.post(
