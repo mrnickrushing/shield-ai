@@ -121,3 +121,16 @@ def mark_all_read(
         Notification.user_id == user.id, Notification.is_read.is_(False)
     ).update({"is_read": True})
     db.commit()
+
+
+@router.delete("/{notif_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_notification(
+    notif_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    notif = db.get(Notification, notif_id)
+    if not notif or notif.user_id != user.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Notification not found")
+    db.delete(notif)
+    db.commit()

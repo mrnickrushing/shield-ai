@@ -17,8 +17,15 @@ const CALL_STEPS = [
 
 const TEXT_STEPS = [
   "Open the Settings app",
-  "Go to Messages → Unknown & Spam",
-  "Under SMS Filtering, select Shield AI",
+  "Go to Apps → Messages, or Messages on older iOS versions",
+  "Open Unknown & Spam or Message Filtering",
+  "Under SMS Filtering, select Shield AI Text Filter",
+];
+
+const TEXT_TROUBLESHOOTING = [
+  "If Unknown & Spam is missing, install the latest TestFlight build and restart the iPhone.",
+  "The option only appears after iOS sees the Shield AI Text Filter extension in the installed app.",
+  "Apple only routes texts from unknown senders to filters; saved contacts and conversations you reply to stay in Messages.",
 ];
 
 function timeAgo(date: Date | null): string {
@@ -195,6 +202,14 @@ export default function CallProtectionScreen() {
                   <Text style={{ color: colors.text, fontSize: 13, flex: 1, lineHeight: 19 }}>{step}</Text>
                 </View>
               ))}
+              <View style={{ marginTop: spacing.sm, gap: spacing.xs }}>
+                {TEXT_TROUBLESHOOTING.map((tip) => (
+                  <View key={tip} style={{ flexDirection: "row", gap: spacing.xs }}>
+                    <Ionicons name="information-circle-outline" size={15} color={colors.textMuted} />
+                    <Text style={{ color: colors.textMuted, fontSize: 12, flex: 1, lineHeight: 17 }}>{tip}</Text>
+                  </View>
+                ))}
+              </View>
               <Button
                 label="Open Settings"
                 icon="settings-outline"

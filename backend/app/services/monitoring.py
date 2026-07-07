@@ -45,7 +45,24 @@ def create_alert(
     topic: str = "account",
     scan_id: str | None = None,
     force_inbox: bool = True,
+    dedupe_for: timedelta | None = timedelta(hours=24),
 ) -> Notification | None:
+    if dedupe_for is not None:
+        cutoff = datetime.now(timezone.utc) - dedupe_for
+        duplicate = (
+            db.query(Notification.id)
+            .filter(
+                Notification.user_id == user_id,
+                Notification.title == title,
+                Notification.body == body[:1000],
+                Notification.scan_id == scan_id,
+                Notification.created_at >= cutoff,
+            )
+            .first()
+        )
+        if duplicate:
+            return None
+
     if not force_inbox and not should_deliver(db, user_id, severity, topic, "push"):
         return None
     notif = Notification(user_id=user_id, title=title, body=body[:1000], scan_id=scan_id)
@@ -335,16 +352,18 @@ def run_recovery_reminders(db: Session) -> int:
     )
     created = 0
     for incident in incidents:
-        create_alert(
+        notif = create_alert(
             db,
             incident.user_id,
             "Recovery case needs follow-up",
             f"{incident.title or 'Recovery case'} has not been updated in 3 days.",
             severity="suspicious",
             topic="account",
+            dedupe_for=timedelta(days=7),
         )
         incident.updated_at = datetime.now(timezone.utc)
-        created += 1
+        if notif:
+            created += 1
     return created
 
 
@@ -359,7 +378,7 @@ def run_scan_pattern_monitor(db: Session) -> int:
     )
     created = 0
     for scan in recent:
-        create_alert(
+        notif = create_alert(
             db,
             scan.user_id,
             "High-risk scan follow-up",
@@ -368,6 +387,8 @@ def run_scan_pattern_monitor(db: Session) -> int:
             topic="account",
             scan_id=scan.id,
             force_inbox=False,
+            dedupe_for=timedelta(days=7),
         )
-        created += 1
+        if notif:
+            created += 1
     return created

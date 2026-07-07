@@ -29,7 +29,7 @@ const PREMIUM_FEATURES = [
 ];
 
 const BILLING_SETUP_MESSAGE =
-  "Subscription plans are not configured for this app yet. You can still use limited protection while billing is fixed.";
+  "Premium billing is temporarily unavailable. You can keep using limited protection while we finish subscription setup.";
 
 export default function Paywall() {
   const router = useRouter();
@@ -56,7 +56,8 @@ export default function Paywall() {
       }
     } catch (e) {
       if (__DEV__) console.warn("Failed to load RevenueCat offerings", e);
-      setError("Couldn't load subscription options. Check your connection and try again.");
+      setOffering(null);
+      setError(BILLING_SETUP_MESSAGE);
     } finally {
       setLoadingOffering(false);
     }
@@ -156,7 +157,7 @@ export default function Paywall() {
       ) : !offering || offering.availablePackages.length === 0 ? (
         <Surface style={{ marginBottom: spacing.lg, alignItems: "center" }}>
           <Text style={{ color: colors.textMuted, fontSize: 14, textAlign: "center", marginBottom: spacing.md }}>
-            Subscription plans aren&apos;t configured in RevenueCat yet.
+            Premium subscription options aren&apos;t available right now.
           </Text>
           <Button label="Try Again" variant="secondary" onPress={loadOffering} />
         </Surface>
@@ -210,8 +211,8 @@ export default function Paywall() {
       </FadeIn>
 
       {error && (
-        <View style={{ backgroundColor: withAlpha(colors.critical, "22"), borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.md }}>
-          <Text style={{ color: colors.critical, textAlign: "center", fontSize: 13 }}>{error}</Text>
+        <View style={{ backgroundColor: withAlpha(colors.suspicious, "18"), borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.md }}>
+          <Text style={{ color: colors.textMuted, textAlign: "center", fontSize: 13 }}>{error}</Text>
         </View>
       )}
 

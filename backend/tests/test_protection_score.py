@@ -13,6 +13,8 @@ from sqlalchemy.pool import StaticPool
 
 from app.db.session import Base, get_db
 from app.main import app
+from app.models.models import Notification, RiskLevel, RiskReport, ScanHistory, ScanType
+from app.services.monitoring import run_scan_pattern_monitor
 
 engine = create_engine(
     "sqlite+pysqlite:///:memory:",
@@ -105,3 +107,23 @@ def test_trends_reflect_high_risk_scans():
 
 def test_trends_requires_auth():
     assert client.get("/api/v1/community/trends").status_code == 401
+
+
+def test_high_risk_followup_is_deduped_per_scan():
+    headers = _auth()
+    user = client.get("/api/v1/auth/me", headers=headers).json()
+    db = TestingSession()
+    try:
+        scan = ScanHistory(user_id=user["id"], scan_type=ScanType.message, raw_input="urgent payment link")
+        db.add(scan)
+        db.flush()
+        db.add(RiskReport(scan_id=scan.id, risk_score=90, risk_level=RiskLevel.high))
+        db.commit()
+
+        assert run_scan_pattern_monitor(db) >= 1
+        db.commit()
+        assert run_scan_pattern_monitor(db) == 0
+        db.commit()
+        assert db.query(Notification).filter(Notification.user_id == user["id"], Notification.scan_id == scan.id).count() == 1
+    finally:
+        db.close()

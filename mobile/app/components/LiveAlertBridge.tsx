@@ -84,6 +84,13 @@ export function LiveAlertBridge() {
 
   if (!alert) return null;
 
+  const dismissAlert = () => {
+    const current = alert;
+    setAlert(null);
+    if (current) ShieldAPI.markNotificationRead(current.id).catch(() => {});
+    queryClient.invalidateQueries({ queryKey: ["notifications"] });
+  };
+
   return (
     <Animated.View
       pointerEvents="box-none"
@@ -98,7 +105,7 @@ export function LiveAlertBridge() {
     >
       <Pressable
         onPress={() => {
-          setAlert(null);
+          dismissAlert();
           if (alert.scan_id) router.push(`/result?id=${alert.scan_id}`);
           else router.push("/notifications");
         }}
@@ -125,6 +132,16 @@ export function LiveAlertBridge() {
           <Text style={{ color: colors.text, fontWeight: "900", fontSize: 14 }} numberOfLines={1}>{alert.title}</Text>
           <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }} numberOfLines={2}>{alert.body}</Text>
         </View>
+        <Pressable
+          onPress={(event) => {
+            event.stopPropagation();
+            dismissAlert();
+          }}
+          hitSlop={10}
+          style={{ padding: 4 }}
+        >
+          <Ionicons name="close" size={18} color={colors.textMuted} />
+        </Pressable>
         <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
       </Pressable>
     </Animated.View>

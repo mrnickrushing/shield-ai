@@ -40,7 +40,7 @@ const TOPICS: { key: keyof NotificationSettings["topics"]; label: string; descri
   { key: "community", label: "Community intel", description: "Analyst-approved scam patterns in your watch areas.", icon: "radio-outline" },
 ];
 
-function NotifItem({ item, onPress }: { item: Notification; onPress: () => void }) {
+function NotifItem({ item, onPress, onClear }: { item: Notification; onPress: () => void; onClear: () => void }) {
   return (
     <Surface
       onPress={onPress}
@@ -62,6 +62,16 @@ function NotifItem({ item, onPress }: { item: Notification; onPress: () => void 
           {new Date(item.created_at).toLocaleString()}
         </Text>
       </View>
+      <Pressable
+        onPress={(event) => {
+          event.stopPropagation();
+          onClear();
+        }}
+        hitSlop={10}
+        style={{ padding: 4 }}
+      >
+        <Ionicons name="close" size={18} color={colors.textMuted} />
+      </Pressable>
     </Surface>
   );
 }
@@ -148,6 +158,11 @@ export default function NotificationsScreen() {
 
   const markAllRead = useMutation({
     mutationFn: () => ShieldAPI.markAllNotificationsRead(),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["notifications"] }),
+  });
+
+  const clearNotification = useMutation({
+    mutationFn: (id: string) => ShieldAPI.deleteNotification(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["notifications"] }),
   });
 
@@ -250,7 +265,7 @@ export default function NotificationsScreen() {
         contentContainerStyle={{ padding: spacing.md, paddingBottom: spacing.xxl }}
         renderItem={({ item, index }) => (
           <FadeIn delay={Math.min(index, 6) * 40}>
-            <NotifItem item={item} onPress={() => handlePress(item)} />
+            <NotifItem item={item} onPress={() => handlePress(item)} onClear={() => clearNotification.mutate(item.id)} />
           </FadeIn>
         )}
         ListEmptyComponent={

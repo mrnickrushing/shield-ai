@@ -456,6 +456,8 @@ export const ShieldAPI = {
     api.post(`/notifications/${id}/read`),
   markAllNotificationsRead: () =>
     api.post("/notifications/read-all"),
+  deleteNotification: (id: string) =>
+    api.delete(`/notifications/${id}`),
 
   // Recovery wizard
   getWizardSteps: (incident_type: string) =>
