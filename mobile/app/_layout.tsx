@@ -101,6 +101,7 @@ export default function RootLayout() {
         <Stack.Screen name="lesson" options={{ title: "Lesson" }} />
         <Stack.Screen name="family" options={{ title: "Family Protection" }} />
         <Stack.Screen name="community" options={{ title: "Community Intel" }} />
+        <Stack.Screen name="call-protection" options={{ title: "Call & Text Protection" }} />
         <Stack.Screen name="notifications" options={{ title: "Notifications" }} />
         <Stack.Screen name="identity" options={{ title: "Identity Protection" }} />
         <Stack.Screen name="exposure" options={{ title: "Data Broker Exposure" }} />

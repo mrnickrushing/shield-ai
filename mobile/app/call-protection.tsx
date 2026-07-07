@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
-import { Linking, Platform, Pressable, ScrollView, Text, View } from "react-native";
+import { Alert, Linking, Platform, Pressable, ScrollView, Text, View } from "react-native";
 
 import { Button, Eyebrow, FadeIn, Surface } from "@/components/ui";
 import { openCallDirectorySettings, syncCallProtection } from "@/lib/callDirectorySync";
@@ -47,24 +47,27 @@ export default function CallProtectionScreen() {
   const syncMutation = useMutation({
     // One tap refreshes both offline blocklists: scam numbers for the call
     // directory and flagged domains for the Safari extension.
-    mutationFn: async () => {
+    mutationFn: async (opts?: { silent?: boolean }) => {
       const [calls] = await Promise.all([
         syncCallProtection(),
         syncSafariBlocklist().catch(() => null),
       ]);
-      return calls;
+      return { ...calls, silent: opts?.silent ?? false };
     },
     onSuccess: (result) => {
       if (result.synced) {
         setLastSyncedAt(new Date());
         setProtectedCount(result.count);
+        if (!result.silent) {
+          Alert.alert("Synced", `${result.count} number${result.count === 1 ? "" : "s"} protected.`);
+        }
       }
     },
   });
 
   useEffect(() => {
-    syncMutation.mutate();
-    // Sync once when the screen opens; the manual button covers the rest.
+    syncMutation.mutate({ silent: true });
+    // Sync silently when the screen opens; the manual button confirms with an alert.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -141,7 +144,7 @@ export default function CallProtectionScreen() {
                 <Button
                   label="Sync Now"
                   icon="refresh-outline"
-                  onPress={() => syncMutation.mutate()}
+                  onPress={() => syncMutation.mutate({})}
                   loading={syncMutation.isPending}
                   variant="secondary"
                 />
