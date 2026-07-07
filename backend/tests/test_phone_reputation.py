@@ -84,6 +84,27 @@ def test_seed_loader_is_idempotent_and_entries_reach_sync():
     assert body["version"] != "0"
 
 
+def test_seed_loader_retires_numbers_missing_from_snapshot():
+    from app.models.models import SeededScamNumber
+    from app.services.phone_seed import seed_scam_numbers
+
+    from tests.test_smoke import TestingSession
+
+    db = TestingSession()
+    try:
+        # A feed-sourced number that isn't in the bundled snapshot (invalid
+        # exchange, so the generator could never emit it) must get retired.
+        stale = SeededScamNumber(number="19111111111", source="fcc_complaints")
+        db.add(stale)
+        db.commit()
+
+        seed_scam_numbers(db)
+        db.refresh(stale)
+        assert stale.is_active is False
+    finally:
+        db.close()
+
+
 def test_community_label_overrides_seed_label():
     from app.models.models import SeededScamNumber
 

@@ -3,8 +3,10 @@
 The snapshot (app/data/scam_number_seed.json) is generated offline by
 scripts/generate_phone_seed.py from FCC consumer-complaint data and committed
 to the repo, so every deploy ships a working feed with no runtime dependency
-on the FCC API. Seeding is idempotent: numbers already in the table are left
-untouched (an admin may have deactivated one), new numbers are inserted.
+on the FCC API. Seeding is idempotent: new snapshot numbers are inserted,
+feed-sourced numbers that dropped out of the snapshot are deactivated (caller
+IDs rotate, and a number may turn out to be a spoofed legitimate line), and
+numbers still present are left untouched so an admin deactivation sticks.
 """
 from __future__ import annotations
 
@@ -19,8 +21,8 @@ _SEED_PATH = Path(__file__).resolve().parents[1] / "data" / "scam_number_seed.js
 
 
 def seed_scam_numbers(db: Session) -> int:
-    """Insert snapshot numbers that aren't in the table yet. Returns how many
-    rows were added."""
+    """Reconcile the table with the bundled snapshot. Returns how many rows
+    were added."""
     if not _SEED_PATH.exists():
         return 0
 
@@ -29,7 +31,9 @@ def seed_scam_numbers(db: Session) -> int:
     if not entries:
         return 0
 
+    snapshot_numbers = {e["number"] for e in entries if e.get("number")}
     existing = {n for (n,) in db.query(SeededScamNumber.number).all()}
+
     added = 0
     for entry in entries:
         number = entry.get("number", "")
@@ -44,6 +48,17 @@ def seed_scam_numbers(db: Session) -> int:
             )
         )
         added += 1
-    if added:
+
+    retired = (
+        db.query(SeededScamNumber)
+        .filter(
+            SeededScamNumber.source == "fcc_complaints",
+            SeededScamNumber.is_active.is_(True),
+            SeededScamNumber.number.notin_(snapshot_numbers),
+        )
+        .update({"is_active": False}, synchronize_session=False)
+    )
+
+    if added or retired:
         db.commit()
     return added

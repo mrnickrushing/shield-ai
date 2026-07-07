@@ -19,10 +19,10 @@ from __future__ import annotations
 import json
 import re
 import sys
-import urllib.parse
-import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+
+import httpx
 
 DATASET_URL = "https://opendata.fcc.gov/resource/vakf-fz8e.json"
 LOOKBACK_DAYS = 548  # ~18 months: stale caller IDs rotate out of use quickly
@@ -68,9 +68,9 @@ def fetch_complaint_counts() -> list[tuple[str, int]]:
         "$order": "cnt DESC",
         "$limit": str(MAX_ENTRIES * 3),  # headroom for rows filtered below
     }
-    url = f"{DATASET_URL}?{urllib.parse.urlencode(params)}"
-    with urllib.request.urlopen(url, timeout=60) as resp:
-        rows = json.load(resp)
+    resp = httpx.get(DATASET_URL, params=params, timeout=60)
+    resp.raise_for_status()
+    rows = resp.json()
 
     counts: list[tuple[str, int]] = []
     for row in rows:
