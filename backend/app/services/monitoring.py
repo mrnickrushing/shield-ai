@@ -153,6 +153,20 @@ def monitor_identity_target(db: Session, target: MonitoredIdentity) -> bool:
     return False
 
 
+def check_identity_target(db: Session, target: MonitoredIdentity) -> bool:
+    pref = preferences_for(db, target.user_id)
+    if pref and not pref.proactive_monitoring:
+        target.last_status = "paused"
+        target.last_checked_at = datetime.now(timezone.utc)
+        return False
+    try:
+        return monitor_identity_target(db, target)
+    except Exception:
+        target.last_status = "unavailable"
+        target.last_checked_at = datetime.now(timezone.utc)
+        return False
+
+
 def _identity_alert_exists(db: Session, target: MonitoredIdentity, alert_type: str) -> bool:
     return bool(
         db.query(IdentityAlert)
@@ -332,12 +346,7 @@ def run_identity_monitors(db: Session, max_age_hours: int = 24) -> int:
     )
     alerts = 0
     for target in targets:
-        pref = preferences_for(db, target.user_id)
-        if pref and not pref.proactive_monitoring:
-            target.last_status = "paused"
-            target.last_checked_at = datetime.now(timezone.utc)
-            continue
-        if monitor_identity_target(db, target):
+        if check_identity_target(db, target):
             alerts += 1
     return alerts
 

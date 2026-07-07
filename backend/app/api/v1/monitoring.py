@@ -69,6 +69,9 @@ def add_target(payload: MonitoredIdentityCreate, db: Session = Depends(get_db), 
         db.rollback()
         raise HTTPException(status.HTTP_409_CONFLICT, "This target is already monitored")
     db.refresh(target)
+    monitoring.check_identity_target(db, target)
+    db.commit()
+    db.refresh(target)
     return target
 
 
