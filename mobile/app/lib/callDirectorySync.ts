@@ -1,11 +1,12 @@
 import { requireNativeModule } from "expo-modules-core";
-import { Platform } from "react-native";
+import { Linking, Platform } from "react-native";
 
 import { PhoneReputationEntry, ShieldAPI } from "@/lib/api";
 
 type CallDirectorySyncNativeModule = {
   writeBlocklistSnapshot: (entries: PhoneReputationEntry[]) => Promise<boolean>;
   reloadCallDirectoryExtension: () => Promise<boolean>;
+  openCallDirectorySettings: () => Promise<boolean>;
 };
 
 function getNativeModule(): CallDirectorySyncNativeModule | null {
@@ -24,6 +25,20 @@ export type CallProtectionSyncResult = {
   count: number;
   version: string;
 };
+
+/** Opens Settings → Phone → Call Blocking & Identification directly via CallKit's public API. */
+export async function openCallDirectorySettings(): Promise<void> {
+  const native = getNativeModule();
+  if (!native) {
+    Linking.openSettings();
+    return;
+  }
+  try {
+    await native.openCallDirectorySettings();
+  } catch {
+    Linking.openSettings();
+  }
+}
 
 export async function syncCallProtection(): Promise<CallProtectionSyncResult> {
   const native = getNativeModule();

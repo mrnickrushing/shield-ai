@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
+  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -49,12 +50,16 @@ export default function IdentityScreen() {
     staleTime: 60_000,
   });
 
+  const showError = (title: string, e: any) =>
+    Alert.alert(title, e?.response?.data?.detail ?? "Something went wrong. Please try again.");
+
   const breachMutation = useMutation({
     mutationFn: () => ShieldAPI.breachCheck(email.trim()),
     onSuccess: (data) => {
       setBreachResult(data);
       queryClient.invalidateQueries({ queryKey: ["identity-alerts"] });
     },
+    onError: (e) => showError("Breach check failed", e),
   });
 
   const pwndMutation = useMutation({
@@ -63,6 +68,7 @@ export default function IdentityScreen() {
       setPwndResult(data);
       setPassword("");
     },
+    onError: (e) => showError("Password check failed", e),
   });
 
   const markRead = useMutation({
@@ -75,10 +81,18 @@ export default function IdentityScreen() {
       setMonitorTarget("");
       queryClient.invalidateQueries({ queryKey: ["monitoring-targets"] });
     },
+    onError: (e: any) =>
+      e?.response?.status === 402
+        ? Alert.alert(
+            "Premium required",
+            "Monitoring more than one email, or monitoring phone numbers, usernames, and domains, requires Shield AI Premium."
+          )
+        : showError("Couldn't add monitor", e),
   });
   const removeMonitor = useMutation({
     mutationFn: (id: string) => ShieldAPI.removeMonitoringTarget(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["monitoring-targets"] }),
+    onError: (e) => showError("Couldn't remove monitor", e),
   });
 
   const inputStyle = {

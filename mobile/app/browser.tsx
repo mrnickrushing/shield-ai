@@ -42,6 +42,12 @@ function hostOf(url: string): string {
   }
 }
 
+// "google.com" vs "www.google.com" should count as the same site so a plain
+// canonicalization redirect doesn't get treated as an unverified navigation.
+function baseDomain(host: string): string {
+  return host.toLowerCase().replace(/^www\./, "");
+}
+
 type PageState = {
   url: string;
   verdict: UrlVerdict["verdict"] | "unverified";
@@ -128,6 +134,16 @@ export default function BrowserScreen() {
         return true;
       }
       if (overrides.current.has(url)) return true;
+
+      // Same-site redirect (e.g. bare domain → www, or http → https
+      // canonicalization) — the destination is already covered by the
+      // check we just ran, so let it through instead of cancelling the
+      // in-flight navigation and forcing a fresh reload.
+      if (page && baseDomain(hostOf(url)) === baseDomain(hostOf(page.url))) {
+        setPage({ url, verdict: page.verdict, reason: page.reason });
+        setInputUrl(url);
+        return true;
+      }
 
       // Unknown or dangerous: hold the navigation, check it, then decide.
       navigateTo(url);
