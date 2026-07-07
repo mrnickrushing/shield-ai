@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user
 from app.core.config import settings
 from app.db.session import get_db
-from app.models.models import PhoneScan, RiskReport, ScanHistory, RiskLevel, User
+from app.models.models import PhoneScan, RiskReport, ScanHistory, RiskLevel, SeededScamNumber, User
 from app.schemas.schemas import PhoneReputationEntry, PhoneReputationSyncOut
 
 router = APIRouter(prefix="/phone-reputation", tags=["phone-reputation"])
@@ -59,8 +59,17 @@ def sync_phone_reputation(
         .all()
     )
 
-    entries: dict[str, str] = {}
-    latest_seen = None
+    # Externally-seeded numbers (FCC complaint feed) fill the list before the
+    # community reaches the corroboration threshold; corroborated community
+    # entries below overwrite the seed's softer label.
+    seeds = (
+        db.query(SeededScamNumber)
+        .filter(SeededScamNumber.is_active.is_(True))
+        .all()
+    )
+    entries: dict[str, str] = {seed.number: seed.label for seed in seeds}
+    latest_seen = max((seed.created_at for seed in seeds), default=None)
+
     for number, category, _reporters, last_seen in rows:
         entries[_to_e164_digits(number)] = _CATEGORY_LABELS.get(category, _DEFAULT_LABEL)
         if latest_seen is None or (last_seen and last_seen > latest_seen):

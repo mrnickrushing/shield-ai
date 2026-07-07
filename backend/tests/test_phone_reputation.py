@@ -59,3 +59,72 @@ def test_sync_includes_number_once_reporter_threshold_met():
 def test_sync_endpoint_requires_auth():
     r = client.get("/api/v1/phone-reputation/sync")
     assert r.status_code in (401, 403)
+
+
+def test_seed_loader_is_idempotent_and_entries_reach_sync():
+    from app.services.phone_seed import seed_scam_numbers
+
+    from tests.test_smoke import TestingSession
+
+    db = TestingSession()
+    try:
+        added_first = seed_scam_numbers(db)
+        assert added_first > 0
+        assert seed_scam_numbers(db) == 0  # second run inserts nothing
+    finally:
+        db.close()
+
+    headers = _register_and_scan("212-555-0199")["headers"]
+    r = client.get("/api/v1/phone-reputation/sync", headers=headers)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    labels = {e["label"] for e in body["entries"]}
+    assert "Spam Risk" in labels
+    assert len(body["entries"]) >= added_first
+    assert body["version"] != "0"
+
+
+def test_seed_loader_retires_numbers_missing_from_snapshot():
+    from app.models.models import SeededScamNumber
+    from app.services.phone_seed import seed_scam_numbers
+
+    from tests.test_smoke import TestingSession
+
+    db = TestingSession()
+    try:
+        # A feed-sourced number that isn't in the bundled snapshot (invalid
+        # exchange, so the generator could never emit it) must get retired.
+        stale = SeededScamNumber(number="19111111111", source="fcc_complaints")
+        db.add(stale)
+        db.commit()
+
+        seed_scam_numbers(db)
+        db.refresh(stale)
+        assert stale.is_active is False
+    finally:
+        db.close()
+
+
+def test_community_label_overrides_seed_label():
+    from app.models.models import SeededScamNumber
+
+    from tests.test_smoke import TestingSession
+
+    # Seed the same number that community corroboration will flag as high risk.
+    number = "900-090-0090"
+    db = TestingSession()
+    try:
+        if not db.query(SeededScamNumber).filter_by(number="19000900090").first():
+            db.add(SeededScamNumber(number="19000900090", label="Spam Risk"))
+            db.commit()
+    finally:
+        db.close()
+
+    last_headers = None
+    for _ in range(settings.PHONE_BLOCKLIST_MIN_REPORTERS):
+        last_headers = _register_and_scan(number)["headers"]
+
+    r = client.get("/api/v1/phone-reputation/sync", headers=last_headers)
+    assert r.status_code == 200, r.text
+    entries = {e["number"]: e["label"] for e in r.json()["entries"]}
+    assert entries["19000900090"] == "Scam Likely"

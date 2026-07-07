@@ -15,6 +15,19 @@ _RATE_LIMIT_BUCKETS: dict[str, list[float]] = {}
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     validate_runtime_settings()
+    try:
+        from app.db.session import SessionLocal
+        from app.services.phone_seed import seed_scam_numbers
+
+        db = SessionLocal()
+        try:
+            added = seed_scam_numbers(db)
+            if added:
+                print(f"[startup] seeded {added} scam numbers from bundled feed")
+        finally:
+            db.close()
+    except Exception as exc:  # seeding must never block the server from booting
+        print(f"[startup] scam-number seeding skipped: {exc}")
     yield
 
 

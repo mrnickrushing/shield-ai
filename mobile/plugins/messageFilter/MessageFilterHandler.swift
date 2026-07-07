@@ -55,6 +55,12 @@ extension MessageFilterHandler: ILMessageFilterQueryHandling {
     let label: String
   }
 
+  // Labels strong enough to hide a text outright. The snapshot also carries
+  // lower-confidence "Spam Risk" entries seeded from FCC complaint data —
+  // those only label incoming calls; texts from them still go through the
+  // network verdict so a spoofed legitimate number never junks SMS offline.
+  private static let junkWorthyLabels: Set<String> = ["Scam Likely", "Reported Spam"]
+
   private func senderIsKnownScammer(_ sender: String?) -> Bool {
     guard let sender = sender, !sender.isEmpty else { return false }
     let digits = sender.filter(\.isNumber)
@@ -70,6 +76,6 @@ extension MessageFilterHandler: ILMessageFilterQueryHandling {
       let entries = try? JSONDecoder().decode([SnapshotEntry].self, from: data)
     else { return false }
 
-    return entries.contains { $0.number == digits }
+    return entries.contains { $0.number == digits && Self.junkWorthyLabels.contains($0.label) }
   }
 }
