@@ -564,6 +564,22 @@ class CommunityReport(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
 
+class SeededScamNumber(Base):
+    """Known-bad phone numbers from external feeds (e.g. FCC complaint data),
+    giving Call Protection a non-empty blocklist before community reports
+    reach the corroboration threshold. Numbers are E.164 digits without '+'."""
+
+    __tablename__ = "seeded_scam_numbers"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    number: Mapped[str] = mapped_column(String, unique=True, index=True)
+    label: Mapped[str] = mapped_column(String, default="Spam Risk")
+    source: Mapped[str] = mapped_column(String, default="fcc_complaints")
+    report_count: Mapped[int] = mapped_column(Integer, default=0)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
 class ScamPattern(Base):
     __tablename__ = "scam_patterns"
 

@@ -1,0 +1,847 @@
+{
+  "generated_at": "2026-07-07T09:47:12.557729+00:00",
+  "source": "FCC Consumer Complaints Data (opendata.fcc.gov/resource/vakf-fz8e)",
+  "label": "Spam Risk",
+  "entries": [
+    {
+      "number": "18507249379",
+      "label": "Spam Risk",
+      "report_count": 42
+    },
+    {
+      "number": "18885306830",
+      "label": "Spam Risk",
+      "report_count": 38
+    },
+    {
+      "number": "12162432260",
+      "label": "Spam Risk",
+      "report_count": 24
+    },
+    {
+      "number": "14142609843",
+      "label": "Spam Risk",
+      "report_count": 24
+    },
+    {
+      "number": "18004365244",
+      "label": "Spam Risk",
+      "report_count": 23
+    },
+    {
+      "number": "18772002515",
+      "label": "Spam Risk",
+      "report_count": 21
+    },
+    {
+      "number": "19163223350",
+      "label": "Spam Risk",
+      "report_count": 20
+    },
+    {
+      "number": "16502030000",
+      "label": "Spam Risk",
+      "report_count": 20
+    },
+    {
+      "number": "17734667206",
+      "label": "Spam Risk",
+      "report_count": 20
+    },
+    {
+      "number": "18776137414",
+      "label": "Spam Risk",
+      "report_count": 19
+    },
+    {
+      "number": "15138312600",
+      "label": "Spam Risk",
+      "report_count": 19
+    },
+    {
+      "number": "17734669282",
+      "label": "Spam Risk",
+      "report_count": 18
+    },
+    {
+      "number": "18332258017",
+      "label": "Spam Risk",
+      "report_count": 18
+    },
+    {
+      "number": "16076069322",
+      "label": "Spam Risk",
+      "report_count": 18
+    },
+    {
+      "number": "18774196664",
+      "label": "Spam Risk",
+      "report_count": 18
+    },
+    {
+      "number": "18669308034",
+      "label": "Spam Risk",
+      "report_count": 16
+    },
+    {
+      "number": "18336625740",
+      "label": "Spam Risk",
+      "report_count": 15
+    },
+    {
+      "number": "12164282570",
+      "label": "Spam Risk",
+      "report_count": 15
+    },
+    {
+      "number": "12317867386",
+      "label": "Spam Risk",
+      "report_count": 15
+    },
+    {
+      "number": "18553572205",
+      "label": "Spam Risk",
+      "report_count": 15
+    },
+    {
+      "number": "18553572005",
+      "label": "Spam Risk",
+      "report_count": 14
+    },
+    {
+      "number": "14048064811",
+      "label": "Spam Risk",
+      "report_count": 14
+    },
+    {
+      "number": "15135997464",
+      "label": "Spam Risk",
+      "report_count": 14
+    },
+    {
+      "number": "18773532170",
+      "label": "Spam Risk",
+      "report_count": 12
+    },
+    {
+      "number": "13029273338",
+      "label": "Spam Risk",
+      "report_count": 12
+    },
+    {
+      "number": "18882694978",
+      "label": "Spam Risk",
+      "report_count": 12
+    },
+    {
+      "number": "18889346489",
+      "label": "Spam Risk",
+      "report_count": 11
+    },
+    {
+      "number": "18775781940",
+      "label": "Spam Risk",
+      "report_count": 11
+    },
+    {
+      "number": "18337220416",
+      "label": "Spam Risk",
+      "report_count": 11
+    },
+    {
+      "number": "18774558569",
+      "label": "Spam Risk",
+      "report_count": 11
+    },
+    {
+      "number": "19165183100",
+      "label": "Spam Risk",
+      "report_count": 11
+    },
+    {
+      "number": "18775781953",
+      "label": "Spam Risk",
+      "report_count": 11
+    },
+    {
+      "number": "18777708125",
+      "label": "Spam Risk",
+      "report_count": 10
+    },
+    {
+      "number": "18669145806",
+      "label": "Spam Risk",
+      "report_count": 10
+    },
+    {
+      "number": "18334470376",
+      "label": "Spam Risk",
+      "report_count": 10
+    },
+    {
+      "number": "18552933726",
+      "label": "Spam Risk",
+      "report_count": 10
+    },
+    {
+      "number": "18775569255",
+      "label": "Spam Risk",
+      "report_count": 10
+    },
+    {
+      "number": "18444190664",
+      "label": "Spam Risk",
+      "report_count": 10
+    },
+    {
+      "number": "12067389845",
+      "label": "Spam Risk",
+      "report_count": 10
+    },
+    {
+      "number": "17739488586",
+      "label": "Spam Risk",
+      "report_count": 10
+    },
+    {
+      "number": "17712200691",
+      "label": "Spam Risk",
+      "report_count": 10
+    },
+    {
+      "number": "15173765025",
+      "label": "Spam Risk",
+      "report_count": 10
+    },
+    {
+      "number": "19893432000",
+      "label": "Spam Risk",
+      "report_count": 9
+    },
+    {
+      "number": "12027690589",
+      "label": "Spam Risk",
+      "report_count": 9
+    },
+    {
+      "number": "18554197365",
+      "label": "Spam Risk",
+      "report_count": 9
+    },
+    {
+      "number": "12163613312",
+      "label": "Spam Risk",
+      "report_count": 9
+    },
+    {
+      "number": "18666540348",
+      "label": "Spam Risk",
+      "report_count": 9
+    },
+    {
+      "number": "12764558493",
+      "label": "Spam Risk",
+      "report_count": 9
+    },
+    {
+      "number": "18889050296",
+      "label": "Spam Risk",
+      "report_count": 9
+    },
+    {
+      "number": "12096554105",
+      "label": "Spam Risk",
+      "report_count": 9
+    },
+    {
+      "number": "18664503339",
+      "label": "Spam Risk",
+      "report_count": 8
+    },
+    {
+      "number": "18773369776",
+      "label": "Spam Risk",
+      "report_count": 8
+    },
+    {
+      "number": "18888447979",
+      "label": "Spam Risk",
+      "report_count": 8
+    },
+    {
+      "number": "18669590957",
+      "label": "Spam Risk",
+      "report_count": 8
+    },
+    {
+      "number": "18449593714",
+      "label": "Spam Risk",
+      "report_count": 8
+    },
+    {
+      "number": "18009909130",
+      "label": "Spam Risk",
+      "report_count": 8
+    },
+    {
+      "number": "18336625708",
+      "label": "Spam Risk",
+      "report_count": 8
+    },
+    {
+      "number": "19162632382",
+      "label": "Spam Risk",
+      "report_count": 7
+    },
+    {
+      "number": "18444873324",
+      "label": "Spam Risk",
+      "report_count": 7
+    },
+    {
+      "number": "18007508694",
+      "label": "Spam Risk",
+      "report_count": 7
+    },
+    {
+      "number": "18005318722",
+      "label": "Spam Risk",
+      "report_count": 7
+    },
+    {
+      "number": "19146888340",
+      "label": "Spam Risk",
+      "report_count": 7
+    },
+    {
+      "number": "12482908371",
+      "label": "Spam Risk",
+      "report_count": 7
+    },
+    {
+      "number": "14805512700",
+      "label": "Spam Risk",
+      "report_count": 7
+    },
+    {
+      "number": "18777903487",
+      "label": "Spam Risk",
+      "report_count": 7
+    },
+    {
+      "number": "15134400668",
+      "label": "Spam Risk",
+      "report_count": 7
+    },
+    {
+      "number": "15013164357",
+      "label": "Spam Risk",
+      "report_count": 7
+    },
+    {
+      "number": "18334131238",
+      "label": "Spam Risk",
+      "report_count": 7
+    },
+    {
+      "number": "18442069035",
+      "label": "Spam Risk",
+      "report_count": 7
+    },
+    {
+      "number": "13804445743",
+      "label": "Spam Risk",
+      "report_count": 7
+    },
+    {
+      "number": "19302050904",
+      "label": "Spam Risk",
+      "report_count": 7
+    },
+    {
+      "number": "18666223911",
+      "label": "Spam Risk",
+      "report_count": 7
+    },
+    {
+      "number": "18885618714",
+      "label": "Spam Risk",
+      "report_count": 7
+    },
+    {
+      "number": "18018014063",
+      "label": "Spam Risk",
+      "report_count": 7
+    },
+    {
+      "number": "12029889467",
+      "label": "Spam Risk",
+      "report_count": 7
+    },
+    {
+      "number": "14076127120",
+      "label": "Spam Risk",
+      "report_count": 7
+    },
+    {
+      "number": "16363238122",
+      "label": "Spam Risk",
+      "report_count": 7
+    },
+    {
+      "number": "18668780828",
+      "label": "Spam Risk",
+      "report_count": 7
+    },
+    {
+      "number": "12357770098",
+      "label": "Spam Risk",
+      "report_count": 7
+    },
+    {
+      "number": "17049371228",
+      "label": "Spam Risk",
+      "report_count": 6
+    },
+    {
+      "number": "18445151257",
+      "label": "Spam Risk",
+      "report_count": 6
+    },
+    {
+      "number": "19494683980",
+      "label": "Spam Risk",
+      "report_count": 6
+    },
+    {
+      "number": "14137363111",
+      "label": "Spam Risk",
+      "report_count": 6
+    },
+    {
+      "number": "18446518694",
+      "label": "Spam Risk",
+      "report_count": 6
+    },
+    {
+      "number": "15136211384",
+      "label": "Spam Risk",
+      "report_count": 6
+    },
+    {
+      "number": "16622553743",
+      "label": "Spam Risk",
+      "report_count": 6
+    },
+    {
+      "number": "14193594586",
+      "label": "Spam Risk",
+      "report_count": 6
+    },
+    {
+      "number": "18777668523",
+      "label": "Spam Risk",
+      "report_count": 6
+    },
+    {
+      "number": "18333035223",
+      "label": "Spam Risk",
+      "report_count": 6
+    },
+    {
+      "number": "17712432141",
+      "label": "Spam Risk",
+      "report_count": 6
+    },
+    {
+      "number": "17712430501",
+      "label": "Spam Risk",
+      "report_count": 6
+    },
+    {
+      "number": "18883821222",
+      "label": "Spam Risk",
+      "report_count": 6
+    },
+    {
+      "number": "14433280872",
+      "label": "Spam Risk",
+      "report_count": 6
+    },
+    {
+      "number": "18006771569",
+      "label": "Spam Risk",
+      "report_count": 6
+    },
+    {
+      "number": "14254945690",
+      "label": "Spam Risk",
+      "report_count": 6
+    },
+    {
+      "number": "17208210485",
+      "label": "Spam Risk",
+      "report_count": 6
+    },
+    {
+      "number": "16502155272",
+      "label": "Spam Risk",
+      "report_count": 6
+    },
+    {
+      "number": "19032721360",
+      "label": "Spam Risk",
+      "report_count": 6
+    },
+    {
+      "number": "19179249941",
+      "label": "Spam Risk",
+      "report_count": 6
+    },
+    {
+      "number": "18008489380",
+      "label": "Spam Risk",
+      "report_count": 6
+    },
+    {
+      "number": "14137282769",
+      "label": "Spam Risk",
+      "report_count": 6
+    },
+    {
+      "number": "17712430598",
+      "label": "Spam Risk",
+      "report_count": 6
+    },
+    {
+      "number": "16562196586",
+      "label": "Spam Risk",
+      "report_count": 6
+    },
+    {
+      "number": "18779100501",
+      "label": "Spam Risk",
+      "report_count": 6
+    },
+    {
+      "number": "19544958398",
+      "label": "Spam Risk",
+      "report_count": 6
+    },
+    {
+      "number": "18442792535",
+      "label": "Spam Risk",
+      "report_count": 6
+    },
+    {
+      "number": "17712491682",
+      "label": "Spam Risk",
+      "report_count": 6
+    },
+    {
+      "number": "18339495764",
+      "label": "Spam Risk",
+      "report_count": 6
+    },
+    {
+      "number": "18338620724",
+      "label": "Spam Risk",
+      "report_count": 6
+    },
+    {
+      "number": "18559090815",
+      "label": "Spam Risk",
+      "report_count": 6
+    },
+    {
+      "number": "19497266039",
+      "label": "Spam Risk",
+      "report_count": 6
+    },
+    {
+      "number": "18337220401",
+      "label": "Spam Risk",
+      "report_count": 6
+    },
+    {
+      "number": "17207920781",
+      "label": "Spam Risk",
+      "report_count": 6
+    },
+    {
+      "number": "15625432523",
+      "label": "Spam Risk",
+      "report_count": 5
+    },
+    {
+      "number": "13235225478",
+      "label": "Spam Risk",
+      "report_count": 5
+    },
+    {
+      "number": "18552605767",
+      "label": "Spam Risk",
+      "report_count": 5
+    },
+    {
+      "number": "18772477967",
+      "label": "Spam Risk",
+      "report_count": 5
+    },
+    {
+      "number": "14342051510",
+      "label": "Spam Risk",
+      "report_count": 5
+    },
+    {
+      "number": "13013637094",
+      "label": "Spam Risk",
+      "report_count": 5
+    },
+    {
+      "number": "18178685566",
+      "label": "Spam Risk",
+      "report_count": 5
+    },
+    {
+      "number": "12026977928",
+      "label": "Spam Risk",
+      "report_count": 5
+    },
+    {
+      "number": "18666850908",
+      "label": "Spam Risk",
+      "report_count": 5
+    },
+    {
+      "number": "18443812564",
+      "label": "Spam Risk",
+      "report_count": 5
+    },
+    {
+      "number": "18007806451",
+      "label": "Spam Risk",
+      "report_count": 5
+    },
+    {
+      "number": "18056377243",
+      "label": "Spam Risk",
+      "report_count": 5
+    },
+    {
+      "number": "12172179274",
+      "label": "Spam Risk",
+      "report_count": 5
+    },
+    {
+      "number": "14153007282",
+      "label": "Spam Risk",
+      "report_count": 5
+    },
+    {
+      "number": "15089389430",
+      "label": "Spam Risk",
+      "report_count": 5
+    },
+    {
+      "number": "13054886471",
+      "label": "Spam Risk",
+      "report_count": 5
+    },
+    {
+      "number": "18668404246",
+      "label": "Spam Risk",
+      "report_count": 5
+    },
+    {
+      "number": "18334872543",
+      "label": "Spam Risk",
+      "report_count": 5
+    },
+    {
+      "number": "12142275391",
+      "label": "Spam Risk",
+      "report_count": 5
+    },
+    {
+      "number": "18669591584",
+      "label": "Spam Risk",
+      "report_count": 5
+    },
+    {
+      "number": "17135161750",
+      "label": "Spam Risk",
+      "report_count": 5
+    },
+    {
+      "number": "13214996451",
+      "label": "Spam Risk",
+      "report_count": 5
+    },
+    {
+      "number": "16072861358",
+      "label": "Spam Risk",
+      "report_count": 5
+    },
+    {
+      "number": "18652256121",
+      "label": "Spam Risk",
+      "report_count": 5
+    },
+    {
+      "number": "17188930202",
+      "label": "Spam Risk",
+      "report_count": 5
+    },
+    {
+      "number": "17712462267",
+      "label": "Spam Risk",
+      "report_count": 5
+    },
+    {
+      "number": "17207921554",
+      "label": "Spam Risk",
+      "report_count": 5
+    },
+    {
+      "number": "18332615681",
+      "label": "Spam Risk",
+      "report_count": 5
+    },
+    {
+      "number": "18009888019",
+      "label": "Spam Risk",
+      "report_count": 5
+    },
+    {
+      "number": "18888225151",
+      "label": "Spam Risk",
+      "report_count": 5
+    },
+    {
+      "number": "19177647152",
+      "label": "Spam Risk",
+      "report_count": 5
+    },
+    {
+      "number": "17867833666",
+      "label": "Spam Risk",
+      "report_count": 5
+    },
+    {
+      "number": "14106574933",
+      "label": "Spam Risk",
+      "report_count": 5
+    },
+    {
+      "number": "17199367067",
+      "label": "Spam Risk",
+      "report_count": 5
+    },
+    {
+      "number": "12028008688",
+      "label": "Spam Risk",
+      "report_count": 5
+    },
+    {
+      "number": "15626454868",
+      "label": "Spam Risk",
+      "report_count": 5
+    },
+    {
+      "number": "18669591033",
+      "label": "Spam Risk",
+      "report_count": 5
+    },
+    {
+      "number": "17034688642",
+      "label": "Spam Risk",
+      "report_count": 5
+    },
+    {
+      "number": "18778675139",
+      "label": "Spam Risk",
+      "report_count": 5
+    },
+    {
+      "number": "19162632300",
+      "label": "Spam Risk",
+      "report_count": 5
+    },
+    {
+      "number": "12105318722",
+      "label": "Spam Risk",
+      "report_count": 5
+    },
+    {
+      "number": "13039707613",
+      "label": "Spam Risk",
+      "report_count": 5
+    },
+    {
+      "number": "18557684424",
+      "label": "Spam Risk",
+      "report_count": 5
+    },
+    {
+      "number": "14063060254",
+      "label": "Spam Risk",
+      "report_count": 5
+    },
+    {
+      "number": "19292028762",
+      "label": "Spam Risk",
+      "report_count": 5
+    },
+    {
+      "number": "12489889183",
+      "label": "Spam Risk",
+      "report_count": 5
+    },
+    {
+      "number": "16097265282",
+      "label": "Spam Risk",
+      "report_count": 5
+    },
+    {
+      "number": "18583410809",
+      "label": "Spam Risk",
+      "report_count": 5
+    },
+    {
+      "number": "18886099452",
+      "label": "Spam Risk",
+      "report_count": 5
+    },
+    {
+      "number": "14402912200",
+      "label": "Spam Risk",
+      "report_count": 5
+    },
+    {
+      "number": "13184032702",
+      "label": "Spam Risk",
+      "report_count": 5
+    },
+    {
+      "number": "17273491561",
+      "label": "Spam Risk",
+      "report_count": 5
+    },
+    {
+      "number": "19204869994",
+      "label": "Spam Risk",
+      "report_count": 5
+    },
+    {
+      "number": "18772743096",
+      "label": "Spam Risk",
+      "report_count": 5
+    },
+    {
+      "number": "12027099972",
+      "label": "Spam Risk",
+      "report_count": 5
+    }
+  ]
+}

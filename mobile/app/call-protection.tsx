@@ -59,7 +59,12 @@ export default function CallProtectionScreen() {
         setLastSyncedAt(new Date());
         setProtectedCount(result.count);
         if (!result.silent) {
-          Alert.alert("Synced", `${result.count} number${result.count === 1 ? "" : "s"} protected.`);
+          Alert.alert(
+            "Synced",
+            result.count > 0
+              ? `${result.count} number${result.count === 1 ? "" : "s"} protected.`
+              : "Protection is active. The blocklist is still growing — confirmed scam numbers appear automatically."
+          );
         }
       }
     },
@@ -139,6 +144,11 @@ export default function CallProtectionScreen() {
                 {syncFailed ? (
                   <Text style={{ color: colors.suspicious, fontSize: 12, marginBottom: spacing.sm }}>
                     Sync didn&apos;t complete. Check your connection and try again.
+                  </Text>
+                ) : lastSyncedAt && protectedCount === 0 ? (
+                  <Text style={{ color: colors.textMuted, fontSize: 12, marginBottom: spacing.sm }}>
+                    Protection is active — the blocklist is still growing. Confirmed scam numbers
+                    appear here automatically.
                   </Text>
                 ) : null}
                 <Button

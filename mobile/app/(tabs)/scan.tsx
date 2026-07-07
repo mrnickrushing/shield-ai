@@ -16,6 +16,7 @@ import {
 } from "react-native";
 
 import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from "expo-speech-recognition";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { GlowBackground } from "@/components/GlowBackground";
 import { GradientButton } from "@/components/GradientButton";
@@ -327,6 +328,7 @@ function ChoicePill({
 
 export default function ScanScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ type?: string; text?: string }>();
   const [mode, setMode] = useState<ScanMode>((params.type as ScanMode) ?? "link");
   const [loading, setLoading] = useState(false);
@@ -501,7 +503,13 @@ export default function ScanScreen() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <GlowBackground accent={`${colors.primary}30`} centerY={0.12} />
-      <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xl }}>
+      <ScrollView
+        contentContainerStyle={{
+          padding: spacing.lg,
+          paddingTop: insets.top + spacing.sm,
+          paddingBottom: spacing.xl,
+        }}
+      >
         {/* Only reached by push (e.g. Protect's Marketplace/Social lanes) carries
             a type param — the tab bar itself never does, so this never shadows it. */}
         {!!params.type && (
