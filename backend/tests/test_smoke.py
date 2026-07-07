@@ -239,6 +239,8 @@ def test_realtime_monitoring_targets_and_telemetry():
         headers=headers,
     )
     assert target.status_code == 201, target.text
+    assert target.json()["last_checked_at"] is not None
+    assert target.json()["last_status"] != "pending"
     listed = client.get("/api/v1/monitoring/targets", headers=headers)
     assert listed.status_code == 200, listed.text
     assert listed.json()[0]["value"] == "monitor@example.com"
