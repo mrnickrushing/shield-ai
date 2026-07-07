@@ -959,6 +959,41 @@ def test_scam_pattern_crud_admin():
     assert key_owner["total_api_keys"] == 2
     assert key_owner["is_active"] is True
 
+    operations_r = client.get("/api/v1/admin/operations", headers=admin_headers)
+    assert operations_r.status_code == 200, operations_r.text
+    assert "queues" in operations_r.json()
+
+    detail_r = client.get(f"/api/v1/admin/users/{key_user_id}", headers=admin_headers)
+    assert detail_r.status_code == 200, detail_r.text
+    assert detail_r.json()["user"]["id"] == key_user_id
+
+    api_keys_r = client.get("/api/v1/admin/api-keys", headers=admin_headers)
+    assert api_keys_r.status_code == 200, api_keys_r.text
+    active_key = next(k for k in api_keys_r.json() if k["user_id"] == key_user_id and k["is_active"])
+    revoke_key = client.patch(f"/api/v1/admin/api-keys/{active_key['id']}", json={"is_active": False}, headers=admin_headers)
+    assert revoke_key.status_code == 200, revoke_key.text
+
+    disable_keys = client.post(f"/api/v1/admin/users/{key_user_id}/disable-api-keys", headers=admin_headers)
+    assert disable_keys.status_code == 200, disable_keys.text
+
+    test_notification = client.post(
+        "/api/v1/admin/notifications/test",
+        json={"user_id": key_user_id, "title": "Admin smoke", "body": "Notification diagnostics"},
+        headers=admin_headers,
+    )
+    assert test_notification.status_code == 200, test_notification.text
+    notifications_r = client.get("/api/v1/admin/notifications/diagnostics", headers=admin_headers)
+    assert notifications_r.status_code == 200, notifications_r.text
+    assert notifications_r.json()["total_notifications"] >= 1
+
+    subscriptions_r = client.get("/api/v1/admin/subscriptions/diagnostics", headers=admin_headers)
+    assert subscriptions_r.status_code == 200, subscriptions_r.text
+    assert "premium_users" in subscriptions_r.json()
+
+    audit_r = client.get("/api/v1/admin/audit-logs", headers=admin_headers)
+    assert audit_r.status_code == 200, audit_r.text
+    assert any(log["action"].startswith("admin_") for log in audit_r.json())
+
     delete_self = client.delete(f"/api/v1/admin/users/{user_id}", headers=admin_headers)
     assert delete_self.status_code == 400
 

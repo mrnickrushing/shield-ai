@@ -534,14 +534,22 @@ class ScamPatternOut(BaseModel):
 
 class AdminStatsOut(BaseModel):
     total_users: int
+    active_users: int
+    premium_users: int
+    developer_users: int
     total_scans: int
     scans_today: int
+    high_risk_scans: int
+    high_risk_scans_today: int
     open_community_reports: int
     pending_feedback_reviews: int
     active_scam_patterns: int
     active_api_keys: int
     total_api_keys: int
     revoked_api_keys: int
+    unread_notifications: int
+    open_incidents: int
+    monitored_identities: int
 
 
 class AdminUserOut(BaseModel):

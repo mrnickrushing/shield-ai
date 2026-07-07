@@ -6,6 +6,11 @@ import PatternsPage from "./pages/Patterns";
 import ReportsPage from "./pages/Reports";
 import FeedbackPage from "./pages/Feedback";
 import UsersPage from "./pages/Users";
+import UserDetailPage from "./pages/UserDetail";
+import ApiKeysPage from "./pages/ApiKeys";
+import AuditLogsPage from "./pages/AuditLogs";
+import NotificationsOpsPage from "./pages/NotificationsOps";
+import SubscriptionsPage from "./pages/Subscriptions";
 import MarketingPage from "./pages/Marketing";
 import SupportPage from "./pages/Support";
 import TermsPage from "./pages/Terms";
@@ -100,6 +105,10 @@ function AdminLayout({ onLogout, children }: { onLogout: () => void; children: R
         <NavItem to="/admin/feedback" label="Feedback Review" />
         <NavItem to="/admin/patterns" label="Scam Patterns" />
         <NavItem to="/admin/users" label="Users" />
+        <NavItem to="/admin/api-keys" label="API Keys" />
+        <NavItem to="/admin/notifications" label="Notification Ops" />
+        <NavItem to="/admin/subscriptions" label="Subscriptions" />
+        <NavItem to="/admin/audit-logs" label="Audit Logs" />
         <div style={{ marginTop: 32, borderTop: `1px solid ${C.border}`, paddingTop: 16 }}>
           <Link to="/" style={{ display: "block", color: C.muted, textDecoration: "none", fontSize: 13, padding: "4px 16px", marginBottom: 4 }}>
             ← Marketing Site
@@ -159,6 +168,11 @@ function AdminApp() {
         <Route path="feedback" element={<FeedbackPage />} />
         <Route path="patterns" element={<PatternsPage />} />
         <Route path="users" element={<UsersPage />} />
+        <Route path="users/:id" element={<UserDetailPage />} />
+        <Route path="api-keys" element={<ApiKeysPage />} />
+        <Route path="notifications" element={<NotificationsOpsPage />} />
+        <Route path="subscriptions" element={<SubscriptionsPage />} />
+        <Route path="audit-logs" element={<AuditLogsPage />} />
         <Route path="*" element={<Navigate to="/admin" replace />} />
       </Routes>
     </AdminLayout>

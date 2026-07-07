@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { AdminAPI, AdminUser } from "../api";
 
 const C = { text: "#F8FAFC", muted: "#94A3B8", surface: "#0B1220", border: "#1E2A45", bg: "#020617", primary: "#3B82F6", safe: "#22c55e", danger: "#ef4444" };
@@ -14,6 +15,7 @@ function FlagToggle({ label, value, onChange }: { label: string; value: boolean;
 export default function UsersPage() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [search, setSearch] = useState("");
+  const [flagFilter, setFlagFilter] = useState("");
   const [error, setError] = useState("");
   const [pending, setPending] = useState<Record<string, boolean>>({});
 
@@ -49,15 +51,35 @@ export default function UsersPage() {
     }
   };
 
-  const filtered = users.filter(u => u.email.toLowerCase().includes(search.toLowerCase()));
+  const filtered = users.filter(u => {
+    const matchesSearch = u.email.toLowerCase().includes(search.toLowerCase());
+    const matchesFlag =
+      !flagFilter ||
+      (flagFilter === "premium" && u.is_premium) ||
+      (flagFilter === "admin" && u.is_admin) ||
+      (flagFilter === "developer" && u.is_developer) ||
+      (flagFilter === "inactive" && !u.is_active) ||
+      (flagFilter === "api_keys" && u.total_api_keys > 0);
+    return matchesSearch && matchesFlag;
+  });
 
   return (
     <div>
       {error && <p style={{ color: "#ef4444", marginBottom: 12, fontSize: 13 }}>{error}</p>}
       <h1 style={{ color: C.text, fontSize: 24, fontWeight: 800, marginBottom: 4 }}>Users</h1>
       <p style={{ color: C.muted, marginBottom: 20, fontSize: 14 }}>{users.length} accounts</p>
-      <input placeholder="Search by email…" value={search} onChange={e => setSearch(e.target.value)}
-        style={{ width: 320, padding: "8px 12px", backgroundColor: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, fontSize: 13, marginBottom: 20 }} />
+      <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
+        <input placeholder="Search by email…" value={search} onChange={e => setSearch(e.target.value)}
+          style={{ width: 320, padding: "8px 12px", backgroundColor: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, fontSize: 13 }} />
+        <select value={flagFilter} onChange={e => setFlagFilter(e.target.value)} style={{ padding: "8px 12px", backgroundColor: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, fontSize: 13 }}>
+          <option value="">All users</option>
+          <option value="premium">Premium</option>
+          <option value="admin">Admins</option>
+          <option value="developer">Developers</option>
+          <option value="inactive">Inactive</option>
+          <option value="api_keys">Has API keys</option>
+        </select>
+      </div>
 
       <div style={{ backgroundColor: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -71,7 +93,10 @@ export default function UsersPage() {
           <tbody>
             {filtered.map(u => (
               <tr key={u.id} style={{ borderBottom: `1px solid ${C.border}` }}>
-                <td style={{ padding: "12px 16px", color: C.text, fontSize: 13 }}>{u.email}</td>
+                <td style={{ padding: "12px 16px", color: C.text, fontSize: 13 }}>
+                  <Link to={`/admin/users/${u.id}`} style={{ color: C.text, fontWeight: 700 }}>{u.email}</Link>
+                  <div style={{ color: C.muted, fontSize: 11, marginTop: 2 }}>{u.id}</div>
+                </td>
                 <td style={{ padding: "12px 16px", color: C.muted, fontSize: 12 }}>{new Date(u.created_at).toLocaleDateString()}</td>
                 <td style={{ padding: "12px 16px", color: C.muted, fontSize: 12 }}>
                   <span style={{ color: u.active_api_keys > 0 ? C.safe : C.muted, fontWeight: 700 }}>{u.active_api_keys}</span>
