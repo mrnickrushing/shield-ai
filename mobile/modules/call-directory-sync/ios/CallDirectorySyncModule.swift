@@ -48,6 +48,19 @@ public class CallDirectorySyncModule: Module {
         }
       }
     }
+
+    // Opens Settings → Phone → Call Blocking & Identification directly, instead
+    // of dropping the user on Shield AI's own Settings page (there's no public
+    // API to deep link Messages' equivalent "Unknown & Spam" screen).
+    AsyncFunction("openCallDirectorySettings") { (promise: Promise) in
+      CXCallDirectoryManager.sharedInstance.openSettings { error in
+        if let error = error {
+          promise.reject(CallDirectorySyncException.openSettingsFailed(error))
+        } else {
+          promise.resolve(true)
+        }
+      }
+    }
   }
 
   private static var appGroupIdentifier: String {
@@ -62,6 +75,7 @@ public class CallDirectorySyncModule: Module {
 enum CallDirectorySyncException: Error, LocalizedError {
   case missingAppGroup
   case reloadFailed(Error)
+  case openSettingsFailed(Error)
 
   var errorDescription: String? {
     switch self {
@@ -69,6 +83,8 @@ enum CallDirectorySyncException: Error, LocalizedError {
       return "Could not access the shared App Group container."
     case .reloadFailed(let error):
       return "Failed to reload the Call Directory extension: \(error.localizedDescription)"
+    case .openSettingsFailed(let error):
+      return "Failed to open Call Blocking & Identification settings: \(error.localizedDescription)"
     }
   }
 }

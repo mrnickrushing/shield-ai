@@ -502,6 +502,13 @@ export default function ScanScreen() {
     >
       <GlowBackground accent={`${colors.primary}30`} centerY={0.12} />
       <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xl }}>
+        {/* Only reached by push (e.g. Protect's Marketplace/Social lanes) carries
+            a type param — the tab bar itself never does, so this never shadows it. */}
+        {!!params.type && (
+          <Pressable onPress={() => router.back()} style={{ marginBottom: spacing.md }} hitSlop={12}>
+            <Text style={{ color: colors.primaryBright, fontSize: 15 }}>← Back</Text>
+          </Pressable>
+        )}
         {/* Universal scan — paste anything, we detect what it is */}
         <View
           style={{

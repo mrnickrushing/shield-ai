@@ -5,7 +5,7 @@ import React, { useEffect, useState } from "react";
 import { Linking, Platform, Pressable, ScrollView, Text, View } from "react-native";
 
 import { Button, Eyebrow, FadeIn, Surface } from "@/components/ui";
-import { syncCallProtection } from "@/lib/callDirectorySync";
+import { openCallDirectorySettings, syncCallProtection } from "@/lib/callDirectorySync";
 import { syncSafariBlocklist } from "@/lib/safariBlocklistSync";
 import { colors, spacing, withAlpha } from "@/theme/theme";
 
@@ -173,7 +173,7 @@ export default function CallProtectionScreen() {
               <Button
                 label="Open Settings"
                 icon="settings-outline"
-                onPress={() => Linking.openSettings()}
+                onPress={() => openCallDirectorySettings()}
                 variant="secondary"
                 style={{ marginTop: spacing.sm }}
               />
