@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-07T13:19:29.360517+00:00",
+  "generated_at": "2026-07-07T13:35:27.887680+00:00",
   "source": "FCC Consumer Complaints Data (opendata.fcc.gov/resource/vakf-fz8e)",
   "label": "Spam Risk",
   "entries": [
@@ -215,11 +215,6 @@
     },
     {
       "number": "12164282570",
-      "label": "Spam Risk",
-      "report_count": 15
-    },
-    {
-      "number": "18883821222",
       "label": "Spam Risk",
       "report_count": 15
     },
@@ -3730,11 +3725,6 @@
     },
     {
       "number": "17039414785",
-      "label": "Spam Risk",
-      "report_count": 4
-    },
-    {
-      "number": "18773824357",
       "label": "Spam Risk",
       "report_count": 4
     },

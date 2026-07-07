@@ -40,6 +40,11 @@ KNOWN_LEGIT = {
     "8009220204",  # Verizon customer service
     "8002662278",  # Comcast/Xfinity
     "8882662278",  # Comcast/Xfinity
+    "8773824357",  # FTC Consumer Response Center (1-877-FTC-HELP)
+    "8883821222",  # FTC Do Not Call Registry
+    "8008291040",  # IRS individual help line
+    "8007721213",  # Social Security Administration
+    "8006334227",  # 1-800-MEDICARE
 }
 
 
