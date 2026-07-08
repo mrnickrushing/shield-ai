@@ -64,8 +64,6 @@ class Settings(BaseSettings):
     PHONE_BLOCKLIST_MIN_REPORTERS: int = 3
 
     # --- Limits ---
-    FREE_TIER_DAILY_SCANS: int = 15
-    FREE_TIER_MONITOR_TARGETS: int = 1
     MAX_UPLOAD_MB: int = 10
 
     # --- Observability ---

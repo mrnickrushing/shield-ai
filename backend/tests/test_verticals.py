@@ -20,6 +20,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.db.session import Base, get_db
 from app.main import app
+from app.models.models import User
 
 engine = create_engine(
     "sqlite+pysqlite:///:memory:",
@@ -53,12 +54,20 @@ def _use_db():
 client = TestClient(app)
 
 
-def _auth_headers() -> dict:
+def _auth_headers(premium: bool = False) -> dict:
     email = f"vtest+{uuid.uuid4().hex}@example.com"
     r = client.post(
         "/api/v1/auth/register",
         json={"email": email, "password": "supersecret1", "display_name": "V"},
     )
+    if premium:
+        db = TestingSession()
+        try:
+            user = db.query(User).filter(User.email == email).first()
+            user.is_premium = True
+            db.commit()
+        finally:
+            db.close()
     return {"Authorization": f"Bearer {r.json()['access_token']}"}
 
 
@@ -142,7 +151,7 @@ def test_medbill_scan_endpoint_full_flow():
     r = client.post(
         "/api/v1/verticals/medbill/scan",
         json={"input": "Office visit $250.00\nLab $80.00\nOffice visit $250.00\nout-of-network"},
-        headers=_auth_headers(),
+        headers=_auth_headers(premium=True),
     )
     assert r.status_code == 200, r.text
     data = r.json()
@@ -157,7 +166,7 @@ def test_recovery_scan_endpoint_returns_action_pack():
     r = client.post(
         "/api/v1/verticals/recovery/scan",
         json={"input": "I sent $800 in gift cards to someone claiming to be the IRS", "context": {"amount": 800}},
-        headers=_auth_headers(),
+        headers=_auth_headers(premium=True),
     )
     assert r.status_code == 200, r.text
     data = r.json()
@@ -175,50 +184,24 @@ def test_empty_input_rejected():
     assert r.status_code == 422
 
 
-def _user_id(headers: dict) -> str:
-    return client.get("/api/v1/auth/me", headers=headers).json()["id"]
-
-
-def test_vertical_scan_enforces_free_quota():
-    from app.core.config import settings
-    from app.models.models import ScanHistory, ScanType
-
+def test_vertical_scan_requires_premium():
+    # Shield AI has no free tier — a non-subscriber is blocked on the very
+    # first vertical scan, no count involved.
     headers = _auth_headers()
-    uid = _user_id(headers)
-    # Pre-fill today's scans up to the shared free limit.
-    db = TestingSession()
-    try:
-        for _ in range(settings.FREE_TIER_DAILY_SCANS):
-            db.add(ScanHistory(user_id=uid, scan_type=ScanType.vertical))
-        db.commit()
-    finally:
-        db.close()
-
     r = client.post("/api/v1/verticals/job/scan", json={"input": "hello"}, headers=headers)
-    assert r.status_code == 429
+    assert r.status_code == 402, r.text
 
 
-def test_vertical_scan_premium_bypasses_quota():
-    from app.core.config import settings
-    from app.models.models import ScanHistory, ScanType, User
-
-    headers = _auth_headers()
-    uid = _user_id(headers)
-    db = TestingSession()
-    try:
-        db.get(User, uid).is_premium = True
-        for _ in range(settings.FREE_TIER_DAILY_SCANS + 2):
-            db.add(ScanHistory(user_id=uid, scan_type=ScanType.vertical))
-        db.commit()
-    finally:
-        db.close()
-
-    r = client.post("/api/v1/verticals/job/scan", json={"input": "hello"}, headers=headers)
-    assert r.status_code == 200
+def test_vertical_scan_premium_unlimited():
+    # Premium users have no daily cap — many calls in a row all succeed.
+    headers = _auth_headers(premium=True)
+    for _ in range(20):
+        r = client.post("/api/v1/verticals/job/scan", json={"input": "hello"}, headers=headers)
+        assert r.status_code == 200, r.text
 
 
 def test_vertical_scan_persisted_to_history():
-    headers = _auth_headers()
+    headers = _auth_headers(premium=True)
     r = client.post(
         "/api/v1/verticals/medbill/scan",
         json={"input": "Office visit 99213 $250.00\nOffice visit 99213 $250.00"},
@@ -288,7 +271,7 @@ def test_medbill_scan_accepts_pdf_upload():
     r = client.post(
         "/api/v1/verticals/medbill/scan",
         json={"file_base64": pdf_b64},
-        headers=_auth_headers(),
+        headers=_auth_headers(premium=True),
     )
     assert r.status_code == 200, r.text
     data = r.json()
@@ -302,7 +285,7 @@ def test_file_upload_rejected_for_non_file_vertical():
     r = client.post(
         "/api/v1/verticals/recovery/scan",
         json={"file_base64": pdf_b64},
-        headers=_auth_headers(),
+        headers=_auth_headers(premium=True),
     )
     assert r.status_code == 400
 

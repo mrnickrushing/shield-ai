@@ -62,8 +62,20 @@ export default function IdentityScreen() {
     staleTime: 60_000,
   });
 
-  const showError = (title: string, e: any) =>
+  const showError = (title: string, e: any) => {
+    if (e?.response?.status === 402) {
+      Alert.alert(
+        "Subscription required",
+        "Your Shield AI subscription isn't active. Renew to keep using identity protection.",
+        [
+          { text: "Not now", style: "cancel" },
+          { text: "Manage Subscription", onPress: () => router.push("/paywall" as any) },
+        ]
+      );
+      return;
+    }
     Alert.alert(title, e?.response?.data?.detail ?? "Something went wrong. Please try again.");
+  };
 
   const breachMutation = useMutation({
     mutationFn: () => ShieldAPI.breachCheck(email.trim()),
@@ -93,13 +105,7 @@ export default function IdentityScreen() {
       setMonitorTarget("");
       queryClient.invalidateQueries({ queryKey: ["monitoring-targets"] });
     },
-    onError: (e: any) =>
-      e?.response?.status === 402
-        ? Alert.alert(
-            "Premium required",
-            "Monitoring more than one email, or monitoring phone numbers, usernames, and domains, requires Shield AI Premium."
-          )
-        : showError("Couldn't add monitor", e),
+    onError: (e: any) => showError("Couldn't add monitor", e),
   });
   const removeMonitor = useMutation({
     mutationFn: (id: string) => ShieldAPI.removeMonitoringTarget(id),

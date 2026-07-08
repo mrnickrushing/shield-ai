@@ -11,6 +11,7 @@ import {
   purchasePackage,
   purchasesSupported,
   restorePurchases,
+  TRIAL_DAYS,
 } from "@/lib/revenuecat";
 import { useAuth, useIsPremium } from "@/state/auth";
 import { colors, gradients, radius, spacing, withAlpha } from "@/theme/theme";
@@ -18,18 +19,18 @@ import { colors, gradients, radius, spacing, withAlpha } from "@/theme/theme";
 const TERMS_URL = "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/";
 const PRIVACY_URL = "https://shieldai.rushingtechnologies.com/privacy";
 
-const PREMIUM_FEATURES = [
-  "Unlimited scans — links, texts, calls, QR, screenshots",
-  "Live Safe Browser with real-time site protection",
-  "Scam call & text filtering on your iPhone",
-  "Identity breach monitoring",
-  "Family alert sharing",
-  "Scam recovery wizard",
-  "Priority AI analysis",
+const OUTCOMES = [
+  "5,576 scam numbers blocked before they ring",
+  "Every link, screenshot, and text checked before you act",
+  "Dangerous sites stopped before they load — not after",
+  "Know the moment your email or password leaks, not after",
+  "A weekly report of exactly what got blocked, for you",
+  "Guided removal from 16 data-broker sites",
+  "Family alerts shared the second something looks wrong",
 ];
 
 const BILLING_SETUP_MESSAGE =
-  "Premium billing is temporarily unavailable. You can keep using limited protection while we finish subscription setup.";
+  "Subscriptions aren't available right now — please try again in a moment.";
 
 export default function Paywall() {
   const router = useRouter();
@@ -83,13 +84,20 @@ export default function Paywall() {
   const annualPerMonth = annualPkg ? `${(annualPkg.product.price / 12).toFixed(2)}` : "3.00";
 
   const finishIfPremium = async (info: Awaited<ReturnType<typeof purchasePackage>>) => {
-    if (info && hasPremium(info)) {
-      setRcPremium(true);
-      refreshUser();
-      router.replace("/(tabs)/dashboard");
-      return true;
+    if (!info || !hasPremium(info)) return false;
+    setRcPremium(true);
+    // user.is_premium on the backend is set by an async RevenueCat webhook, which
+    // can lag a few seconds behind the purchase. Poll briefly so the scan/identity/
+    // monitoring endpoints (gated on the server-side flag) don't 402 a user who
+    // just paid. If it doesn't land in time we still continue — screens that hit a
+    // 402 route back here rather than dead-ending.
+    for (let attempt = 0; attempt < 8; attempt++) {
+      await refreshUser();
+      if (useAuth.getState().user?.is_premium) break;
+      await new Promise((resolve) => setTimeout(resolve, 1000));
     }
-    return false;
+    router.replace("/(tabs)/dashboard");
+    return true;
   };
 
   const buy = async (pkg: PurchasesPackage | null) => {
@@ -136,9 +144,9 @@ export default function Paywall() {
           <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: withAlpha(colors.low, "22"), alignItems: "center", justifyContent: "center", marginBottom: spacing.md, borderWidth: 2, borderColor: withAlpha(colors.low, "44") }}>
             <Ionicons name="star" size={36} color={colors.low} />
           </View>
-          <Text style={{ color: colors.text, fontSize: 28, fontWeight: "900", letterSpacing: -0.8, textAlign: "center" }}>Shield AI Premium</Text>
+          <Text style={{ color: colors.text, fontSize: 28, fontWeight: "900", letterSpacing: -0.8, textAlign: "center" }}>Turn on Shield AI</Text>
           <Text style={{ color: colors.textMuted, fontSize: 15, textAlign: "center", marginTop: 8, lineHeight: 22 }}>
-            Start your 7-day free trial to unlock{"\n"}full protection.
+            Start your {TRIAL_DAYS}-day free trial —{"\n"}protection starts the moment you do.
           </Text>
         </View>
       </FadeIn>
@@ -191,17 +199,17 @@ export default function Paywall() {
               <Text style={{ color: colors.textMuted, fontSize: 14 }}>
                 {annual ? `per year · ~${annualPerMonth}/month` : "per month"}
               </Text>
-              <Text style={{ color: colors.safe, fontSize: 13, fontWeight: "700", marginTop: 4 }}>7-day free trial included</Text>
+              <Text style={{ color: colors.safe, fontSize: 13, fontWeight: "700", marginTop: 4 }}>{TRIAL_DAYS}-day free trial included</Text>
             </Surface>
           </FadeIn>
         </>
       )}
 
-      {/* Features */}
+      {/* Outcomes */}
       <FadeIn delay={140}>
-        <Eyebrow style={{ marginBottom: spacing.sm }}>PREMIUM INCLUDES</Eyebrow>
+        <Eyebrow style={{ marginBottom: spacing.sm }}>WHAT PROTECTION LOOKS LIKE</Eyebrow>
         <Surface accent={colors.purple} style={{ marginBottom: spacing.lg, gap: spacing.sm }}>
-          {PREMIUM_FEATURES.map((f) => (
+          {OUTCOMES.map((f) => (
             <View key={f} style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
               <Ionicons name="checkmark-circle" size={20} color={colors.safe} />
               <Text style={{ color: colors.text, fontSize: 15, flex: 1 }}>{f}</Text>
@@ -218,26 +226,16 @@ export default function Paywall() {
 
       {/* CTA */}
       <FadeIn delay={200}>
-        {hasPurchasablePackage ? (
-          <Button
-            label={busy === "purchase" ? "Starting…" : "Start Free Trial →"}
-            onPress={() => buy(selectedPkg)}
-            loading={busy === "purchase"}
-            disabled={busy !== null}
-            gradient={gradients.primary}
-            style={{ marginBottom: spacing.sm }}
-          />
-        ) : (
-          <Button
-            label="Continue with Limited Protection"
-            onPress={() => router.replace("/(tabs)/dashboard")}
-            disabled={busy !== null}
-            variant="secondary"
-            style={{ marginBottom: spacing.sm }}
-          />
-        )}
+        <Button
+          label={busy === "purchase" ? "Starting…" : "Start Free Trial →"}
+          onPress={() => buy(selectedPkg)}
+          loading={busy === "purchase"}
+          disabled={busy !== null || !hasPurchasablePackage}
+          gradient={gradients.primary}
+          style={{ marginBottom: spacing.sm }}
+        />
         <Text style={{ color: colors.primaryBright, fontSize: 12, marginBottom: spacing.md, textAlign: "center" }}>
-          {hasPurchasablePackage ? "Cancel anytime · No charge for 7 days" : "Premium billing is temporarily unavailable"}
+          {hasPurchasablePackage ? `Cancel anytime · No charge for ${TRIAL_DAYS} days` : "Subscriptions aren't available right now"}
         </Text>
 
         <Pressable onPress={restore} disabled={busy !== null} style={{ padding: spacing.sm, alignItems: "center" }}>

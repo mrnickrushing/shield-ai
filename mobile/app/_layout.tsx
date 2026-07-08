@@ -90,7 +90,7 @@ export default function RootLayout() {
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="onboarding" options={{ headerShown: false }} />
         <Stack.Screen name="login" options={{ headerShown: false }} />
-        <Stack.Screen name="paywall" options={{ title: "Upgrade to Premium", headerShown: false }} />
+        <Stack.Screen name="paywall" options={{ title: "Start Protection", headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="result" options={{ title: "Risk Report" }} />
         <Stack.Screen name="profile" options={{ title: "Profile" }} />

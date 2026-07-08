@@ -38,20 +38,26 @@ from app.services import ocr, scan_service
 router = APIRouter(prefix="/scans", tags=["scans"])
 
 
-def _check_quota(db: Session, user: User) -> None:
-    # Shared daily allowance (also enforced on Shield Labs vertical scans).
-    from app.services.quota import check_daily_scan_quota
+def _require_subscription(db: Session, user: User) -> None:
+    # Shared subscription gate (also enforced on Shield Labs vertical scans).
+    from app.services.quota import require_active_subscription
 
-    check_daily_scan_quota(db, user)
+    require_active_subscription(db, user)
 
 
 @router.get("/url-check")
 def url_check(url: str, user: User = Depends(get_user)):
     """Fast reputation verdict for the live Safe Browser.
 
-    Runs on every WebView navigation, so it bypasses the daily scan quota and
-    writes no scan history. Registered before /{scan_id} so this path wins.
+    Runs on every WebView navigation, so it writes no scan history, but it
+    still requires Premium — Live Safe Browser is a subscription feature.
+    Registered before /{scan_id} so this path wins.
     """
+    if not user.is_premium:
+        raise HTTPException(
+            status.HTTP_402_PAYMENT_REQUIRED,
+            "Live Safe Browser requires Shield AI Premium.",
+        )
     from app.services.url_check import check_url
 
     return check_url(url)
@@ -63,7 +69,7 @@ def create_link_scan(
     db: Session = Depends(get_db),
     user: User = Depends(get_user_write),
 ):
-    _check_quota(db, user)
+    _require_subscription(db, user)
     scan = ScanHistory(
         user_id=user.id, scan_type=ScanType.link, raw_input=payload.url,
         status=ScanStatus.pending,
@@ -85,7 +91,7 @@ def create_image_scan(
     db: Session = Depends(get_db),
     user: User = Depends(get_user_write),
 ):
-    _check_quota(db, user)
+    _require_subscription(db, user)
     try:
         image_bytes = ocr.decode_base64_image(payload.image_base64)
     except Exception:
@@ -186,7 +192,7 @@ def create_qr_scan(
     db: Session = Depends(get_db),
     user: User = Depends(get_user_write),
 ):
-    _check_quota(db, user)
+    _require_subscription(db, user)
     scan = ScanHistory(
         user_id=user.id, scan_type=ScanType.qr, raw_input=payload.qr_content[:500],
         status=ScanStatus.pending,
@@ -208,7 +214,7 @@ def create_message_scan(
     db: Session = Depends(get_db),
     user: User = Depends(get_user_write),
 ):
-    _check_quota(db, user)
+    _require_subscription(db, user)
     scan = ScanHistory(
         user_id=user.id, scan_type=ScanType.message, raw_input=payload.message_text[:500],
         status=ScanStatus.pending,
@@ -237,7 +243,7 @@ def create_voice_scan(
             status.HTTP_422_UNPROCESSABLE_ENTITY,
             "Transcript is too short to analyze — record a longer portion of the voicemail.",
         )
-    _check_quota(db, user)
+    _require_subscription(db, user)
     scan = ScanHistory(
         user_id=user.id, scan_type=ScanType.voice, raw_input=transcript[:500],
         status=ScanStatus.pending,
@@ -266,7 +272,7 @@ def create_email_scan(
             status.HTTP_422_UNPROCESSABLE_ENTITY,
             "Provide at least one of: raw_email, sender_email, subject, or body_text.",
         )
-    _check_quota(db, user)
+    _require_subscription(db, user)
     scan = ScanHistory(
         user_id=user.id, scan_type=ScanType.email,
         raw_input=f"From: {payload.sender_email or ''} | Subject: {payload.subject or ''}"[:500],
@@ -297,7 +303,7 @@ def create_phone_scan(
     db: Session = Depends(get_db),
     user: User = Depends(get_user_write),
 ):
-    _check_quota(db, user)
+    _require_subscription(db, user)
     scan = ScanHistory(
         user_id=user.id, scan_type=ScanType.phone, raw_input=payload.phone_number,
         status=ScanStatus.pending,
@@ -322,7 +328,7 @@ def create_marketplace_scan(
     db: Session = Depends(get_db),
     user: User = Depends(get_user_write),
 ):
-    _check_quota(db, user)
+    _require_subscription(db, user)
     scan = ScanHistory(
         user_id=user.id, scan_type=ScanType.marketplace,
         raw_input=payload.content_text[:500], status=ScanStatus.pending,
@@ -344,7 +350,7 @@ def create_social_scan(
     db: Session = Depends(get_db),
     user: User = Depends(get_user_write),
 ):
-    _check_quota(db, user)
+    _require_subscription(db, user)
     scan = ScanHistory(
         user_id=user.id, scan_type=ScanType.social,
         raw_input=payload.content_text[:500], status=ScanStatus.pending,

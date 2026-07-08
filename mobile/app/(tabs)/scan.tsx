@@ -430,13 +430,21 @@ export default function ScanScreen() {
     return wrap(() => ShieldAPI.scanVoice(voiceTranscript.trim(), voiceCaller.trim() || undefined));
   };
 
+  const handleScanError = (e: any, fallback: string) => {
+    if (e?.response?.status === 402) {
+      router.push("/paywall" as any);
+      return;
+    }
+    setError(e?.response?.data?.detail ?? fallback);
+  };
+
   const wrap = async (fn: () => Promise<{ id: string }>) => {
     setError(null);
     setLoading(true);
     try {
       navigate(await fn());
     } catch (e: any) {
-      setError(e?.response?.data?.detail ?? "Scan failed. Please try again.");
+      handleScanError(e, "Scan failed. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -464,7 +472,7 @@ export default function ScanScreen() {
     try {
       navigate(await ShieldAPI.scanImage(res.assets[0].base64));
     } catch (e: any) {
-      setError(e?.response?.data?.detail ?? "Scan failed.");
+      handleScanError(e, "Scan failed.");
     } finally {
       setLoading(false);
     }

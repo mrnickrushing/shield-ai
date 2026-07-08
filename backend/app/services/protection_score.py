@@ -30,7 +30,7 @@ COMPONENTS = [
     ("safe_browser_used", 10, "Used the live Safe Browser", "Open links through the Safe Browser for real-time protection.", "browser"),
     ("identity_monitored", 20, "Identity monitoring set up", "Add your email so we watch for new breaches.", "identity"),
     ("education_started", 10, "Completed a scam-spotting lesson", "Take a 2-minute lesson — trained users spot scams faster.", "education"),
-    ("premium_active", 10, "Premium protection active", "Unlock unlimited scans and live protection.", "paywall"),
+    ("premium_active", 10, "Premium protection active", "Start your subscription to unlock scanning and live protection.", "paywall"),
 ]
 
 MAX_SCORE = sum(points for _, points, _, _, _ in COMPONENTS)

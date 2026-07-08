@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import { Alert, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 
@@ -10,6 +11,7 @@ import { colors, radius, spacing, withAlpha } from "@/theme/theme";
 const REL_LABELS = ["Parent", "Spouse", "Sibling", "Child", "Friend", "Caregiver", "Other"];
 
 export default function FamilyScreen() {
+  const router = useRouter();
   const qc = useQueryClient();
   const [showAdd, setShowAdd] = useState(false);
   const [name, setName] = useState("");
@@ -27,6 +29,17 @@ export default function FamilyScreen() {
       setEmail("");
       qc.invalidateQueries({ queryKey: ["trusted-contacts"] });
     },
+    onError: (e: any) =>
+      e?.response?.status === 402
+        ? Alert.alert(
+            "Subscription required",
+            "Your Shield AI subscription isn't active. Renew to keep using Family Protection.",
+            [
+              { text: "Not now", style: "cancel" },
+              { text: "Manage Subscription", onPress: () => router.push("/paywall" as any) },
+            ]
+          )
+        : Alert.alert("Couldn't add contact", e?.response?.data?.detail ?? "Something went wrong. Please try again."),
   });
   const removeContact = useMutation({
     mutationFn: (id: string) => ShieldAPI.removeContact(id),

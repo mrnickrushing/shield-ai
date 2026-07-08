@@ -3,7 +3,7 @@
 Each vertical reuses the core pipeline (deterministic rule pack + LLM
 interpretation + blended verdict) for a new high-stakes domain. Verdicts are
 persisted to scan_history / risk_reports just like normal scans, so they appear
-in History and count toward the same daily quota. File-accepting verticals
+in History and require the same active subscription. File-accepting verticals
 (e.g. MedBill) can take a photo or PDF instead of pasted text.
 """
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -17,7 +17,7 @@ from app.db.session import get_db
 from app.models.models import ScanHistory, ScanStatus, ScanType, User
 from app.schemas.schemas import VerdictOut, VerticalInfo, VerticalScanRequest
 from app.services import document, ocr, scan_service
-from app.services.quota import check_daily_scan_quota
+from app.services.quota import require_active_subscription
 from app.verticals import get_vertical, list_verticals, run_vertical
 
 router = APIRouter(prefix="/verticals", tags=["verticals"])
@@ -76,7 +76,7 @@ def scan(
     if not spec:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"Unknown vertical: {key}")
 
-    check_daily_scan_quota(db, user)
+    require_active_subscription(db, user)
     text = _resolve_input(spec, payload)
 
     scan_row = ScanHistory(

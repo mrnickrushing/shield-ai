@@ -21,6 +21,7 @@ from app.models.models import (
     RiskReport,
     ScanHistory,
     ScanType,
+    User,
 )
 from app.services.protection_report import build_report, run_weekly_reports, summarize
 
@@ -55,7 +56,7 @@ def _use_this_module_db():
 client = TestClient(app)
 
 
-def _register() -> tuple[str, dict]:
+def _register(premium: bool = False) -> tuple[str, dict]:
     email = f"report-{uuid.uuid4().hex[:10]}@example.com"
     res = client.post(
         "/api/v1/auth/register",
@@ -64,6 +65,14 @@ def _register() -> tuple[str, dict]:
     assert res.status_code == 201, res.text
     headers = {"Authorization": f"Bearer {res.json()['access_token']}"}
     uid = client.get("/api/v1/auth/me", headers=headers).json()["id"]
+    if premium:
+        db = TestingSession()
+        try:
+            user = db.get(User, uid)
+            user.is_premium = True
+            db.commit()
+        finally:
+            db.close()
     return uid, headers
 
 
@@ -116,7 +125,7 @@ def test_quiet_week_summary():
 
 
 def test_endpoint_returns_report():
-    uid, headers = _register()
+    uid, headers = _register(premium=True)
     db = TestingSession()
     try:
         _seed_activity(db, uid)
@@ -129,9 +138,15 @@ def test_endpoint_returns_report():
     assert "summary" in body
 
 
+def test_endpoint_requires_premium():
+    _, headers = _register()
+    res = client.get("/api/v1/monitoring/report/weekly", headers=headers)
+    assert res.status_code == 402, res.text
+
+
 def test_run_weekly_reports_creates_notification_and_skips_dormant():
-    active_uid, _ = _register()
-    _dormant_uid, _ = _register()
+    active_uid, _ = _register(premium=True)
+    _dormant_uid, _ = _register(premium=True)
     db = TestingSession()
     try:
         _seed_activity(db, active_uid)

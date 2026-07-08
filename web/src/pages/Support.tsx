@@ -25,7 +25,7 @@ const FAQS = [
   },
   {
     q: "Is Shield AI free to use?",
-    a: "Shield AI offers a free tier with standard scan limits. Premium plans are available for higher volume usage and access to the full API.",
+    a: "No — Shield AI is a subscription app. Every account starts with a 3-day trial that requires a card, then continues on a paid plan. Developers integrating the REST API should contact us directly.",
   },
   {
     q: "I'm a developer — can I integrate Shield AI into my product?",
