@@ -21,6 +21,9 @@ export const REVENUECAT_ANDROID_API_KEY = "";
 /** Entitlement identifier attached to both subscription products. */
 export const ENTITLEMENT_PREMIUM = "premium";
 
+/** Free trial length offered on both subscription products (App Store Connect config). */
+export const TRIAL_DAYS = 3;
+
 let configured = false;
 let configuredAppUserId: string | null = null;
 

@@ -11,14 +11,13 @@ import {
   purchasePackage,
   purchasesSupported,
   restorePurchases,
+  TRIAL_DAYS,
 } from "@/lib/revenuecat";
 import { useAuth, useIsPremium } from "@/state/auth";
 import { colors, gradients, radius, spacing, withAlpha } from "@/theme/theme";
 
 const TERMS_URL = "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/";
 const PRIVACY_URL = "https://shieldai.rushingtechnologies.com/privacy";
-
-const TRIAL_DAYS = 3;
 
 const OUTCOMES = [
   "5,576 scam numbers blocked before they ring",
@@ -85,13 +84,20 @@ export default function Paywall() {
   const annualPerMonth = annualPkg ? `${(annualPkg.product.price / 12).toFixed(2)}` : "3.00";
 
   const finishIfPremium = async (info: Awaited<ReturnType<typeof purchasePackage>>) => {
-    if (info && hasPremium(info)) {
-      setRcPremium(true);
-      refreshUser();
-      router.replace("/(tabs)/dashboard");
-      return true;
+    if (!info || !hasPremium(info)) return false;
+    setRcPremium(true);
+    // user.is_premium on the backend is set by an async RevenueCat webhook, which
+    // can lag a few seconds behind the purchase. Poll briefly so the scan/identity/
+    // monitoring endpoints (gated on the server-side flag) don't 402 a user who
+    // just paid. If it doesn't land in time we still continue — screens that hit a
+    // 402 route back here rather than dead-ending.
+    for (let attempt = 0; attempt < 8; attempt++) {
+      await refreshUser();
+      if (useAuth.getState().user?.is_premium) break;
+      await new Promise((resolve) => setTimeout(resolve, 1000));
     }
-    return false;
+    router.replace("/(tabs)/dashboard");
+    return true;
   };
 
   const buy = async (pkg: PurchasesPackage | null) => {

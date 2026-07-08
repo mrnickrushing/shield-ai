@@ -5,6 +5,7 @@ import React, { useRef, useState } from "react";
 import { Dimensions, FlatList, Pressable, Text, View, ViewToken } from "react-native";
 
 import { Button, GlowOrb } from "@/components/ui";
+import { TRIAL_DAYS } from "@/lib/revenuecat";
 import { colors, radius, spacing, withAlpha } from "@/theme/theme";
 
 const { width } = Dimensions.get("window");
@@ -35,7 +36,7 @@ const SLIDES = [
     id: "4",
     icon: "star" as const,
     iconColor: colors.low,
-    title: "Start your 3-day\nfree trial",
+    title: `Start your ${TRIAL_DAYS}-day\nfree trial`,
     body: "Scan checks, call & text protection, the live Safe Browser, breach monitoring, and family alerts. Cancel anytime.",
   },
 ];
