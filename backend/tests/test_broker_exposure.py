@@ -13,6 +13,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.db.session import Base, get_db
 from app.main import app
+from app.models.models import User
 from app.services.broker_catalog import BROKERS
 
 engine = create_engine(
@@ -46,13 +47,21 @@ def _use_this_module_db():
 client = TestClient(app)
 
 
-def _auth() -> dict:
+def _auth(premium: bool = True) -> dict:
     email = f"broker-{uuid.uuid4().hex[:10]}@example.com"
     res = client.post(
         "/api/v1/auth/register",
         json={"email": email, "password": "supersecret1", "display_name": "Jane Doe"},
     )
     assert res.status_code == 201, res.text
+    if premium:
+        db = TestingSession()
+        try:
+            user = db.query(User).filter(User.email == email).first()
+            user.is_premium = True
+            db.commit()
+        finally:
+            db.close()
     return {"Authorization": f"Bearer {res.json()['access_token']}"}
 
 
@@ -105,3 +114,11 @@ def test_progress_is_per_user():
     a, b = _auth(), _auth()
     client.put("/api/v1/identity/brokers/spokeo", json={"status": "removed"}, headers=a)
     assert client.get("/api/v1/identity/brokers", headers=b).json()["resolved"] == 0
+
+
+def test_brokers_requires_premium():
+    headers = _auth(premium=False)
+    res = client.get("/api/v1/identity/brokers", headers=headers)
+    assert res.status_code == 402, res.text
+    res = client.put("/api/v1/identity/brokers/spokeo", json={"status": "removed"}, headers=headers)
+    assert res.status_code == 402, res.text

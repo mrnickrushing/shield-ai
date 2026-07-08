@@ -14,6 +14,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.db.session import Base, get_db
 from app.main import app
+from app.models.models import User
 from app.services import url_check as url_check_service
 
 engine = create_engine(
@@ -49,13 +50,21 @@ def _use_this_module_db():
 client = TestClient(app)
 
 
-def _auth_headers() -> dict:
+def _auth_headers(premium: bool = True) -> dict:
     email = f"browser-{uuid.uuid4().hex[:10]}@example.com"
     res = client.post(
         "/api/v1/auth/register",
         json={"email": email, "password": "supersecret1", "display_name": "Web"},
     )
     assert res.status_code == 201, res.text
+    if premium:
+        db = TestingSession()
+        try:
+            user = db.query(User).filter(User.email == email).first()
+            user.is_premium = True
+            db.commit()
+        finally:
+            db.close()
     return {"Authorization": f"Bearer {res.json()['access_token']}"}
 
 
@@ -68,6 +77,12 @@ def _check(url: str, headers: dict) -> dict:
 def test_requires_auth():
     res = client.get("/api/v1/scans/url-check", params={"url": "https://example.com"})
     assert res.status_code == 401
+
+
+def test_requires_premium():
+    headers = _auth_headers(premium=False)
+    res = client.get("/api/v1/scans/url-check", params={"url": "https://example.com"}, headers=headers)
+    assert res.status_code == 402, res.text
 
 
 def test_trusted_domain_is_safe_without_reputation_call():
@@ -121,8 +136,8 @@ def test_does_not_write_scan_history():
     assert scans.json() == []
 
 
-def test_quota_not_consumed():
-    """url-check must not eat the free daily scan allowance."""
+def test_repeated_checks_do_not_block_other_scans():
+    """url-check (premium-gated, no scan history) must not interfere with /scans/link."""
     headers = _auth_headers()
     for i in range(30):
         _check(f"https://neutral-{i}.org", headers)

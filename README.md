@@ -124,11 +124,14 @@ Differentiation is **cross-channel analysis** (screenshot + link + text + QR + e
 
 ## Monetization
 
+Shield AI has no free tier — every account requires an active subscription
+(a short free trial, card required, precedes the first charge). There is one
+consumer plan, plus a Family upsell and a later B2B tier:
+
 | Tier | Includes |
 |------|----------|
-| **Free** | Limited scans/month, screenshot + link checks, basic report history |
-| **Premium** | Unlimited scans, QR + phone analysis, deeper reports, breach alerts |
-| **Family** | Multiple members, shared alerts, trusted-contact escalation |
+| **Premium** | All scan types, Live Safe Browser, identity breach monitoring, weekly protection report, data-broker exposure checklist |
+| **Family** | Everything in Premium, shared across multiple members, trusted-contact escalation |
 | **B2B (later)** | API, white-label workflows, employee anti-phishing benefits |
 
 ---

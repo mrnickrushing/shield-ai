@@ -35,8 +35,8 @@ const SLIDES = [
     id: "4",
     icon: "star" as const,
     iconColor: colors.low,
-    title: "Start your 7-day\nfree trial",
-    body: "Unlimited scans, call & text protection, the live Safe Browser, breach monitoring, and family alerts. Cancel anytime.",
+    title: "Start your 3-day\nfree trial",
+    body: "Scan checks, call & text protection, the live Safe Browser, breach monitoring, and family alerts. Cancel anytime.",
   },
 ];
 

@@ -69,8 +69,8 @@ Advanced model routing, behavior-based signals, custom threat intel, community r
 8. Identity, recovery, and family layers
 
 ## Monetization
-- **Free:** limited scans/month, link + screenshot checks, basic history
-- **Premium:** unlimited scans, QR + phone analysis, deeper reports, site warnings, breach alerts
+No free tier — every account requires an active subscription (short free trial, card required, precedes the first charge).
+- **Premium:** all scan types, QR + phone analysis, deeper reports, site warnings, breach alerts
 - **Family:** multiple members, shared alerts, trusted-contact escalation
 - **B2B (later):** API, white-label, employee anti-phishing
 

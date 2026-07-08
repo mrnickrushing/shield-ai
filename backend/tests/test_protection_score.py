@@ -13,7 +13,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.db.session import Base, get_db
 from app.main import app
-from app.models.models import Notification, RiskLevel, RiskReport, ScanHistory, ScanType
+from app.models.models import Notification, RiskLevel, RiskReport, ScanHistory, ScanType, User
 from app.services.monitoring import run_scan_pattern_monitor
 
 engine = create_engine(
@@ -47,13 +47,21 @@ def _use_this_module_db():
 client = TestClient(app)
 
 
-def _auth() -> dict:
+def _auth(premium: bool = False) -> dict:
     email = f"score-{uuid.uuid4().hex[:10]}@example.com"
     res = client.post(
         "/api/v1/auth/register",
         json={"email": email, "password": "supersecret1", "display_name": "S"},
     )
     assert res.status_code == 201, res.text
+    if premium:
+        db = TestingSession()
+        try:
+            user = db.query(User).filter(User.email == email).first()
+            user.is_premium = True
+            db.commit()
+        finally:
+            db.close()
     return {"Authorization": f"Bearer {res.json()['access_token']}"}
 
 
@@ -70,7 +78,7 @@ def test_new_user_scores_low_with_full_fix_list():
 
 
 def test_scanning_and_monitoring_raise_score():
-    headers = _auth()
+    headers = _auth(premium=True)
     client.post("/api/v1/scans/message", json={"message_text": "hey how are you"}, headers=headers)
     client.post(
         "/api/v1/monitoring/targets",
@@ -85,7 +93,7 @@ def test_scanning_and_monitoring_raise_score():
 
 
 def test_trends_reflect_high_risk_scans():
-    headers = _auth()
+    headers = _auth(premium=True)
     # Toll smishing scores high/critical deterministically
     client.post(
         "/api/v1/scans/message",

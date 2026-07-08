@@ -7,8 +7,9 @@ os.environ.setdefault("ENVIRONMENT", "development")
 import uuid
 
 from app.core.config import settings
+from app.models.models import User
 
-from tests.test_smoke import client
+from tests.test_smoke import TestingSession, client
 
 
 def _register_and_scan(phone_number: str) -> dict:
@@ -18,6 +19,13 @@ def _register_and_scan(phone_number: str) -> dict:
         json={"email": email, "password": "supersecret1", "display_name": "PhoneRep"},
     )
     headers = {"Authorization": f"Bearer {r.json()['access_token']}"}
+    db = TestingSession()
+    try:
+        user = db.query(User).filter(User.email == email).first()
+        user.is_premium = True
+        db.commit()
+    finally:
+        db.close()
     r = client.post(
         "/api/v1/scans/phone",
         json={"phone_number": phone_number},

@@ -28,6 +28,14 @@ router = APIRouter(prefix="/identity", tags=["identity"])
 _CACHE_TTL_HOURS = 24
 
 
+def _require_premium(user: User) -> None:
+    if not user.is_premium:
+        raise HTTPException(
+            status.HTTP_402_PAYMENT_REQUIRED,
+            "Identity protection requires Shield AI Premium.",
+        )
+
+
 def _fresh_cache(db: Session, user_id: str, email: str) -> BreachRecord | None:
     rec = (
         db.query(BreachRecord)
@@ -48,6 +56,7 @@ def check_breach(
     user: User = Depends(get_current_user),
 ):
     """Check an email address against known data breach databases."""
+    _require_premium(user)
     email = str(payload.email).lower()
 
     # Return cached result if still fresh
@@ -128,6 +137,7 @@ def check_password(
     k-Anonymity password check. Returns the number of times this password
     appeared in known data breaches. Never logs or stores the password.
     """
+    _require_premium(user)
     password = payload.get("password", "")
     if not password:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "password is required")
@@ -183,6 +193,7 @@ def mark_alert_read(
 
 @router.get("/brokers", response_model=BrokerExposureSummary)
 def broker_exposure(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    _require_premium(user)
     display_name = user.profile.display_name if user.profile else ""
     statuses = {
         row.broker_key: row
@@ -224,6 +235,7 @@ def update_broker_status(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
+    _require_premium(user)
     entry = next((b for b in broker_catalog.BROKERS if b["key"] == broker_key), None)
     if entry is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Unknown broker")

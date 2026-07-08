@@ -127,9 +127,11 @@ def summarize(report: dict) -> str:
 
 
 def run_weekly_reports(db: Session) -> int:
-    """Generate and deliver the digest for every active user. Returns count sent."""
+    """Generate and deliver the digest for every active, premium user. Returns count sent."""
     sent = 0
-    for (user_id,) in db.query(User.id).filter(User.is_active.is_(True)).all():
+    for (user_id,) in (
+        db.query(User.id).filter(User.is_active.is_(True), User.is_premium.is_(True)).all()
+    ):
         report = build_report(db, user_id)
         if not _has_activity(report):
             # No digest spam for dormant accounts; the dashboard endpoint

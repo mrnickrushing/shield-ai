@@ -12,6 +12,14 @@ from app.schemas.schemas import TrustedContactCreate, TrustedContactOut
 router = APIRouter(prefix="/family", tags=["family"])
 
 
+def _require_premium(user: User) -> None:
+    if not user.is_premium:
+        raise HTTPException(
+            status.HTTP_402_PAYMENT_REQUIRED,
+            "Family Protection requires Shield AI Premium.",
+        )
+
+
 @router.get("/contacts", response_model=list[TrustedContactOut])
 def list_contacts(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     return db.query(TrustedContact).filter(TrustedContact.user_id == user.id).order_by(TrustedContact.created_at).all()
@@ -19,6 +27,7 @@ def list_contacts(db: Session = Depends(get_db), user: User = Depends(get_curren
 
 @router.post("/contacts", response_model=TrustedContactOut, status_code=status.HTTP_201_CREATED)
 def add_contact(payload: TrustedContactCreate, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    _require_premium(user)
     contact = TrustedContact(
         user_id=user.id, name=payload.name, phone=payload.phone or "",
         email=payload.email or "", relationship_label=payload.relationship_label or "",

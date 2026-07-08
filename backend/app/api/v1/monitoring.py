@@ -9,7 +9,6 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
-from app.core.config import settings
 from app.db.session import SessionLocal, get_db
 from app.models.models import BrowserTelemetryEvent, ExtensionTelemetryEvent, IdentityAlert, MonitoredIdentity, Notification, User
 from app.schemas.schemas import BrowserTelemetryCreate, ExtensionTelemetryCreate, MonitoredIdentityCreate, MonitoredIdentityOut
@@ -25,16 +24,9 @@ def _payment_required(feature: str) -> None:
     )
 
 
-def _enforce_monitor_entitlement(db: Session, user: User, target_type: str) -> None:
-    if user.is_premium:
-        return
-    active_count = (
-        db.query(MonitoredIdentity)
-        .filter(MonitoredIdentity.user_id == user.id, MonitoredIdentity.is_active.is_(True))
-        .count()
-    )
-    if target_type != "email" or active_count >= settings.FREE_TIER_MONITOR_TARGETS:
-        _payment_required("Continuous multi-target monitoring")
+def _enforce_monitor_entitlement(user: User) -> None:
+    if not user.is_premium:
+        _payment_required("Continuous identity monitoring")
 
 
 def _require_live_protection(user: User) -> None:
@@ -54,7 +46,7 @@ def list_targets(db: Session = Depends(get_db), user: User = Depends(get_current
 
 @router.post("/targets", response_model=MonitoredIdentityOut, status_code=status.HTTP_201_CREATED)
 def add_target(payload: MonitoredIdentityCreate, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    _enforce_monitor_entitlement(db, user, payload.target_type)
+    _enforce_monitor_entitlement(user)
     value = payload.value.strip().lower()
     target = MonitoredIdentity(
         user_id=user.id,
@@ -141,6 +133,9 @@ def protection_score(db: Session = Depends(get_db), user: User = Depends(get_cur
 def weekly_protection_report(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     """Live view of the same numbers the weekly digest sends."""
     from app.services.protection_report import build_report, summarize
+
+    if not user.is_premium:
+        _payment_required("The Weekly Protection Report")
 
     report = build_report(db, user.id)
     report["summary"] = summarize(report)

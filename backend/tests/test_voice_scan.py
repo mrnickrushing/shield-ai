@@ -13,6 +13,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.db.session import Base, get_db
 from app.main import app
+from app.models.models import User
 from app.services.message_analyzer import analyze_voicemail
 
 engine = create_engine(
@@ -60,13 +61,21 @@ BENIGN_SCRIPT = (
 )
 
 
-def _auth() -> dict:
+def _auth(premium: bool = True) -> dict:
     email = f"voice-{uuid.uuid4().hex[:10]}@example.com"
     res = client.post(
         "/api/v1/auth/register",
         json={"email": email, "password": "supersecret1", "display_name": "V"},
     )
     assert res.status_code == 201, res.text
+    if premium:
+        db = TestingSession()
+        try:
+            user = db.query(User).filter(User.email == email).first()
+            user.is_premium = True
+            db.commit()
+        finally:
+            db.close()
     return {"Authorization": f"Bearer {res.json()['access_token']}"}
 
 

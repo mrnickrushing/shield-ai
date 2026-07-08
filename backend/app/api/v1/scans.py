@@ -39,19 +39,25 @@ router = APIRouter(prefix="/scans", tags=["scans"])
 
 
 def _check_quota(db: Session, user: User) -> None:
-    # Shared daily allowance (also enforced on Shield Labs vertical scans).
-    from app.services.quota import check_daily_scan_quota
+    # Shared subscription gate (also enforced on Shield Labs vertical scans).
+    from app.services.quota import require_active_subscription
 
-    check_daily_scan_quota(db, user)
+    require_active_subscription(db, user)
 
 
 @router.get("/url-check")
 def url_check(url: str, user: User = Depends(get_user)):
     """Fast reputation verdict for the live Safe Browser.
 
-    Runs on every WebView navigation, so it bypasses the daily scan quota and
-    writes no scan history. Registered before /{scan_id} so this path wins.
+    Runs on every WebView navigation, so it writes no scan history, but it
+    still requires Premium — Live Safe Browser is a subscription feature.
+    Registered before /{scan_id} so this path wins.
     """
+    if not user.is_premium:
+        raise HTTPException(
+            status.HTTP_402_PAYMENT_REQUIRED,
+            "Live Safe Browser requires Shield AI Premium.",
+        )
     from app.services.url_check import check_url
 
     return check_url(url)

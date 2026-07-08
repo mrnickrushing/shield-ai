@@ -124,7 +124,7 @@ def test_update_profile():
 
 
 def test_account_export_purge_and_delete_controls():
-    headers = _auth_headers()
+    headers = _auth_headers(premium=True)
     privacy = client.put(
         "/api/v1/auth/me/privacy",
         json={"retention_days": 30, "require_device_unlock": True},
@@ -268,20 +268,34 @@ def test_realtime_monitoring_targets_and_telemetry():
     assert removed.status_code == 204, removed.text
 
 
-def test_free_monitoring_is_limited_to_one_email_target():
+def test_monitoring_target_requires_premium():
     headers = _auth_headers()
     first = client.post(
         "/api/v1/monitoring/targets",
         json={"target_type": "email", "value": "free-monitor@example.com"},
         headers=headers,
     )
-    assert first.status_code == 201, first.text
-    second = client.post(
-        "/api/v1/monitoring/targets",
-        json={"target_type": "domain", "value": "paypal-secure.xyz"},
+    assert first.status_code == 402, first.text
+
+
+def test_family_contact_requires_premium():
+    headers = _auth_headers()
+    r = client.post(
+        "/api/v1/family/contacts",
+        json={"name": "Mom", "phone": "+15551234567"},
         headers=headers,
     )
-    assert second.status_code == 402, second.text
+    assert r.status_code == 402, r.text
+
+
+def test_family_contact_premium_allows_add():
+    headers = _auth_headers(premium=True)
+    r = client.post(
+        "/api/v1/family/contacts",
+        json={"name": "Mom", "phone": "+15551234567"},
+        headers=headers,
+    )
+    assert r.status_code == 201, r.text
 
 
 def test_link_scan_requires_auth():
@@ -414,7 +428,7 @@ def _auth_headers(premium: bool = False) -> dict:
 
 
 def test_message_scan_full_flow():
-    headers = _auth_headers()
+    headers = _auth_headers(premium=True)
     r = client.post(
         "/api/v1/scans/message",
         json={"message_text": "Congratulations! You won a prize. Click now!", "platform_hint": "sms"},
@@ -429,7 +443,7 @@ def test_message_scan_full_flow():
 
 
 def test_email_scan_full_flow():
-    headers = _auth_headers()
+    headers = _auth_headers(premium=True)
     r = client.post(
         "/api/v1/scans/email",
         json={
@@ -447,7 +461,7 @@ def test_email_scan_full_flow():
 
 
 def test_phone_scan_full_flow():
-    headers = _auth_headers()
+    headers = _auth_headers(premium=True)
     r = client.post(
         "/api/v1/scans/phone",
         json={"phone_number": "+1-876-555-0100"},
@@ -460,7 +474,7 @@ def test_phone_scan_full_flow():
 
 
 def test_qr_scan_full_flow():
-    headers = _auth_headers()
+    headers = _auth_headers(premium=True)
     r = client.post(
         "/api/v1/scans/qr",
         json={"qr_content": "https://paypal-login.xyz/secure"},
@@ -473,7 +487,7 @@ def test_qr_scan_full_flow():
 
 
 def test_notifications_list():
-    headers = _auth_headers()
+    headers = _auth_headers(premium=True)
     # trigger a scan to create a notification
     client.post(
         "/api/v1/scans/message",
@@ -488,7 +502,7 @@ def test_notifications_list():
 
 
 def test_notifications_mark_read():
-    headers = _auth_headers()
+    headers = _auth_headers(premium=True)
     client.post(
         "/api/v1/scans/message",
         json={"message_text": "You won a prize!"},
@@ -623,7 +637,7 @@ def test_identity_alerts_requires_auth():
 
 
 def test_marketplace_scan_full_flow():
-    headers = _auth_headers()
+    headers = _auth_headers(premium=True)
     r = client.post(
         "/api/v1/scans/marketplace",
         json={
@@ -643,7 +657,7 @@ def test_marketplace_scan_full_flow():
 
 
 def test_social_scan_full_flow():
-    headers = _auth_headers()
+    headers = _auth_headers(premium=True)
     r = client.post(
         "/api/v1/scans/social",
         json={
@@ -660,7 +674,7 @@ def test_social_scan_full_flow():
 
 
 def test_identity_breach_check_no_hibp_key():
-    headers = _auth_headers()
+    headers = _auth_headers(premium=True)
     r = client.post(
         "/api/v1/identity/breach-check",
         json={"email": "nobody@example.com"},
@@ -682,7 +696,7 @@ def test_identity_alerts_list():
 
 
 def test_password_check_clean():
-    headers = _auth_headers()
+    headers = _auth_headers(premium=True)
     r = client.post(
         "/api/v1/identity/password-check",
         json={"password": "some-password-to-check"},
@@ -698,7 +712,7 @@ def test_password_check_clean():
 
 
 def test_password_check_requires_password_field():
-    headers = _auth_headers()
+    headers = _auth_headers(premium=True)
     r = client.post("/api/v1/identity/password-check", json={}, headers=headers)
     assert r.status_code == 422
 
@@ -828,6 +842,7 @@ def _make_developer_headers() -> dict:
     try:
         user = db.get(UserModel, user_id)
         user.is_developer = True
+        user.is_premium = True
         db.commit()
     finally:
         db.close()
@@ -1053,7 +1068,7 @@ def test_scam_pattern_crud_admin():
 
 
 def test_admin_feedback_review_queue_and_promotion():
-    headers = _auth_headers()
+    headers = _auth_headers(premium=True)
     scan = client.post(
         "/api/v1/scans/message",
         json={"message_text": "Suspicious correction seed.", "platform_hint": "sms"},
