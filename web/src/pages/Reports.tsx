@@ -21,6 +21,23 @@ export default function ReportsPage() {
 
   useEffect(() => { load(); }, [filter]);
 
+  const [deactivating, setDeactivating] = useState("");
+
+  const deactivateNumber = async (r: CommunityReport) => {
+    const number = (r.artifact_text ?? "").trim();
+    if (!number) return;
+    setDeactivating(r.id);
+    try {
+      await AdminAPI.deactivateSeededNumber(number);
+      await AdminAPI.reviewReport(r.id, "approved", `Seeded number ${number} deactivated.`);
+      load();
+    } catch {
+      setError("Couldn't deactivate that number — it may not be in the seeded list.");
+    } finally {
+      setDeactivating("");
+    }
+  };
+
   const submit = async () => {
     if (!selected) return;
     try {
@@ -67,10 +84,18 @@ export default function ReportsPage() {
             </div>
           )}
           {r.analyst_notes && <p style={{ color: C.muted, fontSize: 13, fontStyle: "italic", marginBottom: 8 }}>Notes: {r.analyst_notes}</p>}
-          <button onClick={() => { setSelected(r); setNotes(r.analyst_notes ?? ""); setNewStatus(r.status || "reviewed"); }}
-            style={{ padding: "5px 14px", borderRadius: 8, backgroundColor: C.primary, color: "#fff", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 700 }}>
-            Review
-          </button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={() => { setSelected(r); setNotes(r.analyst_notes ?? ""); setNewStatus(r.status || "reviewed"); }}
+              style={{ padding: "5px 14px", borderRadius: 8, backgroundColor: C.primary, color: "#fff", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 700 }}>
+              Review
+            </button>
+            {r.report_type === "false_positive" && r.category === "call_label" && r.status === "pending" && (
+              <button onClick={() => deactivateNumber(r)} disabled={deactivating === r.id}
+                style={{ padding: "5px 14px", borderRadius: 8, backgroundColor: C.warn, color: "#fff", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 700, opacity: deactivating === r.id ? 0.6 : 1 }}>
+                {deactivating === r.id ? "Removing…" : "Remove from blocklist"}
+              </button>
+            )}
+          </div>
         </div>
       ))}
 

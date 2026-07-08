@@ -17,6 +17,18 @@ import { Button, Eyebrow, FadeIn, GlowOrb, Surface } from "@/components/ui";
 import { ShieldAPI, BreachResult, IdentityAlert, MonitoredIdentity } from "@/lib/api";
 import { colors, radius, spacing, withAlpha } from "@/theme/theme";
 
+// last_status values come straight from the backend; translate the ones that
+// read like errors into calmer human phrasing.
+const MONITOR_STATUS_LABELS: Record<string, string> = {
+  unavailable: "check pending — data source offline",
+  unsupported: "not supported yet",
+  pending: "queued for first check",
+  clear: "no exposure found",
+  breached: "exposure found",
+  monitored: "monitoring",
+  paused: "paused",
+};
+
 const SEVERITY_COLORS: Record<string, string> = {
   none: colors.safe,
   low: colors.suspicious,
@@ -310,7 +322,8 @@ export default function IdentityScreen() {
                 <View style={{ flex: 1 }}>
                   <Text style={{ color: colors.text, fontWeight: "700" }}>{target.value}</Text>
                   <Text style={{ color: colors.textMuted, fontSize: 12 }}>
-                    {target.target_type} · {target.last_status} · {target.last_checked_at ? new Date(target.last_checked_at).toLocaleString() : "not checked yet"}
+                    {target.target_type} · {MONITOR_STATUS_LABELS[target.last_status] ?? target.last_status} ·{" "}
+                    {target.last_checked_at ? new Date(target.last_checked_at).toLocaleString() : "not checked yet"}
                   </Text>
                 </View>
                 <Pressable onPress={() => removeMonitor.mutate(target.id)} hitSlop={10}>
