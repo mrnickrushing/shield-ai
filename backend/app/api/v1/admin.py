@@ -736,6 +736,10 @@ def update_seeded_number(
     feed refresh never reactivates a row it finds already present, so a
     deactivation sticks across refreshes."""
     digits = "".join(ch for ch in number if ch.isdigit())
+    if len(digits) == 10:
+        # Seed rows store E.164 digits without '+'; bare NANP input (as typed
+        # into a false-positive report) is missing its country code.
+        digits = "1" + digits
     row = db.query(SeededScamNumber).filter(SeededScamNumber.number == digits).first()
     if not row:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Seeded number not found")

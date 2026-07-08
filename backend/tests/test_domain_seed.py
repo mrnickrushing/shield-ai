@@ -124,6 +124,22 @@ def test_admin_can_deactivate_seeded_entries():
     assert r.status_code == 200, r.text
     assert r.json()["is_active"] is False
 
+    # A bare 10-digit NANP number (as typed into a false-positive report)
+    # matches the same 1-prefixed seed row.
+    r = client.patch(
+        "/api/v1/admin/seeded-numbers/999-555-0100",
+        json={"is_active": True},
+        headers=headers,
+    )
+    assert r.status_code == 200, r.text
+    r = client.patch(
+        "/api/v1/admin/seeded-numbers/9995550100",
+        json={"is_active": False},
+        headers=headers,
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["number"] == "19995550100"
+
     # Deactivated entries drop out of the sync feeds.
     user_headers = _auth_headers()
     r = client.get("/api/v1/url-reputation/sync", headers=user_headers)
