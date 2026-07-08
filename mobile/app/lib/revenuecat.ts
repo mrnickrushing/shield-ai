@@ -10,15 +10,29 @@ import Purchases, { CustomerInfo, LOG_LEVEL, PurchasesOffering, PurchasesPackage
 /** RevenueCat public iOS SDK key (safe to commit). */
 export const REVENUECAT_IOS_API_KEY = "appl_MySwPRnfnUCwjjdlNvYbORTDQbE";
 
+/**
+ * RevenueCat public Android SDK key — left blank until the Play Console app,
+ * subscription products, and RevenueCat Play Billing integration exist (see
+ * the Android parity plan). Purchases stay unsupported on Android until this
+ * is filled in, so this scaffolding is a no-op until then.
+ */
+export const REVENUECAT_ANDROID_API_KEY = "";
+
 /** Entitlement identifier attached to both subscription products. */
 export const ENTITLEMENT_PREMIUM = "premium";
 
 let configured = false;
 let configuredAppUserId: string | null = null;
 
-/** True on platforms where the native Purchases module exists. */
+function apiKeyForPlatform(): string | null {
+  if (Platform.OS === "ios") return REVENUECAT_IOS_API_KEY;
+  if (Platform.OS === "android") return REVENUECAT_ANDROID_API_KEY || null;
+  return null;
+}
+
+/** True on platforms where the native Purchases module exists and is configured. */
 export function purchasesSupported(): boolean {
-  return Platform.OS === "ios";
+  return apiKeyForPlatform() !== null;
 }
 
 /**
@@ -38,11 +52,11 @@ export async function configureRevenueCat(appUserId: string): Promise<void> {
 export async function ensureRevenueCatConfigured(appUserId?: string | null): Promise<void> {
   if (!purchasesSupported()) return;
   if (!configured) {
+    const apiKey = apiKeyForPlatform();
+    if (!apiKey) return;
     if (__DEV__) Purchases.setLogLevel(LOG_LEVEL.DEBUG);
     Purchases.configure(
-      appUserId
-        ? { apiKey: REVENUECAT_IOS_API_KEY, appUserID: appUserId }
-        : { apiKey: REVENUECAT_IOS_API_KEY }
+      appUserId ? { apiKey, appUserID: appUserId } : { apiKey }
     );
     configured = true;
     configuredAppUserId = appUserId ?? null;
