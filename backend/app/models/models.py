@@ -395,7 +395,13 @@ class BrokerOptOut(Base):
     # or straight to not_listed when they searched and found nothing.
     status: Mapped[str] = mapped_column(String, default="not_started")
     notes: Mapped[str] = mapped_column(Text, default="")
+    # The user's own profile URL on the broker site — pasted into the
+    # generated opt-out letter and shown when re-verifying a removal.
+    listing_url: Mapped[str] = mapped_column(String, default="")
     requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # When the broker re-check task last alerted about this row, so overdue
+    # and re-verify alerts fire once per window instead of daily.
+    last_recheck_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
 

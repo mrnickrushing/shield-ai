@@ -376,6 +376,19 @@ class BreachCheckResult(BaseModel):
     checked_at: datetime
 
 
+class BreachPreviewResult(BaseModel):
+    """Onboarding teaser: how bad is it, and the worst offenders by name.
+
+    Deliberately excludes the full breach list, dates, and data classes —
+    those stay behind the subscription.
+    """
+    email: str
+    breach_count: int
+    severity: str
+    top_breaches: list[str]
+    data_available: bool
+
+
 class IdentityAlertOut(BaseModel):
     id: str
     alert_type: str
@@ -391,6 +404,7 @@ class IdentityAlertOut(BaseModel):
 class BrokerStatusUpdate(BaseModel):
     status: str
     notes: str = ""
+    listing_url: str = ""
 
 
 class BrokerExposureItem(BaseModel):
@@ -399,12 +413,26 @@ class BrokerExposureItem(BaseModel):
     priority: int
     search_url: str
     opt_out_url: str
+    privacy_email: str = ""
     instructions: str
     expected_days: int
     status: str = "not_started"
     notes: str = ""
+    listing_url: str = ""
     requested_at: datetime | None = None
     updated_at: datetime | None = None
+    # Deadline tracking, derived from requested_at + expected_days.
+    check_back_on: datetime | None = None
+    overdue: bool = False
+
+
+class BrokerOptOutLetter(BaseModel):
+    broker_key: str
+    broker_name: str
+    subject: str
+    body: str
+    privacy_email: str = ""
+    opt_out_url: str
 
 
 class BrokerExposureSummary(BaseModel):
@@ -575,3 +603,17 @@ class PhoneReputationEntry(BaseModel):
 class PhoneReputationSyncOut(BaseModel):
     version: str
     entries: list[PhoneReputationEntry]
+
+
+class CoachMessage(BaseModel):
+    role: str = Field(pattern="^(user|assistant)$")
+    content: str = Field(min_length=1, max_length=4000)
+
+
+class CoachChatRequest(BaseModel):
+    """Stateless chat: the client sends the running thread each turn."""
+    messages: list[CoachMessage] = Field(min_length=1, max_length=40)
+
+
+class CoachChatResponse(BaseModel):
+    reply: str

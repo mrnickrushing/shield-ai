@@ -635,6 +635,31 @@ export default function ScanScreen() {
           </View>
         </View>
 
+        {/* Scam coach — for situations, not artifacts */}
+        <Pressable
+          onPress={() => router.push("/coach" as any)}
+          style={({ pressed }) => ({
+            flexDirection: "row",
+            alignItems: "center",
+            gap: spacing.sm,
+            padding: spacing.md,
+            borderRadius: radius.md,
+            backgroundColor: pressed ? colors.glassActive : colors.glass,
+            borderWidth: 1,
+            borderColor: colors.borderHi,
+            marginBottom: spacing.lg,
+          })}
+        >
+          <Ionicons name="chatbubbles-outline" size={18} color={colors.primaryBright} />
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: colors.text, fontWeight: "700", fontSize: 13 }}>Ask about a situation…</Text>
+            <Text style={{ color: colors.textMuted, fontSize: 12 }}>
+              Nothing to paste? Describe what&apos;s happening and get a straight answer.
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+        </Pressable>
+
         {/* Advanced: specific scan types */}
         <Pressable
           onPress={() => setAdvancedOpen((open) => !open)}

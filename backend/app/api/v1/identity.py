@@ -1,10 +1,12 @@
 """Identity protection routes — Phase 3.
 
 POST /api/v1/identity/breach-check     — check email against HIBP
+POST /api/v1/identity/breach-preview   — onboarding teaser (count + top names, no subscription)
 POST /api/v1/identity/password-check   — k-anonymity password pwned check
 GET  /api/v1/identity/alerts           — list identity alerts
 POST /api/v1/identity/alerts/{id}/read — mark alert as read
 """
+import time as _time
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -16,8 +18,10 @@ from app.models.models import BreachRecord, BrokerOptOut, IdentityAlert, User
 from app.schemas.schemas import (
     BreachCheckRequest,
     BreachCheckResult,
+    BreachPreviewResult,
     BrokerExposureItem,
     BrokerExposureSummary,
+    BrokerOptOutLetter,
     BrokerStatusUpdate,
     IdentityAlertOut,
 )
@@ -34,6 +38,54 @@ def _require_premium(user: User) -> None:
             status.HTTP_402_PAYMENT_REQUIRED,
             "Identity protection requires Shield AI Premium.",
         )
+
+
+# Per-user preview budget: enough to check a couple of addresses during
+# onboarding, small enough that the endpoint can't be farmed as a free HIBP
+# proxy. In-process state resets on deploy, which is fine for a teaser.
+_PREVIEW_LIMIT = 5
+_PREVIEW_WINDOW_SECONDS = 24 * 3600
+_preview_usage: dict[str, list[float]] = {}
+
+
+def _check_preview_budget(user_id: str) -> None:
+    now = _time.monotonic()
+    hits = [t for t in _preview_usage.get(user_id, []) if now - t < _PREVIEW_WINDOW_SECONDS]
+    if len(hits) >= _PREVIEW_LIMIT:
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            "Preview limit reached. Subscribe for unlimited breach checks.",
+        )
+    hits.append(now)
+    _preview_usage[user_id] = hits
+
+
+@router.post("/breach-preview", response_model=BreachPreviewResult)
+def breach_preview(
+    payload: BreachCheckRequest,
+    user: User = Depends(get_current_user),
+):
+    """Onboarding reveal: breach count and the worst breach names, no details.
+
+    Deliberately NOT premium-gated — this runs between signup and the paywall
+    so the user sees their real exposure before deciding to subscribe. Full
+    breach details stay behind /breach-check.
+    """
+    _check_preview_budget(user.id)
+    email = str(payload.email).lower().strip()
+    if "@" not in email:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Enter a valid email address")
+
+    result = breach_check.check_breaches(email)
+    # Worst first: HIBP breach dicts carry pwn_count; largest exposures lead.
+    ranked = sorted(result["breaches"], key=lambda b: b.get("pwn_count", 0), reverse=True)
+    return BreachPreviewResult(
+        email=email,
+        breach_count=result["breach_count"],
+        severity=result["severity"],
+        top_breaches=[b.get("title") or b.get("name", "") for b in ranked[:3]],
+        data_available=result["data_available"],
+    )
 
 
 def _fresh_cache(db: Session, user_id: str, email: str) -> BreachRecord | None:
@@ -206,8 +258,12 @@ def broker_exposure(db: Session = Depends(get_db), user: User = Depends(get_curr
         row = statuses.get(entry["key"])
         entry["status"] = row.status if row else "not_started"
         entry["notes"] = row.notes if row else ""
+        entry["listing_url"] = row.listing_url if row else ""
         entry["requested_at"] = row.requested_at if row else None
         entry["updated_at"] = row.updated_at if row else None
+        entry["check_back_on"], entry["overdue"] = broker_catalog.deadline_for(
+            entry["status"], row.requested_at if row else None, entry["expected_days"]
+        )
         if entry["status"] in broker_catalog.RESOLVED_STATUSES:
             resolved += 1
         elif entry["status"] == "not_started":
@@ -255,6 +311,8 @@ def update_broker_status(
         db.add(row)
     row.status = payload.status
     row.notes = payload.notes[:2000]
+    if payload.listing_url:
+        row.listing_url = payload.listing_url[:500]
     row.updated_at = datetime.now(timezone.utc)
     if payload.status == "requested" and row.requested_at is None:
         row.requested_at = row.updated_at
@@ -263,8 +321,50 @@ def update_broker_status(
 
     display_name = user.profile.display_name if user.profile else ""
     rendered = next(b for b in broker_catalog.catalog_for(display_name) if b["key"] == broker_key)
+    check_back_on, overdue = broker_catalog.deadline_for(
+        row.status, row.requested_at, rendered["expected_days"]
+    )
     rendered.update(
-        status=row.status, notes=row.notes,
+        status=row.status, notes=row.notes, listing_url=row.listing_url,
         requested_at=row.requested_at, updated_at=row.updated_at,
+        check_back_on=check_back_on, overdue=overdue,
     )
     return rendered
+
+
+@router.get("/brokers/{broker_key}/opt-out-letter", response_model=BrokerOptOutLetter)
+def broker_opt_out_letter(
+    broker_key: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Pre-filled removal request the user can send in one tap.
+
+    Deterministic template (no LLM): these letters cite CCPA/state privacy
+    rights and must not vary or hallucinate legal claims.
+    """
+    _require_premium(user)
+    entry = next((b for b in broker_catalog.BROKERS if b["key"] == broker_key), None)
+    if entry is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Unknown broker")
+
+    row = (
+        db.query(BrokerOptOut)
+        .filter(BrokerOptOut.user_id == user.id, BrokerOptOut.broker_key == broker_key)
+        .first()
+    )
+    display_name = (user.profile.display_name if user.profile else "") or "[Your full name]"
+    letter = broker_catalog.build_opt_out_letter(
+        entry,
+        display_name=display_name,
+        email=user.email,
+        listing_url=(row.listing_url if row else "") or "[Paste your listing URL here]",
+    )
+    return BrokerOptOutLetter(
+        broker_key=entry["key"],
+        broker_name=entry["name"],
+        subject=letter["subject"],
+        body=letter["body"],
+        privacy_email=entry.get("privacy_email", ""),
+        opt_out_url=entry["opt_out_url"],
+    )

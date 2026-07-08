@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
+import * as Clipboard from "expo-clipboard";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import React, { useState } from "react";
-import { ActivityIndicator, Linking, Pressable, ScrollView, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, Share, Text, TextInput, View } from "react-native";
 
 import { Eyebrow, FadeIn, Surface } from "@/components/ui";
 import { BrokerExposureItem, BrokerStatus, ShieldAPI } from "@/lib/api";
@@ -23,19 +24,53 @@ const NEXT_ACTIONS: Record<BrokerStatus, { to: BrokerStatus; label: string }[]> 
   ],
   found: [{ to: "requested", label: "I submitted the opt-out" }],
   requested: [{ to: "removed", label: "It's been removed" }],
-  removed: [],
+  removed: [{ to: "found", label: "It came back" }],
   not_listed: [],
 };
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
 
 function BrokerCard({ broker }: { broker: BrokerExposureItem }) {
   const queryClient = useQueryClient();
   const [expanded, setExpanded] = useState(false);
+  const [listingUrl, setListingUrl] = useState(broker.listing_url);
   const meta = STATUS_META[broker.status];
 
   const mutation = useMutation({
-    mutationFn: (status: BrokerStatus) => ShieldAPI.updateBrokerStatus(broker.key, status),
+    mutationFn: (status: BrokerStatus) =>
+      ShieldAPI.updateBrokerStatus(broker.key, status, undefined, listingUrl.trim()),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["broker-exposure"] }),
   });
+
+  const letterMutation = useMutation({
+    mutationFn: () => ShieldAPI.brokerOptOutLetter(broker.key),
+    onSuccess: async (letter) => {
+      if (letter.privacy_email) {
+        // One tap: pre-addressed email with the letter filled in.
+        const url = `mailto:${letter.privacy_email}?subject=${encodeURIComponent(letter.subject)}&body=${encodeURIComponent(letter.body)}`;
+        const canMail = await Linking.canOpenURL(url).catch(() => false);
+        if (canMail) {
+          Linking.openURL(url);
+          return;
+        }
+      }
+      // No known privacy inbox: copy the letter, then open the opt-out form.
+      await Clipboard.setStringAsync(`${letter.subject}\n\n${letter.body}`);
+      Alert.alert(
+        "Letter copied",
+        `Your removal request is on the clipboard. Paste it into ${letter.broker_name}'s opt-out form.`,
+        [
+          { text: "Share instead", onPress: () => Share.share({ message: letter.body, title: letter.subject }) },
+          { text: "Open opt-out page", onPress: () => Linking.openURL(letter.opt_out_url) },
+        ]
+      );
+    },
+    onError: () => Alert.alert("Couldn't build the letter", "Please try again."),
+  });
+
+  const showListingInput = broker.status === "found" || broker.status === "requested";
 
   return (
     <Surface style={{ marginBottom: spacing.sm }}>
@@ -44,8 +79,20 @@ function BrokerCard({ broker }: { broker: BrokerExposureItem }) {
           <Ionicons name={meta.icon} size={20} color={meta.color} />
           <View style={{ flex: 1 }}>
             <Text style={{ color: colors.text, fontWeight: "700", fontSize: 14 }}>{broker.name}</Text>
-            <Text style={{ color: meta.color, fontSize: 12 }}>{meta.label}</Text>
+            <Text style={{ color: meta.color, fontSize: 12 }}>
+              {meta.label}
+              {broker.status === "requested" && broker.check_back_on
+                ? broker.overdue
+                  ? " · past promised removal date"
+                  : ` · check back ${formatDate(broker.check_back_on)}`
+                : ""}
+            </Text>
           </View>
+          {broker.overdue && (
+            <View style={{ backgroundColor: withAlpha(colors.suspicious, "22"), borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 }}>
+              <Text style={{ color: colors.suspicious, fontSize: 10, fontWeight: "800" }}>VERIFY</Text>
+            </View>
+          )}
           {broker.priority === 1 && broker.status === "not_started" && (
             <View style={{ backgroundColor: withAlpha(colors.high, "22"), borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 }}>
               <Text style={{ color: colors.high, fontSize: 10, fontWeight: "800" }}>HIGH TRAFFIC</Text>
@@ -76,6 +123,51 @@ function BrokerCard({ broker }: { broker: BrokerExposureItem }) {
               <Text style={{ color: colors.teal, fontWeight: "700", fontSize: 13 }}>Opt-out page</Text>
             </Pressable>
           </View>
+
+          {showListingInput && (
+            <>
+              <TextInput
+                placeholder="Paste your listing URL (goes into the letter)"
+                placeholderTextColor={colors.textMuted}
+                autoCapitalize="none"
+                value={listingUrl}
+                onChangeText={setListingUrl}
+                onEndEditing={() => {
+                  if (listingUrl.trim() && listingUrl.trim() !== broker.listing_url) {
+                    mutation.mutate(broker.status);
+                  }
+                }}
+                style={{
+                  backgroundColor: colors.bg,
+                  borderColor: colors.border,
+                  borderWidth: 1,
+                  borderRadius: radius.md,
+                  color: colors.text,
+                  padding: spacing.sm,
+                  fontSize: 13,
+                }}
+              />
+              <Pressable
+                onPress={() => letterMutation.mutate()}
+                disabled={letterMutation.isPending}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: spacing.sm,
+                  backgroundColor: withAlpha(colors.purple, "18"),
+                  borderRadius: radius.md,
+                  padding: spacing.sm,
+                  opacity: letterMutation.isPending ? 0.6 : 1,
+                }}
+              >
+                <Ionicons name="mail-outline" size={16} color={colors.purple} />
+                <Text style={{ color: colors.purple, fontWeight: "700", fontSize: 13 }}>
+                  {letterMutation.isPending ? "Building your letter…" : "Send removal request"}
+                </Text>
+              </Pressable>
+            </>
+          )}
 
           {NEXT_ACTIONS[broker.status].map((action) => (
             <Pressable
@@ -114,6 +206,8 @@ export default function ExposureScreen() {
     : data.exposure_score >= 70 ? colors.high
     : data.exposure_score >= 30 ? colors.suspicious
     : colors.safe;
+
+  const needsVerify = data?.brokers.filter((b) => b.overdue).length ?? 0;
 
   return (
     <ScrollView
@@ -157,6 +251,11 @@ export default function ExposureScreen() {
                 {data.resolved} of {data.total} brokers handled
                 {data.in_progress > 0 ? ` · ${data.in_progress} in progress` : ""}
               </Text>
+              {needsVerify > 0 && (
+                <Text style={{ color: colors.suspicious, fontSize: 13, fontWeight: "700", marginTop: spacing.xs }}>
+                  {needsVerify} removal{needsVerify === 1 ? "" : "s"} past the promised date — verify below
+                </Text>
+              )}
             </Surface>
           </FadeIn>
 
@@ -167,8 +266,8 @@ export default function ExposureScreen() {
           ))}
 
           <Text style={{ color: colors.textMuted, fontSize: 11, textAlign: "center", marginTop: spacing.md }}>
-            Removal requests are honored under CCPA/state privacy laws. Brokers
-            sometimes re-list after 6–12 months — check back occasionally.
+            Removal requests are honored under CCPA/state privacy laws. Brokers sometimes
+            re-list after 6–12 months — we&apos;ll remind you monthly to re-verify removals.
           </Text>
         </>
       )}

@@ -266,18 +266,41 @@ export type ScamTrends = {
 
 export type BrokerStatus = "not_started" | "not_listed" | "found" | "requested" | "removed";
 
+export type BreachPreview = {
+  email: string;
+  breach_count: number;
+  severity: string;
+  top_breaches: string[];
+  data_available: boolean;
+};
+
+export type BrokerOptOutLetter = {
+  broker_key: string;
+  broker_name: string;
+  subject: string;
+  body: string;
+  privacy_email: string;
+  opt_out_url: string;
+};
+
+export type CoachMessage = { role: "user" | "assistant"; content: string };
+
 export type BrokerExposureItem = {
   key: string;
   name: string;
   priority: number;
   search_url: string;
   opt_out_url: string;
+  privacy_email: string;
   instructions: string;
   expected_days: number;
   status: BrokerStatus;
   notes: string;
+  listing_url: string;
   requested_at: string | null;
   updated_at: string | null;
+  check_back_on: string | null;
+  overdue: boolean;
 };
 
 export type BrokerExposureSummary = {
@@ -500,6 +523,9 @@ export const ShieldAPI = {
   // Identity protection
   breachCheck: (email: string) =>
     api.post<BreachResult>("/identity/breach-check", { email }).then((r) => r.data),
+  // Onboarding reveal — works before the subscription starts.
+  breachPreview: (email: string) =>
+    api.post<BreachPreview>("/identity/breach-preview", { email }).then((r) => r.data),
   passwordCheck: (password: string) =>
     api.post<{ pwned_count: number; is_compromised: boolean; recommendation: string }>(
       "/identity/password-check",
@@ -511,8 +537,14 @@ export const ShieldAPI = {
     api.post(`/identity/alerts/${id}/read`),
   brokerExposure: () =>
     api.get<BrokerExposureSummary>("/identity/brokers").then((r) => r.data),
-  updateBrokerStatus: (broker_key: string, status: BrokerStatus, notes?: string) =>
-    api.put<BrokerExposureItem>(`/identity/brokers/${broker_key}`, { status, notes: notes ?? "" }).then((r) => r.data),
+  updateBrokerStatus: (broker_key: string, status: BrokerStatus, notes?: string, listing_url?: string) =>
+    api.put<BrokerExposureItem>(`/identity/brokers/${broker_key}`, { status, notes: notes ?? "", listing_url: listing_url ?? "" }).then((r) => r.data),
+  brokerOptOutLetter: (broker_key: string) =>
+    api.get<BrokerOptOutLetter>(`/identity/brokers/${broker_key}/opt-out-letter`).then((r) => r.data),
+
+  // AI scam coach — stateless chat, the client sends the running thread.
+  coachChat: (messages: CoachMessage[]) =>
+    api.post<{ reply: string }>("/coach/chat", { messages }, { timeout: 60000 }).then((r) => r.data),
 
   // Real-time monitoring
   listMonitoringTargets: () =>

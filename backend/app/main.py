@@ -6,7 +6,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api.v1 import admin, auth, billing, community, developer, education, family, identity, message_filter, monitoring, notifications, phone_reputation, recovery, scans, url_reputation, verticals
+from app.api.v1 import admin, auth, billing, coach, community, developer, education, family, identity, message_filter, monitoring, notifications, phone_reputation, recovery, scans, url_reputation, verticals
 from app.core.config import settings, validate_runtime_settings
 
 _RATE_LIMIT_BUCKETS: dict[str, list[float]] = {}
@@ -104,6 +104,7 @@ app.include_router(recovery.router, prefix=settings.API_V1_PREFIX)
 app.include_router(family.router, prefix=settings.API_V1_PREFIX)
 app.include_router(education.router, prefix=settings.API_V1_PREFIX)
 app.include_router(identity.router, prefix=settings.API_V1_PREFIX)
+app.include_router(coach.router, prefix=settings.API_V1_PREFIX)
 app.include_router(community.router, prefix=settings.API_V1_PREFIX)
 app.include_router(phone_reputation.router, prefix=settings.API_V1_PREFIX)
 app.include_router(url_reputation.router, prefix=settings.API_V1_PREFIX)
