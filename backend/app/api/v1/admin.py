@@ -49,6 +49,8 @@ from app.models.models import (
     ScamPattern,
     ScanFeedbackDetail,
     ScanHistory,
+    SeededScamDomain,
+    SeededScamNumber,
     User,
 )
 from app.schemas.schemas import (
@@ -715,3 +717,47 @@ def delete_scam_pattern(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Pattern not found")
     pattern.is_active = False
     db.commit()
+
+
+class _SeedEntryPatch(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    is_active: bool
+
+
+@router.patch("/seeded-numbers/{number}")
+def update_seeded_number(
+    number: str,
+    payload: _SeedEntryPatch,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin),
+):
+    """Deactivate (or reactivate) a feed-seeded phone number — the escape
+    hatch when a legitimate line ends up labeled from complaint data. The
+    feed refresh never reactivates a row it finds already present, so a
+    deactivation sticks across refreshes."""
+    digits = "".join(ch for ch in number if ch.isdigit())
+    row = db.query(SeededScamNumber).filter(SeededScamNumber.number == digits).first()
+    if not row:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Seeded number not found")
+    row.is_active = payload.is_active
+    _audit(db, admin.id, "seeded_number_update", {"number": digits, "is_active": payload.is_active})
+    db.commit()
+    return {"number": row.number, "label": row.label, "is_active": row.is_active}
+
+
+@router.patch("/seeded-domains/{domain}")
+def update_seeded_domain(
+    domain: str,
+    payload: _SeedEntryPatch,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin),
+):
+    """Deactivate (or reactivate) a feed-seeded phishing domain."""
+    normalized = domain.strip().lower()
+    row = db.query(SeededScamDomain).filter(SeededScamDomain.domain == normalized).first()
+    if not row:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Seeded domain not found")
+    row.is_active = payload.is_active
+    _audit(db, admin.id, "seeded_domain_update", {"domain": normalized, "is_active": payload.is_active})
+    db.commit()
+    return {"domain": row.domain, "is_active": row.is_active}

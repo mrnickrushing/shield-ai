@@ -37,6 +37,10 @@ celery_app.conf.beat_schedule = {
         "task": "monitoring.weekly_protection_report",
         "schedule": 7 * 24 * 60 * 60,
     },
+    "seed-feed-refresh-daily": {
+        "task": "feeds.refresh_seeds",
+        "schedule": 24 * 60 * 60,
+    },
 }
 
 
@@ -126,6 +130,32 @@ def scan_pattern_followups_task() -> int:
         return alerts
     finally:
         db.close()
+
+
+@celery_app.task(name="feeds.refresh_seeds")
+def refresh_seed_feeds_task() -> dict:
+    """Re-fetch the FCC complaint feed and phishing-domain feeds so the
+    seeded blocklists stay fresh between deploys. Best-effort per feed."""
+    from app.db.session import SessionLocal
+    from app.services import feed_sources
+    from app.services.domain_seed import reconcile_domains
+    from app.services.phone_seed import reconcile_numbers
+
+    results: dict[str, int] = {}
+    for name, fetch, reconcile in (
+        ("numbers", feed_sources.fetch_fcc_complaint_numbers, reconcile_numbers),
+        ("domains", feed_sources.fetch_phishing_domains, reconcile_domains),
+    ):
+        try:
+            data = fetch()
+            db = SessionLocal()
+            try:
+                results[name] = reconcile(db, data)
+            finally:
+                db.close()
+        except Exception:
+            results[name] = -1  # fetch failed; next daily run retries
+    return results
 
 
 @celery_app.task(name="monitoring.weekly_protection_report")

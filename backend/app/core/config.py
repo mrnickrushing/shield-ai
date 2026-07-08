@@ -68,6 +68,9 @@ class Settings(BaseSettings):
     FREE_TIER_MONITOR_TARGETS: int = 1
     MAX_UPLOAD_MB: int = 10
 
+    # --- Observability ---
+    SENTRY_DSN: str = ""  # error reporting is a no-op when unset
+
     # --- Production safety ---
     STRICT_PRODUCTION_CONFIG: bool = True
     RATE_LIMIT_PER_MINUTE: int = 600
