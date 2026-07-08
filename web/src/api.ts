@@ -209,6 +209,8 @@ export const AdminAPI = {
     api.get<CommunityReport[]>("/admin/reports", { params: statusFilter ? { status_filter: statusFilter } : {} }),
   reviewReport: (id: string, status: string, analyst_notes: string) =>
     api.patch<CommunityReport>(`/admin/reports/${id}`, { status, analyst_notes }),
+  deactivateSeededNumber: (number: string) =>
+    api.patch(`/admin/seeded-numbers/${encodeURIComponent(number)}`, { is_active: false }),
 
   feedback: (statusFilter?: string) =>
     api.get<FeedbackReview[]>("/admin/feedback", { params: statusFilter ? { status_filter: statusFilter } : {} }),
