@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.db.session import get_db
-from app.models.models import LinkScan, RiskLevel, RiskReport, ScanHistory, User
+from app.models.models import LinkScan, RiskLevel, RiskReport, ScanHistory, SeededScamDomain, User
 
 router = APIRouter(prefix="/url-reputation", tags=["url-reputation"])
 
@@ -46,8 +46,16 @@ def sync_url_reputation(
         .all()
     )
 
-    latest = None
-    domains = []
+    # Externally-seeded phishing domains (OpenPhish/URLhaus) fill the list
+    # before community link scans accumulate.
+    seeds = (
+        db.query(SeededScamDomain)
+        .filter(SeededScamDomain.is_active.is_(True))
+        .all()
+    )
+    domains = [seed.domain for seed in seeds]
+    latest = max((seed.created_at for seed in seeds), default=None)
+
     for domain, _detections, last_seen in rows:
         domains.append(domain.lower())
         if latest is None or (last_seen and last_seen > latest):

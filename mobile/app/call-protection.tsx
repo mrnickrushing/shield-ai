@@ -5,6 +5,7 @@ import React, { useEffect, useState } from "react";
 import { Alert, Linking, Platform, Pressable, ScrollView, Text, View } from "react-native";
 
 import { Button, Eyebrow, FadeIn, Surface } from "@/components/ui";
+import { ShieldAPI } from "@/lib/api";
 import { openCallDirectorySettings, syncCallProtection } from "@/lib/callDirectorySync";
 import { syncSafariBlocklist } from "@/lib/safariBlocklistSync";
 import { colors, spacing, withAlpha } from "@/theme/theme";
@@ -75,6 +76,33 @@ export default function CallProtectionScreen() {
     // Sync silently when the screen opens; the manual button confirms with an alert.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const reportWrongLabel = () => {
+    Alert.prompt(
+      "Report a wrong label",
+      "Enter the phone number that's being labeled incorrectly. We'll review it and remove legitimate numbers from the list.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Submit",
+          onPress: (value?: string) => {
+            const number = (value ?? "").trim();
+            if (!number) return;
+            ShieldAPI.submitReport({
+              report_type: "false_positive",
+              artifact_text: number,
+              category: "call_label",
+            })
+              .then(() => Alert.alert("Thanks", "We received your report and will review the label."))
+              .catch(() => Alert.alert("Couldn't send", "Check your connection and try again."));
+          },
+        },
+      ],
+      "plain-text",
+      "",
+      "phone-pad"
+    );
+  };
 
   const notSupported = Platform.OS !== "ios";
   const syncFailed = syncMutation.isError || (syncMutation.data && !syncMutation.data.synced);
@@ -158,6 +186,11 @@ export default function CallProtectionScreen() {
                   loading={syncMutation.isPending}
                   variant="secondary"
                 />
+                <Pressable onPress={reportWrongLabel} hitSlop={8} style={{ marginTop: spacing.sm }}>
+                  <Text style={{ color: colors.textMuted, fontSize: 12, textAlign: "center" }}>
+                    Is a legitimate number being labeled? <Text style={{ color: colors.primaryBright }}>Report it</Text>
+                  </Text>
+                </Pressable>
               </Surface>
             </FadeIn>
 

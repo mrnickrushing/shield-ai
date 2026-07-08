@@ -12,22 +12,52 @@ from app.core.config import settings, validate_runtime_settings
 _RATE_LIMIT_BUCKETS: dict[str, list[float]] = {}
 
 
+def _init_sentry() -> None:
+    if not settings.SENTRY_DSN:
+        return
+    try:
+        import sentry_sdk
+
+        sentry_sdk.init(
+            dsn=settings.SENTRY_DSN,
+            environment=settings.ENVIRONMENT,
+            traces_sample_rate=0.1,
+            send_default_pii=False,  # scan content is sensitive; never attach request bodies
+        )
+        print("[startup] sentry initialized")
+    except Exception as exc:
+        print(f"[startup] sentry init failed: {exc}")
+
+
+def _run_startup_seeds() -> None:
+    """Populate baseline data (never blocks the server from booting)."""
+    from app.db.session import SessionLocal
+    from app.services.domain_seed import seed_scam_domains
+    from app.services.phone_seed import seed_scam_numbers
+    from app.services.threat_intel import seed_default_patterns
+
+    for name, seeder in (
+        ("scam numbers", seed_scam_numbers),
+        ("scam domains", seed_scam_domains),
+        ("threat-intel patterns", seed_default_patterns),
+    ):
+        try:
+            db = SessionLocal()
+            try:
+                added = seeder(db)
+                if added:
+                    print(f"[startup] seeded {added} {name}")
+            finally:
+                db.close()
+        except Exception as exc:
+            print(f"[startup] {name} seeding skipped: {exc}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     validate_runtime_settings()
-    try:
-        from app.db.session import SessionLocal
-        from app.services.phone_seed import seed_scam_numbers
-
-        db = SessionLocal()
-        try:
-            added = seed_scam_numbers(db)
-            if added:
-                print(f"[startup] seeded {added} scam numbers from bundled feed")
-        finally:
-            db.close()
-    except Exception as exc:  # seeding must never block the server from booting
-        print(f"[startup] scam-number seeding skipped: {exc}")
+    _init_sentry()
+    _run_startup_seeds()
     yield
 
 

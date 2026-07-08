@@ -580,6 +580,20 @@ class SeededScamNumber(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
 
+class SeededScamDomain(Base):
+    """Known phishing/malware hostnames from external feeds (OpenPhish,
+    URLhaus), giving the Safari extension a non-empty blocklist before
+    community link scans accumulate. Lowercase hostnames."""
+
+    __tablename__ = "seeded_scam_domains"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    domain: Mapped[str] = mapped_column(String, unique=True, index=True)
+    source: Mapped[str] = mapped_column(String, default="phishing_feeds")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
 class ScamPattern(Base):
     __tablename__ = "scam_patterns"
 

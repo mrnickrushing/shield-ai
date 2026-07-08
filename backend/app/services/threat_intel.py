@@ -70,10 +70,11 @@ def check_patterns(
     return total_boost, flags
 
 
-def seed_default_patterns(db: Session) -> None:
-    """Seed a handful of baseline patterns if the table is empty."""
+def seed_default_patterns(db: Session) -> int:
+    """Seed a handful of baseline patterns if the table is empty. Returns how
+    many patterns were added."""
     if db.query(ScamPattern).count() > 0:
-        return
+        return 0
 
     defaults = [
         ScamPattern(
@@ -130,3 +131,4 @@ def seed_default_patterns(db: Session) -> None:
     for p in defaults:
         db.add(p)
     db.commit()
+    return len(defaults)
