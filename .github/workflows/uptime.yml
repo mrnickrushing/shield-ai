@@ -1,0 +1,27 @@
+name: Uptime check
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Ping backend /health
+        run: |
+          for attempt in 1 2 3; do
+            status=$(curl -sS --max-time 20 -o /tmp/health.json -w "%{http_code}" \
+              "https://backend-production-ed5a.up.railway.app/health" || echo "000")
+            if [ "$status" = "200" ] && grep -q '"status":[[:space:]]*"ok"' /tmp/health.json; then
+              echo "healthy (attempt $attempt)"
+              exit 0
+            fi
+            echo "attempt $attempt failed with HTTP $status"
+            sleep 20
+          done
+          echo "backend unhealthy after 3 attempts"
+          cat /tmp/health.json 2>/dev/null || true
+          exit 1

@@ -7,6 +7,7 @@ import Animated, { Easing, useAnimatedStyle, useSharedValue, withDelay, withSpri
 
 import { GlowBackground } from "@/components/GlowBackground";
 import { GradientButton } from "@/components/GradientButton";
+import { recordWinAndMaybeAskForReview } from "@/lib/appReview";
 import { ShieldAPI, type Scan } from "@/lib/api";
 import { colors, glow, gradients, radius, riskColors, spacing } from "@/theme/theme";
 
@@ -212,6 +213,15 @@ export default function Result() {
     enabled: !!id,
     refetchInterval: (query) => (query.state.data?.report ? false : 2500),
   });
+
+  // A high-risk verdict is a "we just caught this for you" moment — the right
+  // time to (rarely) ask for a rating. Delayed so it never covers the verdict.
+  const verdictLevel = scan?.report?.risk_level;
+  useEffect(() => {
+    if (verdictLevel !== "high" && verdictLevel !== "critical") return;
+    const timer = setTimeout(() => { recordWinAndMaybeAskForReview(); }, 3000);
+    return () => clearTimeout(timer);
+  }, [verdictLevel]);
 
   if (isLoading || !scan) {
     return (

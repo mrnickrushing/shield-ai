@@ -1,9 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
-import React from "react";
-import { ActivityIndicator, ScrollView, Text, View } from "react-native";
+import React, { useEffect } from "react";
+import { ActivityIndicator, ScrollView, Share, Text, View } from "react-native";
 
-import { Eyebrow, FadeIn, Surface } from "@/components/ui";
+import { Button, Eyebrow, FadeIn, Surface } from "@/components/ui";
+import { recordWinAndMaybeAskForReview } from "@/lib/appReview";
 import { ShieldAPI } from "@/lib/api";
 import { colors, spacing, withAlpha } from "@/theme/theme";
 
@@ -23,12 +24,39 @@ const STATS: StatDef[] = [
   { key: "new_breach_alerts", label: "New breach alerts", icon: "key", color: colors.teal },
 ];
 
+function shareMessage(report: Record<string, number>): string {
+  const highlights = [
+    report.threats_caught > 0 && `caught ${report.threats_caught} threat${report.threats_caught === 1 ? "" : "s"}`,
+    report.sites_blocked > 0 && `blocked ${report.sites_blocked} dangerous site${report.sites_blocked === 1 ? "" : "s"}`,
+    report.texts_junked > 0 && `filtered ${report.texts_junked} scam text${report.texts_junked === 1 ? "" : "s"}`,
+    report.calls_labeled > 0 && `labeled ${report.calls_labeled} scam number${report.calls_labeled === 1 ? "" : "s"}`,
+  ].filter(Boolean);
+  const summary = highlights.length
+    ? `Shield AI ${highlights.join(", ")} for me this week.`
+    : "Shield AI is watching my calls, texts, and links for scams.";
+  return `${summary} Before you click. Before you pay. Before you trust.\nhttps://shieldai.rushingtechnologies.com`;
+}
+
 export default function WeeklyReportScreen() {
   const { data: report, isLoading, isError } = useQuery({
     queryKey: ["weekly-report"],
     queryFn: ShieldAPI.weeklyReport,
     staleTime: 5 * 60_000,
   });
+
+  // A threat-filled weekly report is a win moment — eligible (rarely) for the
+  // system rating prompt.
+  const threatsCaught = report?.threats_caught ?? 0;
+  useEffect(() => {
+    if (threatsCaught <= 0) return;
+    const timer = setTimeout(() => { recordWinAndMaybeAskForReview(); }, 3000);
+    return () => clearTimeout(timer);
+  }, [threatsCaught]);
+
+  const shareReport = () => {
+    if (!report) return;
+    Share.share({ message: shareMessage(report as unknown as Record<string, number>) }).catch(() => {});
+  };
 
   return (
     <ScrollView
@@ -87,6 +115,16 @@ export default function WeeklyReportScreen() {
               </FadeIn>
             ))}
           </View>
+
+          <FadeIn delay={320}>
+            <Button
+              label="Share My Report"
+              icon="share-outline"
+              onPress={shareReport}
+              variant="secondary"
+              style={{ marginTop: spacing.lg }}
+            />
+          </FadeIn>
 
           <Text style={{ color: colors.textMuted, fontSize: 11, textAlign: "center", marginTop: spacing.lg }}>
             Delivered weekly as a push notification. Manage in Notifications settings.
