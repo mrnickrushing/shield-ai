@@ -280,18 +280,43 @@ def _monitor_domain(db: Session, target: MonitoredIdentity) -> bool:
         )
         .count()
     )
-    if target.last_status not in ("high", "critical") and prior_high_risk <= 0:
-        return False
-    return _record_identity_alert(
-        db,
-        target,
-        "monitored_domain_risk",
-        {"verdict": verdict, "prior_high_risk_scans": prior_high_risk},
-        "Monitored domain looks risky",
-        f"{domain} is currently rated {target.last_status} or matched prior high-risk scans.",
-        severity="high" if target.last_status != "critical" else "critical",
-        topic="impersonation",
-    )
+    alerted = False
+    if target.last_status in ("high", "critical") or prior_high_risk > 0:
+        alerted = _record_identity_alert(
+            db,
+            target,
+            "monitored_domain_risk",
+            {"verdict": verdict, "prior_high_risk_scans": prior_high_risk},
+            "Monitored domain looks risky",
+            f"{domain} is currently rated {target.last_status} or matched prior high-risk scans.",
+            severity="high" if target.last_status != "critical" else "critical",
+            topic="impersonation",
+        )
+
+    # HIBP domain search: breached accounts @domain. Only yields data once
+    # the owner verifies the domain in the HIBP dashboard; None means the
+    # data isn't available (unverified/no key), which we don't treat as clean.
+    domain_breaches = breach_check.check_domain_breaches(domain)
+    if domain_breaches:
+        target.last_status = "breached"
+        breach_names = sorted({name for names in domain_breaches.values() for name in names})
+        alerted = _record_identity_alert(
+            db,
+            target,
+            "domain_breach_exposure",
+            {
+                "breached_accounts": len(domain_breaches),
+                "aliases": sorted(domain_breaches)[:25],
+                "breaches": breach_names[:25],
+            },
+            "Email accounts on your domain found in breaches",
+            f"{len(domain_breaches)} account{'s' if len(domain_breaches) != 1 else ''} @{domain} "
+            f"appeared in known data breaches ({', '.join(breach_names[:3])}"
+            f"{'…' if len(breach_names) > 3 else ''}). Reset those passwords and enable 2FA.",
+            severity="high",
+            topic="breach",
+        ) or alerted
+    return alerted
 
 
 def _monitor_username(db: Session, target: MonitoredIdentity) -> bool:

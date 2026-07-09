@@ -95,6 +95,39 @@ def _severity(breaches: list[dict]) -> str:
     return "low"
 
 
+def check_domain_breaches(domain: str) -> dict | None:
+    """HIBP domain search: breached email aliases @domain.
+
+    Only works for domains the account owner has verified in the HIBP
+    dashboard (haveibeenpwned.com/DomainSearch). Returns
+    {"alias": ["BreachName", ...], ...} on success, {} when the domain has no
+    breached accounts, and None when the data isn't available (no key,
+    domain not verified, network error) so callers can distinguish
+    "clean" from "couldn't check".
+    """
+    if not settings.HIBP_API_KEY:
+        return None
+    try:
+        import httpx
+
+        resp = httpx.get(
+            f"https://haveibeenpwned.com/api/v3/breacheddomain/{domain}",
+            headers={
+                "hibp-api-key": settings.HIBP_API_KEY,
+                "user-agent": "Shield-AI/3.0",
+            },
+            timeout=10.0,
+        )
+        if resp.status_code == 200:
+            data = resp.json()
+            return data if isinstance(data, dict) else {}
+        if resp.status_code == 404:
+            return {}
+    except Exception:
+        pass
+    return None
+
+
 def _query_hibp(email: str) -> list[dict]:
     """Query HaveIBeenPwned API v3. Returns empty list if key missing or on error."""
     if not settings.HIBP_API_KEY:
