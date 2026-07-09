@@ -148,6 +148,7 @@ export default function Dashboard() {
         <Pressable
           onPress={() => router.push("/profile")}
           hitSlop={12}
+          accessibilityRole="button"
           accessibilityLabel="Account and settings"
           style={{
             flexDirection: "row",

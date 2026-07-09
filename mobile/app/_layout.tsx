@@ -62,8 +62,11 @@ export default function RootLayout() {
   const user = useAuth((s) => s.user);
   useEffect(() => { hydrate(); }, [hydrate]);
 
-  // Apply the user's Large Text preference app-wide. Screens pick up the new
-  // scale as they render (navigating after the toggle re-mounts the target).
+  // Apply the user's Large Text preference app-wide. Set during render (not in
+  // an effect) so the correct scale is in place before first paint — otherwise
+  // preference-enabled users would flash the base scale. Idempotent: it only
+  // assigns a module-level primitive. Screens pick up a later toggle as they
+  // render (navigating after the toggle re-mounts the target).
   setLargeTextMode(user?.large_text_mode ?? false);
 
   const { isUpdatePending } = useUpdates();

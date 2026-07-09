@@ -59,6 +59,19 @@ export default function CallProtectionScreen() {
       if (result.synced) {
         setLastSyncedAt(new Date());
         setProtectedCount(result.count);
+        // Record that the on-device extensions were provisioned. Both the Call
+        // Directory and the SMS filter read the snapshot this sync writes, so a
+        // successful sync is the app's signal that call/text protection is
+        // active — which is what the protection score credits. Best-effort.
+        ShieldAPI.recordExtensionEvent({
+          extension_type: "call_directory",
+          event_type: "synced",
+          counts: { numbers: result.count },
+        }).catch(() => {});
+        ShieldAPI.recordExtensionEvent({
+          extension_type: "message_filter",
+          event_type: "synced",
+        }).catch(() => {});
         if (!result.silent) {
           Alert.alert(
             "Synced",
