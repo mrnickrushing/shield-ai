@@ -23,5 +23,6 @@ export type ProtectionStatsSnapshot = {
 export async function syncWidgetSnapshot(snapshot: ProtectionStatsSnapshot): Promise<void> {
   const native = getNativeModule();
   if (!native) return;
-  await native.writeSnapshot(snapshot);
+  // lastSyncAt (epoch seconds) lets the widget show how fresh its numbers are.
+  await native.writeSnapshot({ ...snapshot, lastSyncAt: Math.floor(Date.now() / 1000) });
 }

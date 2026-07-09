@@ -41,6 +41,14 @@ celery_app.conf.beat_schedule = {
         "task": "feeds.refresh_seeds",
         "schedule": 24 * 60 * 60,
     },
+    "broker-rechecks-daily": {
+        "task": "identity.broker_rechecks",
+        "schedule": 24 * 60 * 60,
+    },
+    "blocklist-growth-weekly": {
+        "task": "feeds.blocklist_growth_push",
+        "schedule": 7 * 24 * 60 * 60,
+    },
 }
 
 
@@ -166,6 +174,34 @@ def weekly_protection_report_task() -> int:
     db = SessionLocal()
     try:
         sent = run_weekly_reports(db)
+        db.commit()
+        return sent
+    finally:
+        db.close()
+
+
+@celery_app.task(name="identity.broker_rechecks")
+def broker_rechecks_task() -> int:
+    from app.db.session import SessionLocal
+    from app.services.monitoring import run_broker_rechecks
+
+    db = SessionLocal()
+    try:
+        created = run_broker_rechecks(db)
+        db.commit()
+        return created
+    finally:
+        db.close()
+
+
+@celery_app.task(name="feeds.blocklist_growth_push")
+def blocklist_growth_push_task() -> int:
+    from app.db.session import SessionLocal
+    from app.services.monitoring import run_blocklist_growth_push
+
+    db = SessionLocal()
+    try:
+        sent = run_blocklist_growth_push(db)
         db.commit()
         return sent
     finally:

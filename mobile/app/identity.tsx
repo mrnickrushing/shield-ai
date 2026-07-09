@@ -221,7 +221,7 @@ export default function IdentityScreen() {
 
                 {!breachResult.data_available && (
                   <Text style={{ color: colors.textMuted, fontSize: 12, marginBottom: spacing.sm }}>
-                    Live breach data requires an API key. Showing local guidance only.
+                    The breach database is temporarily unreachable — showing guidance only. Try again shortly.
                   </Text>
                 )}
 

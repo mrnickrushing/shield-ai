@@ -10,6 +10,7 @@ priority: 1 = highest-traffic brokers to remove first.
 """
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from urllib.parse import quote_plus
 
 BROKERS: list[dict] = [
@@ -118,6 +119,7 @@ BROKERS: list[dict] = [
         "priority": 3,
         "search_url": "https://www.mylife.com/pub-multisearch.pubview?searchWhat={name}",
         "opt_out_url": "https://www.mylife.com/ccpa/index.pubview",
+        "privacy_email": "privacy@mylife.com",
         "instructions": "Use the CCPA request form, or email privacy@mylife.com with your profile URL and request deletion.",
         "expected_days": 10,
     },
@@ -171,5 +173,55 @@ def catalog_for(display_name: str) -> list[dict]:
     for b in sorted(BROKERS, key=lambda b: (b["priority"], b["name"])):
         entry = dict(b)
         entry["search_url"] = b["search_url"].replace("{name}", slug)
+        entry.setdefault("privacy_email", "")
         out.append(entry)
     return out
+
+
+def deadline_for(
+    status: str, requested_at: datetime | None, expected_days: int
+) -> tuple[datetime | None, bool]:
+    """(check_back_on, overdue) for a broker row.
+
+    Only 'requested' rows have a deadline: the broker's own promised removal
+    window, counted from when the user submitted the request.
+    """
+    if status != "requested" or requested_at is None:
+        return None, False
+    if requested_at.tzinfo is None:
+        requested_at = requested_at.replace(tzinfo=timezone.utc)
+    check_back_on = requested_at + timedelta(days=expected_days)
+    return check_back_on, datetime.now(timezone.utc) > check_back_on
+
+
+def build_opt_out_letter(
+    entry: dict, *, display_name: str, email: str, listing_url: str
+) -> dict:
+    """Deterministic CCPA/state-privacy removal request for one broker."""
+    subject = f"Data deletion / opt-out request — {display_name}"
+    body = (
+        f"To the privacy team at {entry['name']},\n"
+        "\n"
+        "I am requesting the removal of my personal information from your site and "
+        "the suppression of future listings, under the California Consumer Privacy "
+        "Act (CCPA/CPRA) and equivalent state privacy laws, including my right to "
+        "deletion and my right to opt out of the sale or sharing of my personal "
+        "information.\n"
+        "\n"
+        f"Name: {display_name}\n"
+        f"Listing URL: {listing_url}\n"
+        f"Contact email for this request: {email}\n"
+        "\n"
+        "Please:\n"
+        "1. Delete the listing above and any other records you hold about me.\n"
+        "2. Suppress my information from re-publication in future data refreshes.\n"
+        "3. Confirm completion to the contact email above.\n"
+        "\n"
+        f"Your published removal process states this takes about {entry['expected_days']} "
+        f"day{'s' if entry['expected_days'] != 1 else ''}. If you need additional "
+        "verification, contact me at the email above — do not use this request to "
+        "enrich or re-publish my data.\n"
+        "\n"
+        f"Thank you,\n{display_name}"
+    )
+    return {"subject": subject, "body": body}

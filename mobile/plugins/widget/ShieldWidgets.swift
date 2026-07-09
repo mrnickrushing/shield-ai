@@ -8,8 +8,19 @@ struct ProtectionSnapshot: Codable {
   let scansThisWeek: Int
   let threatsBlocked: Int
   let callsProtected: Int
+  // Epoch seconds of the last app-side sync; optional so snapshots written by
+  // older app builds still decode.
+  let lastSyncAt: Int?
 
-  static let placeholder = ProtectionSnapshot(scansThisWeek: 0, threatsBlocked: 0, callsProtected: 0)
+  static let placeholder = ProtectionSnapshot(scansThisWeek: 0, threatsBlocked: 0, callsProtected: 0, lastSyncAt: nil)
+
+  var lastSyncText: String? {
+    guard let lastSyncAt else { return nil }
+    let date = Date(timeIntervalSince1970: TimeInterval(lastSyncAt))
+    let formatter = RelativeDateTimeFormatter()
+    formatter.unitsStyle = .abbreviated
+    return "Synced \(formatter.localizedString(for: date, relativeTo: Date()))"
+  }
 
   static func load() -> ProtectionSnapshot {
     guard
@@ -52,10 +63,17 @@ struct ShieldWidgetsSmallView: View {
   let snapshot: ProtectionSnapshot
   var body: some View {
     VStack(alignment: .leading, spacing: 4) {
-      Image(systemName: "shield.checkerboard").foregroundColor(accent)
+      HStack {
+        Image(systemName: "shield.checkerboard").foregroundColor(accent)
+        Spacer()
+        Text("ON").font(.system(size: 10, weight: .heavy)).foregroundColor(accent)
+      }
       Spacer()
       Text("\(snapshot.threatsBlocked)").font(.system(size: 28, weight: .bold))
       Text("threats blocked").font(.caption2).foregroundColor(.secondary)
+      if let synced = snapshot.lastSyncText {
+        Text(synced).font(.system(size: 9)).foregroundColor(.secondary)
+      }
     }
     .padding()
   }
@@ -64,12 +82,22 @@ struct ShieldWidgetsSmallView: View {
 struct ShieldWidgetsMediumView: View {
   let snapshot: ProtectionSnapshot
   var body: some View {
-    HStack {
-      stat("\(snapshot.scansThisWeek)", "Scans this week")
-      Divider()
-      stat("\(snapshot.threatsBlocked)", "Threats blocked")
-      Divider()
-      stat("\(snapshot.callsProtected)", "Calls protected")
+    VStack(spacing: 6) {
+      HStack {
+        Label("Protection on", systemImage: "shield.checkerboard")
+          .font(.caption2.weight(.bold)).foregroundColor(accent)
+        Spacer()
+        if let synced = snapshot.lastSyncText {
+          Text(synced).font(.system(size: 9)).foregroundColor(.secondary)
+        }
+      }
+      HStack {
+        stat("\(snapshot.scansThisWeek)", "Scans this week")
+        Divider()
+        stat("\(snapshot.threatsBlocked)", "Threats blocked")
+        Divider()
+        stat("\(snapshot.callsProtected)", "Calls protected")
+      }
     }
     .padding()
   }

@@ -18,10 +18,13 @@ export const REVENUECAT_IOS_API_KEY = "appl_MySwPRnfnUCwjjdlNvYbORTDQbE";
  */
 export const REVENUECAT_ANDROID_API_KEY = "";
 
-/** Entitlement identifier attached to both subscription products. */
+/** Entitlement identifier attached to the individual subscription products. */
 export const ENTITLEMENT_PREMIUM = "premium";
 
-/** Free trial length offered on both subscription products (App Store Connect config). */
+/** Entitlement identifier for the Family plan products (may share "premium" instead). */
+export const ENTITLEMENT_FAMILY = "family";
+
+/** Free trial length offered on all subscription products (App Store Connect config). */
 export const TRIAL_DAYS = 3;
 
 let configured = false;
@@ -87,7 +90,23 @@ export async function logOutRevenueCat(): Promise<void> {
 }
 
 export function hasPremium(info: CustomerInfo | null): boolean {
-  return Boolean(info?.entitlements.active[ENTITLEMENT_PREMIUM]);
+  return Boolean(
+    info?.entitlements.active[ENTITLEMENT_PREMIUM] ||
+    info?.entitlements.active[ENTITLEMENT_FAMILY]
+  );
+}
+
+/**
+ * Family packages inside an offering, identified by "family" in the package
+ * identifier or product id. Empty until the Family products exist in
+ * RevenueCat, at which point the paywall's plan selector lights up on its own.
+ */
+export function familyPackages(offering: PurchasesOffering | null): PurchasesPackage[] {
+  if (!offering) return [];
+  return offering.availablePackages.filter((p) => {
+    const id = `${p.identifier} ${p.product.identifier}`.toLowerCase();
+    return id.includes("family");
+  });
 }
 
 /** Fetch entitlement state; null when unavailable (offline, unsupported platform). */

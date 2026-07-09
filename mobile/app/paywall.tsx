@@ -6,6 +6,7 @@ import { PurchasesOffering, PurchasesPackage } from "react-native-purchases";
 
 import { Button, Eyebrow, FadeIn, GlowOrb, Surface } from "@/components/ui";
 import {
+  familyPackages,
   getDefaultOffering,
   hasPremium,
   purchasePackage,
@@ -41,6 +42,7 @@ export default function Paywall() {
   const logout = useAuth((s) => s.logout);
 
   const [annual, setAnnual] = useState(true);
+  const [family, setFamily] = useState(false);
   const [offering, setOffering] = useState<PurchasesOffering | null>(null);
   const [loadingOffering, setLoadingOffering] = useState(true);
   const [busy, setBusy] = useState<"purchase" | "restore" | null>(null);
@@ -73,9 +75,16 @@ export default function Paywall() {
     if (isPremium) router.replace("/(tabs)/dashboard");
   }, [isPremium, router]);
 
-  const monthlyPkg = offering?.monthly ?? null;
-  const annualPkg = offering?.annual ?? null;
-  const fallbackPkg = offering?.availablePackages[0] ?? null;
+  // Family products appear here automatically once they exist in the
+  // RevenueCat offering; until then the plan selector stays hidden.
+  const familyPkgs = familyPackages(offering);
+  const familyAvailable = familyPkgs.length > 0;
+  const familyMonthly = familyPkgs.find((p) => p.packageType === "MONTHLY") ?? null;
+  const familyAnnual = familyPkgs.find((p) => p.packageType === "ANNUAL") ?? null;
+
+  const monthlyPkg = (family ? familyMonthly : offering?.monthly) ?? null;
+  const annualPkg = (family ? familyAnnual : offering?.annual) ?? null;
+  const fallbackPkg = (family ? familyPkgs[0] : offering?.availablePackages[0]) ?? null;
   const selectedPkg = annual ? annualPkg ?? fallbackPkg : monthlyPkg ?? fallbackPkg;
   const hasPurchasablePackage = Boolean(selectedPkg);
 
@@ -171,6 +180,40 @@ export default function Paywall() {
         </Surface>
       ) : (
         <>
+          {/* Plan tier — appears once Family products exist in the offering */}
+          {familyAvailable && (
+            <FadeIn delay={40}>
+              <View style={{ flexDirection: "row", gap: spacing.sm, marginBottom: spacing.md }}>
+                {([
+                  { isFamily: false, title: "Individual", caption: "Just you" },
+                  { isFamily: true, title: "Family", caption: "You + your family" },
+                ] as const).map((tier) => {
+                  const selected = family === tier.isFamily;
+                  return (
+                    <Pressable
+                      key={tier.title}
+                      onPress={() => setFamily(tier.isFamily)}
+                      style={{
+                        flex: 1,
+                        borderRadius: radius.lg,
+                        borderWidth: 2,
+                        borderColor: selected ? colors.primaryBright : colors.border,
+                        backgroundColor: selected ? withAlpha(colors.primaryBright, "14") : colors.surface,
+                        padding: spacing.md,
+                        alignItems: "center",
+                      }}
+                    >
+                      <Text style={{ color: selected ? colors.primaryBright : colors.text, fontWeight: "800", fontSize: 15 }}>
+                        {tier.title}
+                      </Text>
+                      <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>{tier.caption}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </FadeIn>
+          )}
+
           {/* Billing toggle */}
           <FadeIn delay={60}>
             <View style={{ flexDirection: "row", backgroundColor: colors.surface, borderRadius: radius.lg, padding: 4, marginBottom: spacing.lg }}>

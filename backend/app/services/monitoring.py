@@ -401,3 +401,105 @@ def run_scan_pattern_monitor(db: Session) -> int:
         if notif:
             created += 1
     return created
+
+
+def run_broker_rechecks(db: Session) -> int:
+    """Deadline and re-verification alerts for data-broker removals.
+
+    Two cases, both alerting instead of scraping (we never fetch broker sites
+    on the user's behalf):
+    - 'requested' past the broker's promised removal window -> nudge the user
+      to verify it actually happened.
+    - 'removed' for 30+ days -> monthly prompt to re-check, since brokers
+      routinely re-list people after data refreshes.
+    last_recheck_at throttles each row to one alert per window.
+    """
+    from app.models.models import BrokerOptOut
+    from app.services.broker_catalog import BROKERS
+
+    catalog = {b["key"]: b for b in BROKERS}
+    now = datetime.now(timezone.utc)
+    created = 0
+
+    rows = (
+        db.query(BrokerOptOut)
+        .filter(BrokerOptOut.status.in_(["requested", "removed"]))
+        .limit(2000)
+        .all()
+    )
+    for row in rows:
+        entry = catalog.get(row.broker_key)
+        if not entry:
+            continue
+        last = row.last_recheck_at or row.updated_at
+        if last is not None and last.tzinfo is None:
+            last = last.replace(tzinfo=timezone.utc)
+
+        if row.status == "requested" and row.requested_at is not None:
+            requested_at = row.requested_at
+            if requested_at.tzinfo is None:
+                requested_at = requested_at.replace(tzinfo=timezone.utc)
+            deadline = requested_at + timedelta(days=entry["expected_days"])
+            if now < deadline or (last and now - last < timedelta(days=7)):
+                continue
+            title = f"Check your {entry['name']} removal"
+            body = (
+                f"{entry['name']} promised removal within ~{entry['expected_days']} "
+                f"day{'s' if entry['expected_days'] != 1 else ''} and that window has passed. "
+                "Search yourself again and mark it removed — or resend the request."
+            )
+        elif row.status == "removed":
+            if last is None or now - last < timedelta(days=30):
+                continue
+            title = f"Re-check {entry['name']} — listings come back"
+            body = (
+                f"It's been a month since your {entry['name']} listing was removed. "
+                "Brokers often re-list people after data refreshes; take 30 seconds to verify you're still gone."
+            )
+        else:
+            continue
+
+        notif = create_alert(
+            db, row.user_id, title, body,
+            severity="suspicious", topic="breach",
+            force_inbox=True, dedupe_for=timedelta(days=7),
+        )
+        row.last_recheck_at = now
+        if notif:
+            created += 1
+    return created
+
+
+def run_blocklist_growth_push(db: Session) -> int:
+    """Weekly 'your blocklist grew by N' push to premium users.
+
+    Makes invisible protection visible: counts scam numbers the daily feed
+    refresh added in the trailing week and tells subscribers their call
+    shield got bigger. Skips quiet weeks entirely.
+    """
+    from app.models.models import SeededScamNumber, User
+
+    week_ago = datetime.now(timezone.utc) - timedelta(days=7)
+    added = (
+        db.query(func.count(SeededScamNumber.id))
+        .filter(SeededScamNumber.is_active.is_(True), SeededScamNumber.created_at >= week_ago)
+        .scalar()
+        or 0
+    )
+    if added < 10:
+        return 0  # not worth a push
+
+    title = "Your call shield grew this week"
+    body = f"{added:,} new scam numbers were added to your blocklist this week. Open Call Protection to sync them to your phone."
+    sent = 0
+    for (user_id,) in (
+        db.query(User.id).filter(User.is_active.is_(True), User.is_premium.is_(True)).all()
+    ):
+        notif = create_alert(
+            db, user_id, title, body,
+            severity="low", topic="account",
+            force_inbox=False, dedupe_for=timedelta(days=6),
+        )
+        if notif:
+            sent += 1
+    return sent
