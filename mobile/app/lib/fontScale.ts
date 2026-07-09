@@ -9,10 +9,11 @@ import { StyleSheet, Text as RNText } from "react-native";
  * and a working "Large Text" accessibility toggle.
  */
 
-// Baseline bump for everyone (users reported the default felt too small) and
-// the stronger multiplier when Large Text mode is on.
-export const BASE_FONT_SCALE = 1.15;
-export const LARGE_FONT_SCALE = 1.45;
+// Baseline is a very slight bump over the app's hand-tuned sizes — a flat
+// multiplier inflates already-large headers too, so keep it gentle. Large Text
+// mode is the opt-in accessibility boost.
+export const BASE_FONT_SCALE = 1.05;
+export const LARGE_FONT_SCALE = 1.3;
 const DEFAULT_FONT_SIZE = 14; // RN's implicit default when a Text sets none
 
 let currentScale = BASE_FONT_SCALE;
