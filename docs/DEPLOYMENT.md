@@ -12,7 +12,7 @@
 | web-admin service | `93354528-3abf-4912-a6d1-04d373dd26f8` (repo `mrnickrushing/shield-ai`, root `/web`) |
 | postgres service | `382b3679-47fd-485b-bad0-95590802f803` (image `postgres:16`, volume mounted) |
 | redis service | `37692301-eaa1-422c-80be-9bc19a10f331` (image `redis:7`) |
-| backend Railway domain | `backend-production-f835.up.railway.app` |
+| backend Railway domain | `backend-production-ed5a.up.railway.app` |
 | web-admin Railway domain | `web-admin-production-b6d5.up.railway.app` |
 
 ## URL Architecture
@@ -22,7 +22,7 @@
 | `shieldai.rushingtechnologies.com` | web-admin | Marketing/landing page + admin UI |
 | `admin.shieldai.rushingtechnologies.com` | web-admin | Same as above (alias) |
 | `api.shieldai.rushingtechnologies.com` | backend | REST API |
-| `backend-production-f835.up.railway.app` | backend | REST API (Railway direct) |
+| `backend-production-ed5a.up.railway.app` | backend | REST API (Railway direct) |
 
 ## Cloudflare DNS (zone `rushingtechnologies.com` = `7270ff1f9c59d54e9d57d3afa4c45919`)
 

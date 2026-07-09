@@ -217,11 +217,12 @@ export default function Result() {
   // A high-risk verdict is a "we just caught this for you" moment — the right
   // time to (rarely) ask for a rating. Delayed so it never covers the verdict.
   const verdictLevel = scan?.report?.risk_level;
+  const scanId = scan?.id;
   useEffect(() => {
-    if (verdictLevel !== "high" && verdictLevel !== "critical") return;
-    const timer = setTimeout(() => { recordWinAndMaybeAskForReview(); }, 3000);
+    if (!scanId || (verdictLevel !== "high" && verdictLevel !== "critical")) return;
+    const timer = setTimeout(() => { recordWinAndMaybeAskForReview(`scan:${scanId}`); }, 3000);
     return () => clearTimeout(timer);
-  }, [verdictLevel]);
+  }, [verdictLevel, scanId]);
 
   if (isLoading || !scan) {
     return (
