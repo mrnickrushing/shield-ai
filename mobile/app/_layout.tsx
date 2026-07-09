@@ -9,9 +9,14 @@ import { Platform } from "react-native";
 
 import { LiveAlertBridge } from "@/components/LiveAlertBridge";
 import { ShieldAPI } from "@/lib/api";
+import { installGlobalFontScaling, setLargeTextMode } from "@/lib/fontScale";
 import { addCustomerInfoListener, configureRevenueCat, getCustomerInfo, hasPremium } from "@/lib/revenuecat";
 import { useAuth } from "@/state/auth";
 import { colors } from "@/theme/theme";
+
+// Patch Text scaling before any screen renders so the baseline bump applies
+// from first paint.
+installGlobalFontScaling();
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
@@ -56,6 +61,13 @@ export default function RootLayout() {
   const hydrate = useAuth((s) => s.hydrate);
   const user = useAuth((s) => s.user);
   useEffect(() => { hydrate(); }, [hydrate]);
+
+  // Apply the user's Large Text preference app-wide. Set during render (not in
+  // an effect) so the correct scale is in place before first paint — otherwise
+  // preference-enabled users would flash the base scale. Idempotent: it only
+  // assigns a module-level primitive. Screens pick up a later toggle as they
+  // render (navigating after the toggle re-mounts the target).
+  setLargeTextMode(user?.large_text_mode ?? false);
 
   const { isUpdatePending } = useUpdates();
   useEffect(() => {
