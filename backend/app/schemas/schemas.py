@@ -618,3 +618,17 @@ class CoachChatRequest(BaseModel):
 
 class CoachChatResponse(BaseModel):
     reply: str
+
+
+class ClientErrorReport(BaseModel):
+    """Fatal (or notable) JS error reported by the mobile app before it dies.
+
+    TestFlight crash logs strip the JS exception message, so the app phones
+    home with it directly — this is the only way to see what actually threw.
+    """
+    message: str = Field(min_length=1, max_length=2000)
+    stack: str = Field(default="", max_length=8000)
+    is_fatal: bool = True
+    app_version: str = Field(default="", max_length=40)
+    update_id: str = Field(default="", max_length=80)
+    screen: str = Field(default="", max_length=120)
