@@ -20,22 +20,26 @@ type ErrorUtilsShape = {
 
 let installed = false;
 
-function report(error: unknown, isFatal: boolean): void {
+function report(error: unknown, isFatal: boolean): Promise<void> {
   try {
     const err = error as Error | undefined;
-    api.post(
-      "/monitoring/client-errors",
-      {
-        message: String(err?.message ?? error ?? "unknown").slice(0, 2000),
-        stack: String(err?.stack ?? "").slice(0, 8000),
-        is_fatal: isFatal,
-        app_version: `${Constants.expoConfig?.version ?? "?"} (${Constants.expoConfig?.ios?.buildNumber ?? "?"})`,
-        update_id: Updates.updateId ?? "embedded",
-      },
-      { timeout: 3000 }
-    ).catch(() => {});
+    return api
+      .post(
+        "/monitoring/client-errors",
+        {
+          message: String(err?.message ?? error ?? "unknown").slice(0, 2000),
+          stack: String(err?.stack ?? "").slice(0, 8000),
+          is_fatal: isFatal,
+          app_version: `${Constants.expoConfig?.version ?? "?"} (${Constants.expoConfig?.ios?.buildNumber ?? "?"})`,
+          update_id: Updates.updateId ?? "embedded",
+        },
+        { timeout: 3000 }
+      )
+      .then(() => undefined)
+      .catch(() => undefined);
   } catch {
     // Reporting must never make a crash worse.
+    return Promise.resolve();
   }
 }
 
@@ -46,7 +50,15 @@ export function installCrashReporter(): void {
   if (!errorUtils) return;
   const previous = errorUtils.getGlobalHandler();
   errorUtils.setGlobalHandler((error, isFatal) => {
-    report(error, Boolean(isFatal));
-    previous?.(error, isFatal);
+    const send = report(error, Boolean(isFatal));
+    if (!isFatal) {
+      previous?.(error, isFatal);
+      return;
+    }
+    // The previous fatal handler aborts the process (RCTFatal), which would
+    // kill the report mid-flight — hold the crash until the POST resolves or
+    // a short deadline passes, whichever comes first.
+    const crash = () => previous?.(error, isFatal);
+    Promise.race([send, new Promise((resolve) => setTimeout(resolve, 2000))]).then(crash, crash);
   });
 }
