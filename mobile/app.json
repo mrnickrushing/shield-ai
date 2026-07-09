@@ -3,7 +3,7 @@
     "name": "Shield AI",
     "slug": "shield-ai",
     "owner": "rushingtechnologies",
-    "version": "0.2.0",
+    "version": "1.0.0",
     "scheme": "shieldai",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -97,7 +97,7 @@
       "./plugins/withMessageFilterExtension.js",
       "./plugins/withSafariExtension.js"
     ],
-    "runtimeVersion": "0.2.0",
+    "runtimeVersion": "1.0.0",
     "updates": {
       "url": "https://u.expo.dev/80d9208f-a5e9-47c3-bf6a-a20105e6bb60",
       "enabled": true,
