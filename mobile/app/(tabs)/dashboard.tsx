@@ -171,10 +171,18 @@ export default function Dashboard() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ padding: spacing.lg, paddingTop: 0, paddingBottom: spacing.xxl }}
       >
-        {/* Protection ring — floats directly on the bloom, no box */}
-        <View style={{ alignItems: "center", paddingVertical: spacing.md }}>
+        {/* Protection ring — tap to see every way to raise the score */}
+        <Pressable
+          onPress={() => router.push("/protection" as any)}
+          accessibilityRole="button"
+          accessibilityLabel="View protection checklist"
+          style={{ alignItems: "center", paddingVertical: spacing.md }}
+        >
           <ProtectionRing score={score} />
-        </View>
+          <Text style={{ color: colors.primaryBright, fontSize: 13, fontWeight: "700", marginTop: spacing.sm }}>
+            How to raise your score →
+          </Text>
+        </Pressable>
 
         {/* Stats row — glass strip */}
         <GlassCard style={{ marginBottom: spacing.lg }}>

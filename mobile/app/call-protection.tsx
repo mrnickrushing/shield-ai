@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { Alert, Linking, Platform, Pressable, ScrollView, Text, View } from "react-native";
@@ -42,6 +42,7 @@ function timeAgo(date: Date | null): string {
 
 export default function CallProtectionScreen() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
   const [protectedCount, setProtectedCount] = useState(0);
 
@@ -72,6 +73,9 @@ export default function CallProtectionScreen() {
           extension_type: "message_filter",
           event_type: "synced",
         }).catch(() => {});
+        // Provisioning protection changes the score; refresh it so the
+        // dashboard ring and checklist reflect the new state promptly.
+        queryClient.invalidateQueries({ queryKey: ["protection-score"] });
         if (!result.silent) {
           Alert.alert(
             "Synced",
