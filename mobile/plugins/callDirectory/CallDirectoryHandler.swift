@@ -17,6 +17,14 @@ class CallDirectoryHandler: CXCallDirectoryProvider {
     let label: String
   }
 
+  // Labels that get the call *blocked* (it never rings): community-corroborated
+  // scam numbers and numbers the user blocked themselves. The softer FCC
+  // complaint feed ("Spam Risk") is only labeled — a complaint feed can include
+  // a spoofed-but-legit number, and silently blocking a real call is worse than
+  // flagging it. Users who want a specific complaint-feed number gone can block
+  // it directly (it then arrives here labeled "Blocked").
+  private static let blockLabels: Set<String> = ["Scam Likely", "Reported Spam", "Blocked"]
+
   override func beginRequest(with context: CXCallDirectoryExtensionContext) {
     context.delegate = self
 
@@ -25,9 +33,17 @@ class CallDirectoryHandler: CXCallDirectoryProvider {
         guard let phoneNumber = CXCallDirectoryPhoneNumber(entry.number) else { return nil }
         return (phoneNumber, entry.label)
       }
-      // CallKit requires entries added in strictly ascending numeric order.
+      // CallKit requires each entry sequence added in strictly ascending
+      // numeric order — blocking and identification are separate sequences.
       .sorted { $0.0 < $1.0 }
 
+    // Block the high-confidence + user-chosen numbers so they never ring...
+    for (phoneNumber, label) in entries where Self.blockLabels.contains(label) {
+      context.addBlockingEntry(withNextSequentialPhoneNumber: phoneNumber)
+    }
+
+    // ...and label every number (blocked ones too, harmlessly) so anything not
+    // blocked still shows "Scam Likely" / "Spam Risk" on the incoming screen.
     for (phoneNumber, label) in entries {
       context.addIdentificationEntry(withNextSequentialPhoneNumber: phoneNumber, label: label)
     }
