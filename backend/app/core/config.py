@@ -30,7 +30,12 @@ class Settings(BaseSettings):
     CELERY_RESULT_BACKEND: str = "redis://localhost:6379/2"
 
     # --- CORS ---
-    CORS_ORIGINS: List[str] = ["*"]
+    CORS_ORIGINS: List[str] = [
+        "https://shieldai.rushingtechnologies.com",
+        "https://www.shieldai.rushingtechnologies.com",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ]
 
     # --- Third-party detection APIs ---
     ANTHROPIC_API_KEY: str = ""

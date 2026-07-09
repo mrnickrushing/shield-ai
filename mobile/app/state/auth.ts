@@ -16,7 +16,7 @@ type AuthState = {
   acceptTokens: (accessToken: string, refreshToken: string) => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, name: string) => Promise<void>;
-  loginWithSocial: (provider: "apple" | "google", token: string, email?: string, displayName?: string) => Promise<void>;
+  loginWithSocial: (provider: "apple" | "google", token: string, email?: string, displayName?: string, nonce?: string) => Promise<void>;
   updateProfile: (patch: ProfilePatch) => Promise<void>;
   logout: () => Promise<void>;
 };
@@ -69,8 +69,8 @@ export const useAuth = create<AuthState>((set) => ({
     set({ user: await ShieldAPI.me() });
   },
 
-  loginWithSocial: async (provider, token, email, displayName) => {
-    const tokens = await ShieldAPI.socialAuth(provider, token, email, displayName);
+  loginWithSocial: async (provider, token, email, displayName, nonce) => {
+    const tokens = await ShieldAPI.socialAuth(provider, token, email, displayName, nonce);
     await saveTokens(tokens.access_token, tokens.refresh_token);
     set({ user: await ShieldAPI.me() });
   },

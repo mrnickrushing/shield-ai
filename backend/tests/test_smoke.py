@@ -88,30 +88,42 @@ def test_register_normalizes_email():
     assert me.json()["email"] == "normalize@example.com"
 
 
+def test_cors_default_does_not_allow_wildcard_with_credentials():
+    from app.core.config import settings
+
+    assert "*" not in settings.CORS_ORIGINS
+
+
 def test_apple_social_auth_reuses_identity_without_email(monkeypatch):
     from app.api.v1 import auth as auth_routes
 
+    raw_nonce = "raw-apple-nonce-for-test"
     claims_by_token = {
         "verified-apple-token-1": {"sub": "apple-user-123", "email": "apple-user@example.com"},
         "verified-apple-token-2": {"sub": "apple-user-123"},
     }
+
+    def verify_apple_token(token: str, nonce: str):
+        assert nonce == raw_nonce
+        return claims_by_token[token]
+
     monkeypatch.setattr(
         auth_routes,
         "_verify_apple_identity_token",
-        lambda token: claims_by_token[token],
+        verify_apple_token,
     )
 
     token1 = "verified-apple-token-1"
     r1 = client.post(
         "/api/v1/auth/social",
-        json={"provider": "apple", "token": token1, "display_name": "Apple User"},
+        json={"provider": "apple", "token": token1, "nonce": raw_nonce, "display_name": "Apple User"},
     )
     assert r1.status_code == 200, r1.text
 
     token2 = "verified-apple-token-2"
     r2 = client.post(
         "/api/v1/auth/social",
-        json={"provider": "apple", "token": token2},
+        json={"provider": "apple", "token": token2, "nonce": raw_nonce},
     )
     assert r2.status_code == 200, r2.text
 
@@ -127,9 +139,29 @@ def test_apple_social_auth_rejects_unsigned_forged_token():
     token1 = _fake_apple_token("apple-user-123", "apple-user@example.com")
     r1 = client.post(
         "/api/v1/auth/social",
-        json={"provider": "apple", "token": token1, "display_name": "Apple User"},
+        json={
+            "provider": "apple",
+            "token": token1,
+            "nonce": "raw-apple-nonce-for-test",
+            "display_name": "Apple User",
+        },
     )
     assert r1.status_code == 400, r1.text
+
+
+def test_apple_social_auth_requires_nonce(monkeypatch):
+    from app.api.v1 import auth as auth_routes
+
+    def fail_if_called(_token: str, _nonce: str):
+        raise AssertionError("Apple verifier should not run without a nonce")
+
+    monkeypatch.setattr(auth_routes, "_verify_apple_identity_token", fail_if_called)
+    r = client.post(
+        "/api/v1/auth/social",
+        json={"provider": "apple", "token": "verified-apple-token"},
+    )
+    assert r.status_code == 400, r.text
+    assert r.json()["detail"] == "Apple nonce is required"
 
 
 def test_update_profile():

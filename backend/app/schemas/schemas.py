@@ -28,6 +28,7 @@ class RefreshRequest(BaseModel):
 class SocialAuthRequest(BaseModel):
     provider: str = Field(pattern="^(apple|google)$")
     token: str
+    nonce: str | None = Field(default=None, min_length=16, max_length=256)
     email: str | None = None
     display_name: str | None = None
 

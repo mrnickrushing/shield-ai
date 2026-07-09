@@ -38,7 +38,7 @@ All CNAMEs are DNS-only (not proxied — required for Railway TLS).
 `ENVIRONMENT=production`, `DEBUG=false`, `SECRET_KEY` (generated), `DATABASE_URL`
 (points at `postgres.railway.internal:5432`), `REDIS_URL` / `CELERY_*`
 (point at `redis.railway.internal:6379`), `ANTHROPIC_API_KEY` (set),
-`CORS_ORIGINS=["*"]`.
+`CORS_ORIGINS=["https://shieldai.rushingtechnologies.com","https://www.shieldai.rushingtechnologies.com"]`.
 
 **Still to add:** `GOOGLE_SAFE_BROWSING_KEY`,
 `VIRUSTOTAL_API_KEY` (optional). Without these the app still runs — the LLM

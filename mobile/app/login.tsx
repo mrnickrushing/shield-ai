@@ -1,4 +1,5 @@
 import * as AppleAuthentication from "expo-apple-authentication";
+import * as Crypto from "expo-crypto";
 import * as Linking from "expo-linking";
 import * as SecureStore from "expo-secure-store";
 import { useRouter } from "expo-router";
@@ -53,11 +54,11 @@ export default function Login() {
     }
   }, []);
 
-  const handleSocial = async (provider: "apple" | "google", token: string, emailHint?: string, displayName?: string) => {
+  const handleSocial = async (provider: "apple" | "google", token: string, emailHint?: string, displayName?: string, nonce?: string) => {
     setError(null);
     setLoading(true);
     try {
-      await loginWithSocial(provider, token, emailHint?.trim().toLowerCase(), displayName?.trim());
+      await loginWithSocial(provider, token, emailHint?.trim().toLowerCase(), displayName?.trim(), nonce);
       router.replace("/");
     } catch (e: any) {
       setError(
@@ -73,15 +74,21 @@ export default function Login() {
 
   const handleApple = async () => {
     try {
+      const rawNonce = `${Crypto.randomUUID()}${Crypto.randomUUID()}`;
+      const hashedNonce = await Crypto.digestStringAsync(
+        Crypto.CryptoDigestAlgorithm.SHA256,
+        rawNonce
+      );
       const cred = await AppleAuthentication.signInAsync({
         requestedScopes: [
           AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
           AppleAuthentication.AppleAuthenticationScope.EMAIL,
         ],
+        nonce: hashedNonce,
       });
       if (!cred.identityToken) throw new Error("No identity token");
       const fullName = [cred.fullName?.givenName, cred.fullName?.familyName].filter(Boolean).join(" ");
-      await handleSocial("apple", cred.identityToken, cred.email ?? undefined, fullName || undefined);
+      await handleSocial("apple", cred.identityToken, cred.email ?? undefined, fullName || undefined, rawNonce);
     } catch (e: any) {
       if (e.code !== "ERR_REQUEST_CANCELED") {
         setError(extractErrorMessage(e, "Apple Sign In failed. Try again."));

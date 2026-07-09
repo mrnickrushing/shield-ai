@@ -1,5 +1,6 @@
 """Authentication routes: register, login, refresh, me, social."""
 import hashlib
+import hmac
 import secrets
 from datetime import datetime, timedelta, timezone
 from urllib.parse import quote
@@ -119,9 +120,13 @@ def _normalize_email(email: str | None) -> str | None:
     return normalized or None
 
 
-def _verify_apple_identity_token(token: str) -> dict:
+def _hash_apple_nonce(nonce: str) -> str:
+    return hashlib.sha256(nonce.encode()).hexdigest()
+
+
+def _verify_apple_identity_token(token: str, nonce: str) -> dict:
     signing_key = _apple_jwks_client.get_signing_key_from_jwt(token)
-    return jwt.decode(
+    claims = jwt.decode(
         token,
         signing_key.key,
         algorithms=["RS256"],
@@ -129,6 +134,11 @@ def _verify_apple_identity_token(token: str) -> dict:
         issuer=APPLE_ISSUER,
         options={"require": ["sub", "iss", "aud", "exp"]},
     )
+    token_nonce = claims.get("nonce")
+    expected_nonce = _hash_apple_nonce(nonce)
+    if not isinstance(token_nonce, str) or not hmac.compare_digest(token_nonce, expected_nonce):
+        raise ValueError("Invalid Apple nonce")
+    return claims
 
 
 def _create_google_state(return_url: str) -> str:
@@ -242,8 +252,10 @@ def social_auth(payload: SocialAuthRequest, request: Request, db: Session = Depe
             raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Google verification unavailable")
 
     elif payload.provider == "apple":
+        if not payload.nonce:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Apple nonce is required")
         try:
-            claims = _verify_apple_identity_token(payload.token)
+            claims = _verify_apple_identity_token(payload.token, payload.nonce)
             email = _normalize_email(claims.get("email") or payload.email)
             subject = claims.get("sub")
         except Exception:
