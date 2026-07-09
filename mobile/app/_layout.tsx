@@ -9,10 +9,14 @@ import { Platform } from "react-native";
 
 import { LiveAlertBridge } from "@/components/LiveAlertBridge";
 import { ShieldAPI } from "@/lib/api";
+import { installCrashReporter } from "@/lib/crashReporter";
 import { installGlobalFontScaling, setLargeTextMode } from "@/lib/fontScale";
 import { addCustomerInfoListener, configureRevenueCat, getCustomerInfo, hasPremium } from "@/lib/revenuecat";
 import { useAuth } from "@/state/auth";
 import { colors } from "@/theme/theme";
+
+// Hook the global JS error handler before anything else can throw.
+installCrashReporter();
 
 // Patch Text scaling before any screen renders so the baseline bump applies
 // from first paint.

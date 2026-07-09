@@ -220,3 +220,42 @@ def test_blocklist_growth_push_targets_premium_users():
         assert free_notes == 0
     finally:
         db.close()
+
+
+# --- client error reporting -------------------------------------------------
+
+def test_client_error_report_stored_without_premium():
+    from app.models.models import AuditLog
+
+    uid, headers = _auth(premium=False)
+    r = client.post(
+        "/api/v1/monitoring/client-errors",
+        json={"message": "TypeError: undefined is not a function", "stack": "at Paywall", "is_fatal": True, "app_version": "1.2.0 (79)"},
+        headers=headers,
+    )
+    assert r.status_code == 201, r.text
+    assert r.json()["stored"] is True
+
+    db = TestingSession()
+    try:
+        row = (
+            db.query(AuditLog)
+            .filter(AuditLog.user_id == uid, AuditLog.action == "mobile_js_error")
+            .one()
+        )
+        assert row.detail["message"].startswith("TypeError")
+    finally:
+        db.close()
+
+
+def test_client_error_report_crash_loop_capped():
+    uid, headers = _auth(premium=False)
+    for _ in range(20):
+        r = client.post(
+            "/api/v1/monitoring/client-errors",
+            json={"message": "boom"},
+            headers=headers,
+        )
+        assert r.json()["stored"] is True
+    r = client.post("/api/v1/monitoring/client-errors", json={"message": "boom"}, headers=headers)
+    assert r.json()["stored"] is False

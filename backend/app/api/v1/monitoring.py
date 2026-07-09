@@ -10,8 +10,8 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.db.session import SessionLocal, get_db
-from app.models.models import BrowserTelemetryEvent, ExtensionTelemetryEvent, IdentityAlert, MonitoredIdentity, Notification, User
-from app.schemas.schemas import BrowserTelemetryCreate, ExtensionTelemetryCreate, MonitoredIdentityCreate, MonitoredIdentityOut
+from app.models.models import AuditLog, BrowserTelemetryEvent, ExtensionTelemetryEvent, IdentityAlert, MonitoredIdentity, Notification, User
+from app.schemas.schemas import BrowserTelemetryCreate, ClientErrorReport, ExtensionTelemetryCreate, MonitoredIdentityCreate, MonitoredIdentityOut
 from app.services import monitoring
 
 router = APIRouter(prefix="/monitoring", tags=["monitoring"])
@@ -32,6 +32,47 @@ def _enforce_monitor_entitlement(user: User) -> None:
 def _require_live_protection(user: User) -> None:
     if not user.is_premium:
         _payment_required("Live browser and extension protection")
+
+
+@router.post("/client-errors", status_code=status.HTTP_201_CREATED)
+def report_client_error(
+    payload: ClientErrorReport,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Mobile JS crash telemetry.
+
+    TestFlight crash logs show RCTFatal but strip the JS exception message, so
+    the app reports it here (best-effort) before dying. Deliberately NOT
+    premium-gated: crashes on the paywall itself must still be reportable.
+    Rows land in audit_logs (action=mobile_js_error) — visible in the admin
+    console's audit view.
+    """
+    recent = (
+        db.query(AuditLog)
+        .filter(
+            AuditLog.user_id == user.id,
+            AuditLog.action == "mobile_js_error",
+            AuditLog.created_at >= datetime.now(timezone.utc) - timedelta(hours=1),
+        )
+        .count()
+    )
+    if recent >= 20:
+        return {"ok": True, "stored": False}  # crash loop; don't flood the table
+    db.add(AuditLog(
+        user_id=user.id,
+        action="mobile_js_error",
+        detail={
+            "message": payload.message,
+            "stack": payload.stack,
+            "is_fatal": payload.is_fatal,
+            "app_version": payload.app_version,
+            "update_id": payload.update_id,
+            "screen": payload.screen,
+        },
+    ))
+    db.commit()
+    return {"ok": True, "stored": True}
 
 
 @router.get("/targets", response_model=list[MonitoredIdentityOut])
