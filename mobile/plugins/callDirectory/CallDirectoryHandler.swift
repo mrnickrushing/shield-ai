@@ -25,9 +25,21 @@ class CallDirectoryHandler: CXCallDirectoryProvider {
         guard let phoneNumber = CXCallDirectoryPhoneNumber(entry.number) else { return nil }
         return (phoneNumber, entry.label)
       }
-      // CallKit requires entries added in strictly ascending numeric order.
+      // CallKit requires each entry sequence added in strictly ascending
+      // numeric order — blocking and identification are separate sequences.
       .sorted { $0.0 < $1.0 }
 
+    // The snapshot is the curated scam/spam list (community-corroborated
+    // numbers plus a complaint feed with known-legit lines excluded), so every
+    // number is blocked outright — it never rings. This is what a spam-blocker
+    // is for; the in-app "report wrong label" flow removes any false positive.
+    for (phoneNumber, _) in entries {
+      context.addBlockingEntry(withNextSequentialPhoneNumber: phoneNumber)
+    }
+
+    // Also label them, so if the user leaves blocking off but identification on
+    // (Settings → Phone → Call Blocking & Identification), the call still shows
+    // "Scam Likely" / "Spam Risk" instead of ringing anonymously.
     for (phoneNumber, label) in entries {
       context.addIdentificationEntry(withNextSequentialPhoneNumber: phoneNumber, label: label)
     }

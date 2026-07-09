@@ -151,15 +151,16 @@ export default function CallProtectionScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={{ color: colors.text, fontWeight: "800", fontSize: 17 }}>Call &amp; Text Protection</Text>
                 <Text style={{ color: colors.textMuted, fontSize: 12 }}>
-                  Labels scam calls and filters scam texts system-wide
+                  Blocks confirmed scam calls and filters scam texts system-wide
                 </Text>
               </View>
             </View>
             <Text style={{ color: colors.textMuted, fontSize: 13, lineHeight: 19 }}>
-              Numbers repeatedly reported as high-risk by the Shield AI community get labeled
-              &ldquo;Scam Likely&rdquo; right on your iPhone&apos;s incoming call screen — no app needs to be open.
-              Texts from unknown senders are screened the same way, and scam texts are filed into
-              your Junk folder before they ever buzz your phone.
+              Thousands of known scam and spam numbers are blocked outright — they never ring your
+              phone. If one ever gets through, it&apos;s labeled &ldquo;Spam Risk&rdquo; on your
+              incoming call screen. Texts from unknown senders are screened the same way, and scam
+              texts are filed into your Junk folder before they ever buzz your phone. No app needs
+              to be open, and you can report a wrongly-blocked number below.
             </Text>
           </Surface>
         </FadeIn>
