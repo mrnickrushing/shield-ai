@@ -31,16 +31,41 @@ def require_active_subscription(db: Session, user: User) -> None:
         )
 
     limit = settings.PREMIUM_DAILY_SCAN_LIMIT
-    if limit > 0:
-        day_ago = datetime.now(timezone.utc) - timedelta(hours=24)
-        recent = (
-            db.query(ScanHistory.id)
-            .filter(ScanHistory.user_id == user.id, ScanHistory.created_at >= day_ago)
-            .count()
+    if limit > 0 and _daily_scan_count(db, user.id) >= limit:
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            f"You've reached today's scan limit ({limit}). It resets on a rolling "
+            "24-hour basis — thanks for helping keep Shield AI fast for everyone.",
         )
-        if recent >= limit:
-            raise HTTPException(
-                status.HTTP_429_TOO_MANY_REQUESTS,
-                f"You've reached today's scan limit ({limit}). It resets on a rolling "
-                "24-hour basis — thanks for helping keep Shield AI fast for everyone.",
-            )
+
+
+def _daily_scan_count(db: Session, user_id: str) -> int:
+    """Scans charged to this user in the current window.
+
+    Prefers an atomic Redis counter so a burst of concurrent requests can't all
+    read the same sub-limit count and slip past the cap (a plain DB COUNT is
+    read-then-act and races under load). Falls back to a rolling-24h DB count
+    when Redis is unavailable.
+    """
+    from app.services.llm_cache import get_redis
+
+    r = get_redis()
+    if r is not None:
+        try:
+            day = datetime.now(timezone.utc).strftime("%Y%m%d")
+            key = f"scancount:{user_id}:{day}"
+            count = r.incr(key)
+            if count == 1:
+                r.expire(key, 86400)
+            # incr counts this attempt too; report the prior total so the caller
+            # compares "already used" against the limit.
+            return count - 1
+        except Exception:
+            pass
+
+    day_ago = datetime.now(timezone.utc) - timedelta(hours=24)
+    return (
+        db.query(ScanHistory.id)
+        .filter(ScanHistory.user_id == user_id, ScanHistory.created_at >= day_ago)
+        .count()
+    )

@@ -63,12 +63,45 @@ def test_scan_allowed_under_limit(monkeypatch):
     assert r.status_code == 201, r.text
 
 
+def test_daily_cap_uses_atomic_redis_counter_when_available(monkeypatch):
+    # With Redis present, the cap is enforced by an atomic counter so a
+    # concurrent burst can't slip past the read-then-act DB count.
+    monkeypatch.setattr(settings, "PREMIUM_DAILY_SCAN_LIMIT", 2)
+
+    counter = {"n": 0}
+
+    class _FakeRedis:
+        def incr(self, key):
+            counter["n"] += 1
+            return counter["n"]
+
+        def expire(self, key, ttl):
+            pass
+
+    from app.services import quota
+
+    monkeypatch.setattr(quota, "ScanHistory", ScanHistory)
+    import app.services.llm_cache as llm_cache
+
+    monkeypatch.setattr(llm_cache, "get_redis", lambda: _FakeRedis())
+
+    db = TestingSession()
+    try:
+        # counter returns prior totals 0, 1 (allowed), then 2 (>= limit).
+        assert quota._daily_scan_count(db, "u1") == 0
+        assert quota._daily_scan_count(db, "u1") == 1
+        assert quota._daily_scan_count(db, "u1") == 2
+    finally:
+        db.close()
+
+
 def test_llm_cache_reuses_identical_request(monkeypatch):
     monkeypatch.setattr(settings, "LLM_CACHE_TTL_SECONDS", 3600)
     monkeypatch.setattr(settings, "ANTHROPIC_API_KEY", "test-key")
 
-    from app.services import ai_analyzer
+    from app.services import ai_analyzer, llm_cache
 
+    llm_cache._MEM_CACHE.clear()  # isolate from any prior cache state
     calls = {"n": 0}
 
     class _FakeResp:
