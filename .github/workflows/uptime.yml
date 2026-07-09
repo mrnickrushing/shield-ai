@@ -30,6 +30,7 @@ jobs:
 
       - name: Ping Railway origin
         if: always()
+        continue-on-error: true  # diagnostic only — must not gate the job
         run: |
           for attempt in 1 2 3; do
             status=$(curl -sS --max-time 20 -o /tmp/health2.json -w "%{http_code}" \
