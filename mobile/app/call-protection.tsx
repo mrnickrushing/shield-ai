@@ -56,26 +56,10 @@ export default function CallProtectionScreen() {
       ]);
       return { ...calls, silent: opts?.silent ?? false };
     },
-    onSuccess: (result) => {
+    onSuccess: async (result) => {
       if (result.synced) {
         setLastSyncedAt(new Date());
         setProtectedCount(result.count);
-        // Record that the on-device extensions were provisioned. Both the Call
-        // Directory and the SMS filter read the snapshot this sync writes, so a
-        // successful sync is the app's signal that call/text protection is
-        // active — which is what the protection score credits. Best-effort.
-        ShieldAPI.recordExtensionEvent({
-          extension_type: "call_directory",
-          event_type: "synced",
-          counts: { numbers: result.count },
-        }).catch(() => {});
-        ShieldAPI.recordExtensionEvent({
-          extension_type: "message_filter",
-          event_type: "synced",
-        }).catch(() => {});
-        // Provisioning protection changes the score; refresh it so the
-        // dashboard ring and checklist reflect the new state promptly.
-        queryClient.invalidateQueries({ queryKey: ["protection-score"] });
         if (!result.silent) {
           Alert.alert(
             "Synced",
@@ -84,6 +68,24 @@ export default function CallProtectionScreen() {
               : "Protection is active. The blocklist is still growing — confirmed scam numbers appear automatically."
           );
         }
+        // Record that the on-device extensions were provisioned. Both the Call
+        // Directory and the SMS filter read the snapshot this sync writes, so a
+        // successful sync is the app's signal that call/text protection is
+        // active — which is what the protection score credits. Best-effort.
+        // Await both writes before invalidating so the score refetch reflects
+        // them instead of racing ahead and re-caching the pre-sync score.
+        await Promise.allSettled([
+          ShieldAPI.recordExtensionEvent({
+            extension_type: "call_directory",
+            event_type: "synced",
+            counts: { numbers: result.count },
+          }),
+          ShieldAPI.recordExtensionEvent({
+            extension_type: "message_filter",
+            event_type: "synced",
+          }),
+        ]);
+        queryClient.invalidateQueries({ queryKey: ["protection-score"] });
       }
     },
   });
