@@ -1,10 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Linking, Pressable, ScrollView, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, Text, View } from "react-native";
 import { PurchasesOffering, PurchasesPackage } from "react-native-purchases";
 
 import { Button, Eyebrow, FadeIn, GlowOrb, Surface } from "@/components/ui";
+import { ShieldAPI } from "@/lib/api";
 import {
   familyPackages,
   getDefaultOffering,
@@ -143,6 +144,29 @@ export default function Paywall() {
   const signOut = async () => {
     await logout();
     router.replace("/login");
+  };
+
+  const confirmDeleteAccount = () => {
+    Alert.alert(
+      "Delete your account?",
+      "This permanently removes your account, scans, recovery cases, devices, contacts, and alerts. This cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete account",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await ShieldAPI.deleteAccount();
+              await logout();
+              router.replace("/login");
+            } catch (e: any) {
+              Alert.alert("Delete failed", e?.response?.data?.detail ?? "We could not delete your account right now.");
+            }
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -300,9 +324,17 @@ export default function Paywall() {
           Subscription auto-renews after the trial. Cancel anytime in Settings.
         </Text>
 
-        <Pressable onPress={signOut} style={{ padding: spacing.md, alignItems: "center", marginTop: spacing.sm }}>
-          <Text style={{ color: colors.textMuted, fontSize: 13 }}>Sign out</Text>
-        </Pressable>
+        <View style={{ flexDirection: "row", justifyContent: "center", gap: spacing.lg, marginTop: spacing.sm }}>
+          <Pressable onPress={signOut} style={{ padding: spacing.md }}>
+            <Text style={{ color: colors.textMuted, fontSize: 13 }}>Sign out</Text>
+          </Pressable>
+          {/* Apple 5.1.1(v): account deletion must stay reachable even for
+              users without an active subscription — this screen is the only
+              one they can access. */}
+          <Pressable onPress={confirmDeleteAccount} style={{ padding: spacing.md }}>
+            <Text style={{ color: colors.textMuted, fontSize: 13 }}>Delete account</Text>
+          </Pressable>
+        </View>
       </FadeIn>
     </ScrollView>
   );
