@@ -8,20 +8,38 @@ on:
 jobs:
   health:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 5
     steps:
-      - name: Ping backend /health
+      # The public host is what the app actually calls — checking only the
+      # Railway origin would stay green through a DNS/TLS breakage users feel.
+      - name: Ping public API host
         run: |
           for attempt in 1 2 3; do
             status=$(curl -sS --max-time 20 -o /tmp/health.json -w "%{http_code}" \
-              "https://backend-production-ed5a.up.railway.app/health" || echo "000")
+              "https://api.shieldai.rushingtechnologies.com/health" || echo "000")
             if [ "$status" = "200" ] && grep -q '"status":[[:space:]]*"ok"' /tmp/health.json; then
-              echo "healthy (attempt $attempt)"
+              echo "public host healthy (attempt $attempt)"
               exit 0
             fi
             echo "attempt $attempt failed with HTTP $status"
             sleep 20
           done
-          echo "backend unhealthy after 3 attempts"
+          echo "public API host unhealthy after 3 attempts"
           cat /tmp/health.json 2>/dev/null || true
+          exit 1
+
+      - name: Ping Railway origin
+        if: always()
+        run: |
+          for attempt in 1 2 3; do
+            status=$(curl -sS --max-time 20 -o /tmp/health2.json -w "%{http_code}" \
+              "https://backend-production-ed5a.up.railway.app/health" || echo "000")
+            if [ "$status" = "200" ] && grep -q '"status":[[:space:]]*"ok"' /tmp/health2.json; then
+              echo "railway origin healthy (attempt $attempt)"
+              exit 0
+            fi
+            echo "attempt $attempt failed with HTTP $status"
+            sleep 20
+          done
+          echo "railway origin unhealthy after 3 attempts"
           exit 1

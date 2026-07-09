@@ -49,7 +49,9 @@ export default function WeeklyReportScreen() {
   const threatsCaught = report?.threats_caught ?? 0;
   useEffect(() => {
     if (threatsCaught <= 0) return;
-    const timer = setTimeout(() => { recordWinAndMaybeAskForReview(); }, 3000);
+    // One win per calendar week, however many times the report is opened.
+    const weekBucket = Math.floor(Date.now() / (7 * 86_400_000));
+    const timer = setTimeout(() => { recordWinAndMaybeAskForReview(`weekly:${weekBucket}`); }, 3000);
     return () => clearTimeout(timer);
   }, [threatsCaught]);
 
