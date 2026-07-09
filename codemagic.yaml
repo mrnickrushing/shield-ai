@@ -166,13 +166,14 @@ workflows:
             echo "    app-groups: $grp" | tee -a "$LOG"
           done
 
-          # Assign installed profiles to Xcode project targets. Keep this
-          # binary eligible for internal TestFlight without Apple's external
-          # beta-review metadata gate; external TestFlight still requires the
-          # app's Test Information to be completed in App Store Connect.
-          xcode-project use-profiles \
-            --custom-export-options='{"testFlightInternalTestingOnly": true}' \
-            2>&1 | tee -a "$LOG"
+          # Assign installed profiles to Xcode project targets.
+          #
+          # Do NOT pass testFlightInternalTestingOnly here: that export option
+          # brands the uploaded binary INTERNAL_ONLY in App Store Connect,
+          # which permanently blocks attaching it to an App Store version
+          # (greyed out in the "Add Build" picker with a 409). Internal
+          # TestFlight testing works fine without the flag — it only restricts.
+          xcode-project use-profiles 2>&1 | tee -a "$LOG"
 
           # Diagnostic: show ShareExtension bundle ID stored in pbxproj.
           grep -E "BUNDLE_IDENTIFIER|PRODUCT_BUNDLE_IDENTIFIER" \
