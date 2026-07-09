@@ -71,6 +71,13 @@ class Settings(BaseSettings):
 
     # --- Limits ---
     MAX_UPLOAD_MB: int = 10
+    # Fair-use ceiling on scans per rolling 24h for an active subscriber (or
+    # trial). "Unlimited" for any real user; stops scripted abuse from running
+    # up the Anthropic bill. 0 disables the cap.
+    PREMIUM_DAILY_SCAN_LIMIT: int = 75
+    # How long an identical-input LLM verdict is reused before re-charging for a
+    # fresh call. 0 disables the dedupe cache.
+    LLM_CACHE_TTL_SECONDS: int = 86400
 
     # --- Observability ---
     SENTRY_DSN: str = ""  # error reporting is a no-op when unset
