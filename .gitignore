@@ -16,6 +16,14 @@ web-build/
 *.log
 npm-debug.*
 
+# Signing artifacts and local credentials
+*.mobileprovision
+*.p12
+*.cer
+*.p8
+*.pem
+*.key
+
 # OS / editor
 .DS_Store
 .idea/

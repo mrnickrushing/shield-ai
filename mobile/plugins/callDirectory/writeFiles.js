@@ -2,6 +2,8 @@ const fs = require("node:fs");
 const path = require("node:path");
 const plist = require("@expo/plist").default;
 
+const pluginDir = __dirname;
+
 const {
   EXTENSION_NAME,
   ENTITLEMENTS_FILE_NAME,
@@ -60,7 +62,7 @@ async function writeCallDirectoryExtensionFiles(platformProjectRoot, appIdentifi
   await fs.promises.writeFile(getInfoPlistFilePath(platformProjectRoot), getInfoPlistContent());
 
   const handlerTemplate = fs.readFileSync(
-    path.resolve(__dirname, "./CallDirectoryHandler.swift"),
+    path.resolve(pluginDir, "./CallDirectoryHandler.swift"),
     "utf8"
   );
   const handlerContent = handlerTemplate.replaceAll(

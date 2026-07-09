@@ -1,7 +1,5 @@
 """Authentication routes: register, login, refresh, me, social."""
-import base64
 import hashlib
-import json
 import secrets
 from datetime import datetime, timedelta, timezone
 from urllib.parse import quote
@@ -58,6 +56,9 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 GOOGLE_DISCOVERY_AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token"
 GOOGLE_TOKENINFO_ENDPOINT = "https://oauth2.googleapis.com/tokeninfo"
+APPLE_ISSUER = "https://appleid.apple.com"
+APPLE_JWKS_URL = "https://appleid.apple.com/auth/keys"
+_apple_jwks_client = jwt.PyJWKClient(APPLE_JWKS_URL)
 
 
 def _hash_token(token: str) -> str:
@@ -118,12 +119,16 @@ def _normalize_email(email: str | None) -> str | None:
     return normalized or None
 
 
-def _decode_jwt_payload(token: str) -> dict:
-    parts = token.split(".")
-    if len(parts) < 2:
-        raise ValueError("Malformed JWT")
-    padding = "=" * (-len(parts[1]) % 4)
-    return json.loads(base64.urlsafe_b64decode(parts[1] + padding))
+def _verify_apple_identity_token(token: str) -> dict:
+    signing_key = _apple_jwks_client.get_signing_key_from_jwt(token)
+    return jwt.decode(
+        token,
+        signing_key.key,
+        algorithms=["RS256"],
+        audience=settings.APPLE_CLIENT_ID,
+        issuer=APPLE_ISSUER,
+        options={"require": ["sub", "iss", "aud", "exp"]},
+    )
 
 
 def _create_google_state(return_url: str) -> str:
@@ -226,6 +231,9 @@ def social_auth(payload: SocialAuthRequest, request: Request, db: Session = Depe
             if r.status_code != 200:
                 raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid Google token")
             info = r.json()
+            expected_audience = settings.GOOGLE_OAUTH_CLIENT_ID.strip()
+            if expected_audience and info.get("aud") != expected_audience:
+                raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid Google token")
             email = _normalize_email(info.get("email"))
             subject = info.get("sub")
             if not display_name:
@@ -235,7 +243,7 @@ def social_auth(payload: SocialAuthRequest, request: Request, db: Session = Depe
 
     elif payload.provider == "apple":
         try:
-            claims = _decode_jwt_payload(payload.token)
+            claims = _verify_apple_identity_token(payload.token)
             email = _normalize_email(claims.get("email") or payload.email)
             subject = claims.get("sub")
         except Exception:

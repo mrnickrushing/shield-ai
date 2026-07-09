@@ -2,6 +2,8 @@ const fs = require("node:fs");
 const path = require("node:path");
 const plist = require("@expo/plist").default;
 
+const pluginDir = __dirname;
+
 const {
   EXTENSION_NAME,
   ENTITLEMENTS_FILE_NAME,
@@ -67,7 +69,7 @@ async function writeSafariExtensionFiles(platformProjectRoot, appIdentifier) {
   await fs.promises.writeFile(getInfoPlistFilePath(platformProjectRoot), getInfoPlistContent());
 
   const handlerTemplate = fs.readFileSync(
-    path.resolve(__dirname, HANDLER_SWIFT_FILE_NAME),
+    path.resolve(pluginDir, HANDLER_SWIFT_FILE_NAME),
     "utf8"
   );
   await fs.promises.writeFile(
@@ -77,7 +79,7 @@ async function writeSafariExtensionFiles(platformProjectRoot, appIdentifier) {
 
   for (const name of RESOURCE_FILE_NAMES) {
     await fs.promises.copyFile(
-      path.resolve(__dirname, "resources", name),
+      path.resolve(pluginDir, "resources", name),
       path.join(extensionDir, name)
     );
   }

@@ -7,7 +7,6 @@ workflows:
     environment:
       vars:
         EXPO_PUBLIC_API_URL: https://api.shieldai.rushingtechnologies.com
-        EXPO_TOKEN: 0jmTCQH3xPGBbv_LC-D9jYK8Gppf5ya1e6323T-E
         CI: "1"
       node: "18"
 
@@ -32,6 +31,11 @@ workflows:
       - name: Publish OTA update to production channel
         working_directory: mobile
         script: |
+          if [ -z "${EXPO_TOKEN:-}" ]; then
+            echo "EXPO_TOKEN must be configured as a secure Codemagic variable."
+            exit 1
+          fi
+
           # codemagic.yaml is always part of the changeset (Codemagic includes it
           # by default), so a config-only edit still triggers this workflow even
           # though `when.changeset.includes: [mobile/]` matched nothing real.
@@ -65,8 +69,6 @@ workflows:
       vars:
         BUNDLE_ID: com.shieldai.app
         EXPO_PUBLIC_API_URL: https://api.shieldai.rushingtechnologies.com
-        EXPO_PUBLIC_OTA_UPDATE_KEY: amcPSXf5G3HAUp6DfMGl2hkHkMGwrn8o26PHYkZ9GoM
-        EXPO_TOKEN: 0jmTCQH3xPGBbv_LC-D9jYK8Gppf5ya1e6323T-E
         CI: "1"
       node: "18"
       xcode: latest

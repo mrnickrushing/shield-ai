@@ -7,6 +7,14 @@ module.exports = defineConfig([
     ignores: ["dist/*", ".expo/*", "node_modules/*", "scripts/*", "patches/*"],
   },
   {
+    files: ["plugins/**/*.js"],
+    languageOptions: {
+      globals: {
+        __dirname: "readonly",
+      },
+    },
+  },
+  {
     rules: {
       // TypeScript already validates module resolution; the import resolver
       // can't follow package "exports" maps (e.g. expo-file-system).

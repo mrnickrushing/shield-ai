@@ -101,15 +101,27 @@ export default function IdentityScreen() {
   });
   const addMonitor = useMutation({
     mutationFn: () => ShieldAPI.addMonitoringTarget({ target_type: monitorType, value: monitorTarget.trim() }),
-    onSuccess: () => {
+    onSuccess: (createdTarget) => {
       setMonitorTarget("");
+      queryClient.setQueryData<MonitoredIdentity[]>(["monitoring-targets"], (current) => [
+        createdTarget,
+        ...(current ?? []).filter((target) => target.id !== createdTarget.id),
+      ]);
       queryClient.invalidateQueries({ queryKey: ["monitoring-targets"] });
+      queryClient.invalidateQueries({ queryKey: ["identity-alerts"] });
     },
     onError: (e: any) => showError("Couldn't add monitor", e),
   });
   const removeMonitor = useMutation({
     mutationFn: (id: string) => ShieldAPI.removeMonitoringTarget(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["monitoring-targets"] }),
+    onSuccess: (_, removedId) => {
+      queryClient.setQueryData<MonitoredIdentity[]>(["monitoring-targets"], (current) =>
+        (current ?? []).map((target) => (
+          target.id === removedId ? { ...target, is_active: false } : target
+        ))
+      );
+      queryClient.invalidateQueries({ queryKey: ["monitoring-targets"] });
+    },
     onError: (e) => showError("Couldn't remove monitor", e),
   });
 

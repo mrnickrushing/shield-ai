@@ -88,15 +88,27 @@ def test_register_normalizes_email():
     assert me.json()["email"] == "normalize@example.com"
 
 
-def test_apple_social_auth_reuses_identity_without_email():
-    token1 = _fake_apple_token("apple-user-123", "apple-user@example.com")
+def test_apple_social_auth_reuses_identity_without_email(monkeypatch):
+    from app.api.v1 import auth as auth_routes
+
+    claims_by_token = {
+        "verified-apple-token-1": {"sub": "apple-user-123", "email": "apple-user@example.com"},
+        "verified-apple-token-2": {"sub": "apple-user-123"},
+    }
+    monkeypatch.setattr(
+        auth_routes,
+        "_verify_apple_identity_token",
+        lambda token: claims_by_token[token],
+    )
+
+    token1 = "verified-apple-token-1"
     r1 = client.post(
         "/api/v1/auth/social",
         json={"provider": "apple", "token": token1, "display_name": "Apple User"},
     )
     assert r1.status_code == 200, r1.text
 
-    token2 = _fake_apple_token("apple-user-123")
+    token2 = "verified-apple-token-2"
     r2 = client.post(
         "/api/v1/auth/social",
         json={"provider": "apple", "token": token2},
@@ -109,6 +121,15 @@ def test_apple_social_auth_reuses_identity_without_email():
     )
     assert me.status_code == 200
     assert me.json()["email"] == "apple-user@example.com"
+
+
+def test_apple_social_auth_rejects_unsigned_forged_token():
+    token1 = _fake_apple_token("apple-user-123", "apple-user@example.com")
+    r1 = client.post(
+        "/api/v1/auth/social",
+        json={"provider": "apple", "token": token1, "display_name": "Apple User"},
+    )
+    assert r1.status_code == 400, r1.text
 
 
 def test_update_profile():

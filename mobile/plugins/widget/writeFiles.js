@@ -2,6 +2,8 @@ const fs = require("node:fs");
 const path = require("node:path");
 const plist = require("@expo/plist").default;
 
+const pluginDir = __dirname;
+
 const {
   EXTENSION_NAME,
   ENTITLEMENTS_FILE_NAME,
@@ -58,7 +60,7 @@ async function writeWidgetExtensionFiles(platformProjectRoot, appIdentifier) {
   );
   await fs.promises.writeFile(getInfoPlistFilePath(platformProjectRoot), getInfoPlistContent());
 
-  const swiftTemplate = fs.readFileSync(path.resolve(__dirname, "./ShieldWidgets.swift"), "utf8");
+  const swiftTemplate = fs.readFileSync(path.resolve(pluginDir, "./ShieldWidgets.swift"), "utf8");
   const swiftContent = swiftTemplate.replaceAll("<APP_GROUP>", getAppGroup(appIdentifier));
   await fs.promises.writeFile(getSwiftFilePath(platformProjectRoot), swiftContent);
 }

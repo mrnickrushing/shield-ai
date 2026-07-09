@@ -143,6 +143,8 @@ export async function purchasePackage(pkg: PurchasesPackage): Promise<CustomerIn
   }
 }
 
-export async function restorePurchases(): Promise<CustomerInfo> {
+export async function restorePurchases(): Promise<CustomerInfo | null> {
+  if (!purchasesSupported()) return null;
+  await ensureRevenueCatConfigured(configuredAppUserId);
   return Purchases.restorePurchases();
 }

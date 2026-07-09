@@ -127,6 +127,7 @@ export default function Paywall() {
   };
 
   const restore = async () => {
+    if (!purchasesSupported()) return;
     setError(null);
     setBusy("restore");
     try {
@@ -305,11 +306,13 @@ export default function Paywall() {
           {hasPurchasablePackage ? `Cancel anytime · No charge for ${TRIAL_DAYS} days` : "Subscriptions aren't available right now"}
         </Text>
 
-        <Pressable onPress={restore} disabled={busy !== null} style={{ padding: spacing.sm, alignItems: "center" }}>
-          <Text style={{ color: colors.text, fontSize: 14, fontWeight: "600" }}>
-            {busy === "restore" ? "Restoring…" : "Restore Purchases"}
-          </Text>
-        </Pressable>
+        {purchasesSupported() && (
+          <Pressable onPress={restore} disabled={busy !== null} style={{ padding: spacing.sm, alignItems: "center" }}>
+            <Text style={{ color: colors.text, fontSize: 14, fontWeight: "600" }}>
+              {busy === "restore" ? "Restoring…" : "Restore Purchases"}
+            </Text>
+          </Pressable>
+        )}
 
         <View style={{ flexDirection: "row", justifyContent: "center", gap: spacing.lg, marginTop: spacing.sm }}>
           <Pressable onPress={() => Linking.openURL(TERMS_URL)}>

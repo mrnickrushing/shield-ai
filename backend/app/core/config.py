@@ -40,6 +40,7 @@ class Settings(BaseSettings):
     GOOGLE_OAUTH_CLIENT_SECRET: str = ""
     GOOGLE_OAUTH_REDIRECT_URI: str = "https://api.shieldai.rushingtechnologies.com/api/v1/auth/google/callback"
     MOBILE_GOOGLE_AUTH_RETURN_URI: str = "shieldai://google-auth"
+    APPLE_CLIENT_ID: str = "com.shieldai.app"
     REVENUECAT_WEBHOOK_SECRET: str = ""  # Authorization header value RevenueCat sends to /billing/revenuecat-webhook
 
     # --- Phase 2 optional APIs ---

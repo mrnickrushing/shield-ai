@@ -23,6 +23,8 @@
       "infoPlist": {
         "NSCameraUsageDescription": "Shield AI uses the camera to scan QR codes for threat analysis.",
         "NSPhotoLibraryUsageDescription": "Shield AI accesses your photo library to scan screenshots for scam detection.",
+        "NSMicrophoneUsageDescription": "Shield AI uses the microphone to record suspicious voicemails you play for analysis.",
+        "NSSpeechRecognitionUsageDescription": "Shield AI transcribes voicemails on your device so the audio never leaves your phone.",
         "ITSAppUsesNonExemptEncryption": false
       }
     },
@@ -57,7 +59,7 @@
         "expo-camera",
         {
           "cameraPermission": "Shield AI uses your camera to scan QR codes.",
-          "microphonePermission": false
+          "microphonePermission": "Shield AI uses the microphone to record suspicious voicemails you play for analysis."
         }
       ],
       [

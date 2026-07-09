@@ -5,16 +5,14 @@ Steps:
   1. Ensure App ID com.shieldai.app.widget exists with App Groups capability.
   2. Find the team's App Store distribution certificate.
   3. Delete any stale distribution profile for the widget App ID.
-  4. Create a fresh profile (including App Groups) and save it to
-     scripts/widget_extension.mobileprovision for commit to the repo.
+  4. Create a fresh profile (including App Groups) and install it locally.
 
 Unlike setup_share_extension_signing.py (which runs conceptually on the
 Codemagic Mac instance and uses the macOS `security` tool), this is meant to
 be run once, locally, wherever App Store Connect API credentials are
 available — it decodes the returned profile with `openssl cms` instead, so it
-works on any OS. The committed .mobileprovision it produces is what CI
-actually consumes (see the "Set up code signing" step in codemagic.yaml),
-exactly like the share-extension profile.
+works on any OS. Do not commit generated .mobileprovision files; CI fetches
+fresh signing files in codemagic.yaml.
 
 Requires env vars:
   APP_STORE_CONNECT_KEY_IDENTIFIER
@@ -35,7 +33,6 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 BASE = "https://api.appstoreconnect.apple.com"
-REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 # ── auth ──────────────────────────────────────────────────────────────────────
@@ -253,7 +250,9 @@ def main():
     ensure_app_groups(bid_id)
     delete_stale_profiles(bid_id)
     cert_id = find_distribution_cert()
-    dest_path = os.path.join(REPO_ROOT, "scripts", "widget_extension.mobileprovision")
+    dest_path = os.path.expanduser(
+        "~/Library/MobileDevice/Provisioning Profiles/widget_extension.mobileprovision"
+    )
     uuid, app_groups = create_and_install_profile(
         bid_id, cert_id, "Shield AI Widget AppStore", dest_path
     )
