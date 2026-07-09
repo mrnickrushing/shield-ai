@@ -199,7 +199,10 @@ workflows:
       - name: Increment build number
         working_directory: mobile/ios
         script: |
-          agvtool new-version -all "$(date +%Y%m%d%H%M)"
+          # Small, auto-incrementing build number (Codemagic's per-project
+          # counter) instead of a huge YYYYMMDDHHMM timestamp. Still strictly
+          # ascending, so Apple never rejects an upload as a duplicate.
+          agvtool new-version -all "${BUILD_NUMBER}"
 
       - name: Build IPA
         working_directory: mobile/ios
