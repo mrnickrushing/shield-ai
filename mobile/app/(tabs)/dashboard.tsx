@@ -18,7 +18,7 @@ import { ScanCard } from "@/components/ScanCard";
 import { ShieldAPI } from "@/lib/api";
 import { syncWidgetSnapshot } from "@/lib/widgetSync";
 import { useAuth } from "@/state/auth";
-import { colors, glow, radius, spacing } from "@/theme/theme";
+import { colors, glow, radius, spacing, withAlpha } from "@/theme/theme";
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -148,18 +148,21 @@ export default function Dashboard() {
         <Pressable
           onPress={() => router.push("/profile")}
           hitSlop={12}
+          accessibilityLabel="Account and settings"
           style={{
-            width: 40,
-            height: 40,
-            borderRadius: 20,
-            backgroundColor: colors.glass,
-            borderWidth: 1,
-            borderColor: colors.borderHi,
+            flexDirection: "row",
             alignItems: "center",
-            justifyContent: "center",
+            gap: 6,
+            height: 44,
+            paddingHorizontal: 14,
+            borderRadius: 22,
+            backgroundColor: withAlpha(colors.primaryBright, "1A"),
+            borderWidth: 1,
+            borderColor: withAlpha(colors.primaryBright, "55"),
           }}
         >
-          <Ionicons name="person-outline" size={18} color={colors.textDim} />
+          <Ionicons name="person-circle-outline" size={24} color={colors.primaryBright} />
+          <Text style={{ color: colors.primaryBright, fontSize: 14, fontWeight: "700" }}>Account</Text>
         </Pressable>
       </View>
 
