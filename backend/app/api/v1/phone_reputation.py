@@ -2,17 +2,43 @@
 
 GET /api/v1/phone-reputation/sync — corroborated scam-number snapshot (authenticated)
 """
-from fastapi import APIRouter, Depends
+import re
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.core.config import settings
 from app.db.session import get_db
-from app.models.models import PhoneScan, RiskReport, ScanHistory, RiskLevel, SeededScamNumber, User
+from app.models.models import (
+    PersonalBlockedNumber,
+    PhoneScan,
+    RiskReport,
+    ScanHistory,
+    RiskLevel,
+    SeededScamNumber,
+    User,
+)
 from app.schemas.schemas import PhoneReputationEntry, PhoneReputationSyncOut
 
 router = APIRouter(prefix="/phone-reputation", tags=["phone-reputation"])
+
+
+class BlockNumberIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    number: str
+
+
+def _normalize_block_number(raw: str) -> str:
+    """Digits only, NANP 10-digit gets the US/Canada country code — matching
+    how the Call Directory snapshot stores numbers so a personal block lines up
+    with what iOS hands the extension."""
+    digits = re.sub(r"\D", "", raw or "")
+    if len(digits) == 10:
+        digits = "1" + digits
+    return digits
 
 # RiskReport.threat_category stores the display string from
 # risk_engine.THREAT_CATEGORIES, not the raw category key — map from that.
@@ -75,7 +101,66 @@ def sync_phone_reputation(
         if latest_seen is None or (last_seen and last_seen > latest_seen):
             latest_seen = last_seen
 
+    # This user's own blocks always win — a number they chose to block is
+    # blocked no matter what the community/feed says.
+    personal = db.query(PersonalBlockedNumber).filter(PersonalBlockedNumber.user_id == user.id).all()
+    for block in personal:
+        entries[block.number] = block.label or "Blocked"
+        if latest_seen is None or block.created_at > latest_seen:
+            latest_seen = block.created_at
+
     return PhoneReputationSyncOut(
         version=latest_seen.isoformat() if latest_seen else "0",
         entries=[PhoneReputationEntry(number=n, label=l) for n, l in entries.items()],
     )
+
+
+@router.get("/blocks")
+def list_personal_blocks(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    rows = (
+        db.query(PersonalBlockedNumber)
+        .filter(PersonalBlockedNumber.user_id == user.id)
+        .order_by(PersonalBlockedNumber.created_at.desc())
+        .all()
+    )
+    return [{"number": r.number, "label": r.label, "created_at": r.created_at} for r in rows]
+
+
+@router.post("/block", status_code=status.HTTP_201_CREATED)
+def add_personal_block(
+    payload: BlockNumberIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Add a number to this user's personal call blocklist. Takes effect on the
+    next Call Directory sync."""
+    number = _normalize_block_number(payload.number)
+    if len(number) < 7:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Enter a valid phone number.")
+
+    existing = (
+        db.query(PersonalBlockedNumber)
+        .filter(PersonalBlockedNumber.user_id == user.id, PersonalBlockedNumber.number == number)
+        .first()
+    )
+    if existing:
+        return {"number": number, "already_blocked": True}
+
+    db.add(PersonalBlockedNumber(user_id=user.id, number=number, label="Blocked"))
+    db.commit()
+    return {"number": number, "already_blocked": False}
+
+
+@router.delete("/block/{number}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_personal_block(
+    number: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    normalized = _normalize_block_number(number)
+    (
+        db.query(PersonalBlockedNumber)
+        .filter(PersonalBlockedNumber.user_id == user.id, PersonalBlockedNumber.number == normalized)
+        .delete()
+    )
+    db.commit()

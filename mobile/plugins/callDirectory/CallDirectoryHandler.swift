@@ -17,6 +17,14 @@ class CallDirectoryHandler: CXCallDirectoryProvider {
     let label: String
   }
 
+  // Labels that get the call *blocked* (it never rings): community-corroborated
+  // scam numbers and numbers the user blocked themselves. The softer FCC
+  // complaint feed ("Spam Risk") is only labeled — a complaint feed can include
+  // a spoofed-but-legit number, and silently blocking a real call is worse than
+  // flagging it. Users who want a specific complaint-feed number gone can block
+  // it directly (it then arrives here labeled "Blocked").
+  private static let blockLabels: Set<String> = ["Scam Likely", "Reported Spam", "Blocked"]
+
   override func beginRequest(with context: CXCallDirectoryExtensionContext) {
     context.delegate = self
 
@@ -29,17 +37,13 @@ class CallDirectoryHandler: CXCallDirectoryProvider {
       // numeric order — blocking and identification are separate sequences.
       .sorted { $0.0 < $1.0 }
 
-    // The snapshot is the curated scam/spam list (community-corroborated
-    // numbers plus a complaint feed with known-legit lines excluded), so every
-    // number is blocked outright — it never rings. This is what a spam-blocker
-    // is for; the in-app "report wrong label" flow removes any false positive.
-    for (phoneNumber, _) in entries {
+    // Block the high-confidence + user-chosen numbers so they never ring...
+    for (phoneNumber, label) in entries where Self.blockLabels.contains(label) {
       context.addBlockingEntry(withNextSequentialPhoneNumber: phoneNumber)
     }
 
-    // Also label them, so if the user leaves blocking off but identification on
-    // (Settings → Phone → Call Blocking & Identification), the call still shows
-    // "Scam Likely" / "Spam Risk" instead of ringing anonymously.
+    // ...and label every number (blocked ones too, harmlessly) so anything not
+    // blocked still shows "Scam Likely" / "Spam Risk" on the incoming screen.
     for (phoneNumber, label) in entries {
       context.addIdentificationEntry(withNextSequentialPhoneNumber: phoneNumber, label: label)
     }

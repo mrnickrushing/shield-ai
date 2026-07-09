@@ -96,6 +96,35 @@ export default function CallProtectionScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const blockNumber = () => {
+    Alert.prompt(
+      "Block a number",
+      "Enter the number that called you (find it in your Phone app's Recents). It'll stop ringing your phone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Block",
+          style: "destructive",
+          onPress: async (value?: string) => {
+            const number = (value ?? "").trim();
+            if (!number) return;
+            try {
+              await ShieldAPI.blockNumber(number);
+              // Push the new block into the on-device snapshot right away.
+              await syncCallProtection();
+              Alert.alert("Blocked", "That number won't ring your phone anymore.");
+            } catch {
+              Alert.alert("Couldn't block", "Check the number and your connection, then try again.");
+            }
+          },
+        },
+      ],
+      "plain-text",
+      "",
+      "phone-pad"
+    );
+  };
+
   const reportWrongLabel = () => {
     Alert.prompt(
       "Report a wrong label",
@@ -156,11 +185,11 @@ export default function CallProtectionScreen() {
               </View>
             </View>
             <Text style={{ color: colors.textMuted, fontSize: 13, lineHeight: 19 }}>
-              Thousands of known scam and spam numbers are blocked outright — they never ring your
-              phone. If one ever gets through, it&apos;s labeled &ldquo;Spam Risk&rdquo; on your
-              incoming call screen. Texts from unknown senders are screened the same way, and scam
-              texts are filed into your Junk folder before they ever buzz your phone. No app needs
-              to be open, and you can report a wrongly-blocked number below.
+              Confirmed scam numbers — and any number you block yourself — never ring your phone.
+              Numbers from complaint feeds are labeled &ldquo;Spam Risk&rdquo; on your incoming call
+              screen so you can decide, and you can block any of them with one tap below. Texts from
+              unknown senders are screened the same way, and scam texts are filed into your Junk
+              folder before they ever buzz your phone. No app needs to be open.
             </Text>
           </Surface>
         </FadeIn>
@@ -205,6 +234,13 @@ export default function CallProtectionScreen() {
                   onPress={() => syncMutation.mutate({})}
                   loading={syncMutation.isPending}
                   variant="secondary"
+                />
+                <Button
+                  label="Block a Number"
+                  icon="ban-outline"
+                  onPress={blockNumber}
+                  variant="secondary"
+                  style={{ marginTop: spacing.sm }}
                 />
                 <Pressable onPress={reportWrongLabel} hitSlop={8} style={{ marginTop: spacing.sm }}>
                   <Text style={{ color: colors.textMuted, fontSize: 12, textAlign: "center" }}>

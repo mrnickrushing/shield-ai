@@ -586,6 +586,23 @@ class SeededScamNumber(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
 
+class PersonalBlockedNumber(Base):
+    """A number an individual user chose to block. Merged into that user's
+    Call Directory snapshot so it never rings — independent of the community /
+    complaint feed. Numbers are E.164 digits without '+'."""
+
+    __tablename__ = "personal_blocked_numbers"
+    __table_args__ = (
+        UniqueConstraint("user_id", "number", name="uq_personal_block_user_number"),
+    )
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    number: Mapped[str] = mapped_column(String, index=True)
+    label: Mapped[str] = mapped_column(String, default="Blocked")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
 class SeededScamDomain(Base):
     """Known phishing/malware hostnames from external feeds (OpenPhish,
     URLhaus), giving the Safari extension a non-empty blocklist before

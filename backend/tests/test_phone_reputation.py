@@ -136,3 +136,45 @@ def test_community_label_overrides_seed_label():
     assert r.status_code == 200, r.text
     entries = {e["number"]: e["label"] for e in r.json()["entries"]}
     assert entries["19000900090"] == "Scam Likely"
+
+
+def test_personal_block_appears_in_sync_and_can_be_removed():
+    headers = _register_and_scan("212-555-0123")["headers"]
+
+    # Block a bare 10-digit number; it should normalize to 1-prefixed E.164.
+    r = client.post("/api/v1/phone-reputation/block", json={"number": "415-555-0199"}, headers=headers)
+    assert r.status_code == 201, r.text
+    assert r.json()["number"] == "14155550199"
+
+    r = client.get("/api/v1/phone-reputation/sync", headers=headers)
+    entries = {e["number"]: e["label"] for e in r.json()["entries"]}
+    assert entries.get("14155550199") == "Blocked"
+
+    # Idempotent re-block.
+    r = client.post("/api/v1/phone-reputation/block", json={"number": "14155550199"}, headers=headers)
+    assert r.status_code == 201 and r.json()["already_blocked"] is True
+
+    # Remove it.
+    r = client.delete("/api/v1/phone-reputation/block/14155550199", headers=headers)
+    assert r.status_code == 204
+    r = client.get("/api/v1/phone-reputation/sync", headers=headers)
+    assert "14155550199" not in {e["number"] for e in r.json()["entries"]}
+
+
+def test_personal_block_rejects_garbage_and_requires_auth():
+    headers = _register_and_scan("212-555-0124")["headers"]
+    r = client.post("/api/v1/phone-reputation/block", json={"number": "abc"}, headers=headers)
+    assert r.status_code == 422
+    r = client.post("/api/v1/phone-reputation/block", json={"number": "415-555-0111"})
+    assert r.status_code in (401, 403)
+
+
+def test_personal_block_is_per_user():
+    a = _register_and_scan("212-555-0125")["headers"]
+    b = _register_and_scan("212-555-0126")["headers"]
+    client.post("/api/v1/phone-reputation/block", json={"number": "202-555-0143"}, headers=a)
+
+    entries_b = {e["number"] for e in client.get("/api/v1/phone-reputation/sync", headers=b).json()["entries"]}
+    assert "12025550143" not in entries_b
+    entries_a = {e["number"] for e in client.get("/api/v1/phone-reputation/sync", headers=a).json()["entries"]}
+    assert "12025550143" in entries_a

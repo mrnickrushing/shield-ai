@@ -577,6 +577,12 @@ export const ShieldAPI = {
   // Phone reputation — Call Directory Extension sync
   syncPhoneReputation: () =>
     api.get<PhoneReputationSync>("/phone-reputation/sync").then((r) => r.data),
+  blockNumber: (number: string) =>
+    api.post<{ number: string; already_blocked: boolean }>("/phone-reputation/block", { number }).then((r) => r.data),
+  unblockNumber: (number: string) =>
+    api.delete(`/phone-reputation/block/${encodeURIComponent(number)}`),
+  listBlockedNumbers: () =>
+    api.get<{ number: string; label: string; created_at: string }[]>("/phone-reputation/blocks").then((r) => r.data),
   // URL reputation — Safari Web Extension sync
   syncUrlReputation: () =>
     api.get<{ version: string; domains: string[] }>("/url-reputation/sync").then((r) => r.data),
