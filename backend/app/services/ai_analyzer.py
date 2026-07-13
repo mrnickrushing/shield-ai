@@ -24,6 +24,39 @@ log = logging.getLogger(__name__)
 _JSON_BLOCK_RE = re.compile(r"\{.*\}", re.DOTALL)
 
 
+def _detect_image_media_type(image_bytes: bytes) -> str | None:
+    """Sniff the actual image format from magic bytes. Claude's vision input
+    validates the declared media_type against the real bytes, so trusting the
+    client's mime type (or hardcoding one) gets a 400 on mismatch."""
+    if image_bytes[:3] == b"\xff\xd8\xff":
+        return "image/jpeg"
+    if image_bytes[:8] == b"\x89PNG\r\n\x1a\n":
+        return "image/png"
+    if image_bytes[:6] in (b"GIF87a", b"GIF89a"):
+        return "image/gif"
+    if image_bytes[:4] == b"RIFF" and image_bytes[8:12] == b"WEBP":
+        return "image/webp"
+    return None
+
+
+def _prepare_vision_image(image_bytes: bytes) -> tuple[bytes, str]:
+    """Return (bytes, media_type) acceptable to Claude vision. Formats Claude
+    doesn't take (e.g. HEIC straight off an iPhone camera roll, BMP, TIFF) are
+    re-encoded to JPEG via Pillow; a Pillow failure propagates to the caller's
+    except-block, which falls back to the OCR/text path."""
+    media_type = _detect_image_media_type(image_bytes)
+    if media_type is not None:
+        return image_bytes, media_type
+
+    from io import BytesIO
+
+    from PIL import Image
+
+    buf = BytesIO()
+    Image.open(BytesIO(image_bytes)).convert("RGB").save(buf, format="JPEG", quality=85)
+    return buf.getvalue(), "image/jpeg"
+
+
 def _parse_json_response(text: str) -> dict:
     """Claude sometimes wraps JSON in prose or markdown fences despite
     instructions to return JSON only — extract the outermost object."""
@@ -154,11 +187,12 @@ def analyze_image_with_vision(image_bytes: bytes, evidence: dict) -> dict | None
             return cached
 
         client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
-        b64 = base64.b64encode(image_bytes).decode()
+        vision_bytes, media_type = _prepare_vision_image(image_bytes)
+        b64 = base64.b64encode(vision_bytes).decode()
         user_message = [
             {
                 "type": "image",
-                "source": {"type": "base64", "media_type": "image/jpeg", "data": b64},
+                "source": {"type": "base64", "media_type": media_type, "data": b64},
             },
             {
                 "type": "text",
