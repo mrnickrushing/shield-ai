@@ -212,24 +212,34 @@ function timeAgo(dateStr: string): string {
   return `${Math.floor(hours / 24)}d ago`;
 }
 
-/** Human title per scan: domains for links, never raw OCR text or enum names. */
-function scanTitle(scan: Scan): string {
+/** Human title + detail per scan: domains for links, never raw OCR text or enum names. */
+function scanRowText(scan: Scan): { title: string; detail: string } {
   const input = (scan.raw_input || "").trim();
+  const type = SCAN_TYPE_LABEL[scan.scan_type] ?? "Scan";
+  const when = timeAgo(scan.created_at);
   switch (scan.scan_type) {
     case "link":
     case "qr": {
-      const domain = input.replace(/^https?:\/\//i, "").replace(/^www\./i, "").split(/[/?#]/)[0];
-      return domain || `${SCAN_TYPE_LABEL[scan.scan_type]} scan`;
+      const stripped = input.replace(/^https?:\/\//i, "").replace(/^www\./i, "");
+      const [domain, ...rest] = stripped.split(/(?=[/?#])/);
+      const path = rest.join("");
+      return {
+        title: domain || `${type} scan`,
+        detail: path ? `${path.slice(0, 34)}${path.length > 34 ? "…" : ""} · ${when}` : `${type} · ${when}`,
+      };
     }
     case "phone":
-      return input || "Phone number scan";
+      return { title: input || "Phone number scan", detail: `${type} · ${when}` };
     case "message":
     case "marketplace":
     case "social":
-      return input ? `“${input.slice(0, 48)}${input.length > 48 ? "…" : ""}”` : `${SCAN_TYPE_LABEL[scan.scan_type]} scan`;
+      return {
+        title: input ? `“${input.slice(0, 48)}${input.length > 48 ? "…" : ""}”` : `${type} scan`,
+        detail: `${type} · ${when}`,
+      };
     default:
       // Screenshots and documents carry OCR text in raw_input — junk as a title.
-      return `${SCAN_TYPE_LABEL[scan.scan_type] ?? "Scan"} scan`;
+      return { title: `${type} scan`, detail: `${type} · ${when}` };
   }
 }
 
@@ -237,6 +247,7 @@ function ActivityRow({ scan }: { scan: Scan }) {
   const router = useRouter();
   const level = scan.report?.risk_level ?? "safe";
   const meta = activityMeta[level] ?? activityMeta.safe;
+  const { title, detail } = scanRowText(scan);
   return (
     <Pressable
       onPress={() => router.push(`/result?id=${scan.id}` as any)}
@@ -254,10 +265,8 @@ function ActivityRow({ scan }: { scan: Scan }) {
         <Ionicons name={meta.icon} size={17} color={meta.color} />
       </View>
       <View style={{ flex: 1, marginLeft: 10 }}>
-        <Text numberOfLines={1} style={{ color: colors.text, fontWeight: "700", fontSize: 13 }}>{scanTitle(scan)}</Text>
-        <Text numberOfLines={1} style={{ color: colors.textMuted, fontSize: 11, marginTop: 1 }}>
-          {SCAN_TYPE_LABEL[scan.scan_type] ?? scan.scan_type} · {timeAgo(scan.created_at)}
-        </Text>
+        <Text numberOfLines={1} style={{ color: colors.text, fontWeight: "700", fontSize: 13 }}>{title}</Text>
+        <Text numberOfLines={1} style={{ color: colors.textMuted, fontSize: 11, marginTop: 1 }}>{detail}</Text>
       </View>
       <View style={{ backgroundColor: `${meta.color}1a`, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 }}>
         <Text style={{ color: meta.color, fontSize: 11, fontWeight: "700" }}>{meta.verdict}</Text>
@@ -276,6 +285,7 @@ export default function Dashboard() {
   const threatsBlocked = scans?.filter((scan) => scan.report && ["suspicious", "high", "critical"].includes(scan.report.risk_level)).length ?? 0;
   const score = protection?.score ?? (scans?.length ? Math.max(42, Math.round(100 - (threatsBlocked / scans.length) * 58)) : 85);
   const recent = scans?.slice(0, 3) ?? [];
+  const topFix = protection?.fixes?.[0];
   const firstName = user?.display_name?.split(" ")[0] || "";
   // The hero should tell the truth: tie its copy to the actual score.
   const heroStatus =
@@ -327,7 +337,21 @@ export default function Dashboard() {
           </View>
         </View>
 
-        <View style={{ flexDirection: "row", alignItems: "center", marginTop: 8, marginBottom: 4 }}>
+        {/* Score + activity as one anchored unit, not two floating charts */}
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            marginTop: 10,
+            marginBottom: 4,
+            borderRadius: radius.md,
+            borderWidth: 1,
+            borderColor: `${colors.primaryBright}25`,
+            backgroundColor: colors.glassDeep,
+            paddingVertical: 8,
+            paddingHorizontal: 4,
+          }}
+        >
           <Pressable
             onPress={() => router.push("/protection" as any)}
             accessibilityRole="button"
@@ -339,6 +363,33 @@ export default function Dashboard() {
           <View style={{ flex: 1 }}><ActivityTrend scans={scans} /></View>
         </View>
 
+        {/* The single highest-impact fix — one card, never a stack */}
+        {topFix && (
+          <Pressable
+            onPress={() => router.push(`/${topFix.screen}` as any)}
+            style={({ pressed }) => ({
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 10,
+              marginBottom: 6,
+              borderRadius: radius.md,
+              borderWidth: 1,
+              borderColor: `${colors.suspicious}40`,
+              backgroundColor: pressed ? colors.glassActive : colors.glassDeep,
+              padding: 11,
+            })}
+          >
+            <Ionicons name="trending-up" size={18} color={colors.suspicious} />
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: colors.text, fontWeight: "800", fontSize: 12 }}>
+                +{topFix.points} to your score
+              </Text>
+              <Text numberOfLines={1} style={{ color: colors.textMuted, fontSize: 11 }}>{topFix.hint}</Text>
+            </View>
+            <Text style={{ color: colors.suspicious, fontWeight: "800", fontSize: 12 }}>Fix →</Text>
+          </Pressable>
+        )}
+
         <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", rowGap: 10 }}>
           {tools.map((tool) => <ToolCard key={tool.title} {...tool} />)}
         </View>
@@ -349,9 +400,17 @@ export default function Dashboard() {
         </View>
         <View style={{ borderRadius: radius.md, borderWidth: 1, borderColor: `${colors.primaryBright}25`, backgroundColor: colors.glassDeep, overflow: "hidden" }}>
           {recent.length ? recent.map((scan) => <ActivityRow key={scan.id} scan={scan} />) : (
-            <Pressable onPress={() => router.push("/(tabs)/scan")} style={{ padding: 14, alignItems: "center" }}>
-              <Text style={{ color: colors.textDim, fontSize: 12 }}>No scans yet</Text>
-              <Text style={{ color: colors.primaryBright, fontSize: 12, fontWeight: "800", marginTop: 4 }}>Run your first scan</Text>
+            <Pressable onPress={() => router.push("/(tabs)/scan")} style={{ paddingVertical: 22, paddingHorizontal: 16, alignItems: "center" }}>
+              <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: `${colors.primaryBright}1a`, alignItems: "center", justifyContent: "center", marginBottom: 8 }}>
+                <Ionicons name="scan-outline" size={20} color={colors.primaryBright} />
+              </View>
+              <Text style={{ color: colors.text, fontSize: 13, fontWeight: "700" }}>Your scans will appear here</Text>
+              <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2, textAlign: "center" }}>
+                Paste a suspicious link, text, or screenshot and get a verdict in seconds.
+              </Text>
+              <View style={{ marginTop: 10, borderRadius: 999, backgroundColor: `${colors.primaryBright}22`, paddingHorizontal: 14, paddingVertical: 7 }}>
+                <Text style={{ color: colors.primaryBright, fontSize: 12, fontWeight: "800" }}>Run your first scan</Text>
+              </View>
             </Pressable>
           )}
         </View>
