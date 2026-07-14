@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Pressable, ScrollView, Share, Text, TextInput, View } from "react-native";
-import Animated, { Easing, useAnimatedStyle, useSharedValue, withDelay, withSpring, withTiming } from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { GlowBackground } from "@/components/GlowBackground";
 import { GradientButton } from "@/components/GradientButton";
@@ -21,67 +21,6 @@ const VERDICT_BLOOM: Record<string, string> = {
   high: "#1c0d03",
   critical: "#1a0205",
 };
-
-/** Score counts up from 0 with an ease-out over ~800ms, per the design deck. */
-function useCountUp(target: number, duration = 800) {
-  const [value, setValue] = useState(0);
-  useEffect(() => {
-    const start = Date.now();
-    const timer = setInterval(() => {
-      const t = Math.min(1, (Date.now() - start) / duration);
-      const eased = 1 - Math.pow(1 - t, 3);
-      setValue(Math.round(target * eased));
-      if (t >= 1) clearInterval(timer);
-    }, 16);
-    return () => clearInterval(timer);
-  }, [target, duration]);
-  return value;
-}
-
-function VerdictBadge({ accent, riskScore, riskLevel, children }: {
-  accent: string;
-  riskScore: number;
-  riskLevel: string;
-  children?: React.ReactNode;
-}) {
-  const scale = useSharedValue(0.6);
-  const opacity = useSharedValue(0);
-  const displayScore = useCountUp(riskScore);
-
-  useEffect(() => {
-    scale.value = withDelay(100, withSpring(1, { damping: 10, stiffness: 120 }));
-    opacity.value = withDelay(100, withTiming(1, { duration: 300, easing: Easing.out(Easing.ease) }));
-  }, [scale, opacity]);
-
-  const style = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-    opacity: opacity.value,
-  }));
-
-  return (
-    <Animated.View style={[{ flexDirection: "row", alignItems: "center", gap: spacing.md }, style]}>
-      <View
-        style={{
-          width: 104,
-          height: 104,
-          borderRadius: 52,
-          borderWidth: 6,
-          borderColor: `${accent}88`,
-          alignItems: "center",
-          justifyContent: "center",
-          backgroundColor: `${accent}12`,
-          ...glow(accent, "lg"),
-        }}
-      >
-        <Text style={{ color: colors.text, fontSize: 30, fontWeight: "900", letterSpacing: -1 }}>
-          {displayScore}
-        </Text>
-        <Text style={{ color: colors.textDim, fontSize: 11, fontWeight: "700" }}>RISK</Text>
-      </View>
-      {children}
-    </Animated.View>
-  );
-}
 
 function SignalTile({
   label,
@@ -201,6 +140,7 @@ function extractTargetUrl(scan: Scan) {
 
 export default function Result() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [feedbackMode, setFeedbackMode] = useState<"helpful" | "not_accurate" | null>(null);
   const [feedbackReason, setFeedbackReason] = useState("");
@@ -293,13 +233,6 @@ export default function Result() {
             onPress: () => router.push("/(tabs)/scan"),
           };
 
-  const summaryTitle =
-    report.risk_level === "critical" || report.risk_level === "high"
-      ? "This needs a defensive response now."
-      : report.risk_level === "suspicious"
-        ? "This deserves caution before you continue."
-        : "No major threat signal dominated this scan.";
-
   const bloom = VERDICT_BLOOM[report.risk_level] ?? colors.bgBloom;
   const canRescanWithContext = ["link", "message", "email", "phone", "marketplace", "social", "qr"].includes(scan.scan_type);
 
@@ -365,55 +298,25 @@ export default function Result() {
   return (
     <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ paddingBottom: spacing.xl }}>
       <GlowBackground accent={bloom} bloomOpacity={1} centerY={0.1} />
-      <View
-        style={{
-          paddingHorizontal: spacing.lg,
-          paddingTop: spacing.xl,
-          paddingBottom: spacing.xl,
-          overflow: "hidden",
-        }}
-      >
-        <Text style={{ color: accent, fontSize: 12, fontWeight: "800", letterSpacing: 1.2, marginBottom: spacing.sm }}>
-          VERDICT
-        </Text>
-        <VerdictBadge accent={accent} riskScore={report.risk_score} riskLevel={report.risk_level}>
-          <View style={{ flex: 1 }}>
-            <Text
-              style={{
-                color: accent,
-                fontSize: 28,
-                fontWeight: "900",
-                letterSpacing: -1,
-                textShadowColor: accent,
-                textShadowRadius: 12,
-                textShadowOffset: { width: 0, height: 0 },
-              }}
-            >
-              {report.risk_level.toUpperCase()}
-            </Text>
-            <Text style={{ color: colors.textMuted, fontSize: 14, marginTop: 4 }}>
-              {summaryTitle}
-            </Text>
-            <Text style={{ color: accent, fontSize: 13, fontWeight: "700", marginTop: spacing.sm }}>
-              {report.threat_category} • {Math.round(report.confidence * 100)}% confidence
-            </Text>
-          </View>
-        </VerdictBadge>
-        {(report.risk_level === "critical" || report.risk_level === "high") && (
-          <View
-            style={{
-              marginTop: spacing.lg,
-              backgroundColor: colors.critical,
-              borderRadius: radius.md,
-              padding: spacing.md,
-              ...glow(colors.critical, "md"),
-            }}
-          >
-            <Text style={{ color: "#fff", fontWeight: "900", fontSize: 14, textAlign: "center" }}>
-              Do not interact with this content
-            </Text>
-          </View>
-        )}
+      <View style={{ paddingHorizontal: spacing.lg, paddingTop: insets.top + 8, paddingBottom: spacing.lg }}>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+          <Pressable onPress={() => router.back()} hitSlop={12} style={{ width: 70, flexDirection: "row", alignItems: "center" }}>
+            <Ionicons name="chevron-back" size={20} color={colors.primaryBright} />
+            <Text style={{ color: colors.primaryBright, fontSize: 13 }}>Back</Text>
+          </Pressable>
+          <Text style={{ color: colors.text, fontSize: 15, fontWeight: "800" }}>Scan Result Detail</Text>
+          <View style={{ width: 70 }} />
+        </View>
+        <View style={{ minHeight: 166, borderRadius: radius.md, backgroundColor: accent, alignItems: "center", justifyContent: "center", padding: 18, ...glow(accent, "md") }}>
+          <Ionicons name={report.risk_level === "safe" ? "shield-checkmark-outline" : "warning-outline"} size={48} color="#fff" />
+          <Text style={{ color: "#fff", fontSize: 25, fontWeight: "900", marginTop: 8 }}>{report.risk_level.toUpperCase()} RISK</Text>
+          <Text style={{ color: "#fff", fontSize: 13, fontWeight: "600", marginTop: 2 }}>
+            {report.risk_level === "safe" ? "No Threats Detected" : "Do Not Interact"}
+          </Text>
+          <Text style={{ color: "rgba(255,255,255,0.78)", fontSize: 10, marginTop: 7 }}>
+            {report.threat_category} · {Math.round(report.confidence * 100)}% confidence · score {report.risk_score}/100
+          </Text>
+        </View>
       </View>
 
       <View style={{ padding: spacing.lg }}>

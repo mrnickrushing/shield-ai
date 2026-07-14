@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useQuery } from "@tanstack/react-query";
 import * as Clipboard from "expo-clipboard";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
@@ -21,6 +22,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { GlowBackground } from "@/components/GlowBackground";
 import { GradientButton } from "@/components/GradientButton";
 import { CornerBrackets, ScanBeam } from "@/components/ScanBeam";
+import { ScanCard } from "@/components/ScanCard";
 import { ShieldAPI } from "@/lib/api";
 import { colors, glow as glowStyle, mono, radius, spacing } from "@/theme/theme";
 
@@ -32,12 +34,6 @@ const ANALYSIS_STAGES = [
 ];
 
 type DetectedKind = "link" | "phone" | "message";
-
-const DETECT_HINT: Record<DetectedKind, { label: string; icon: keyof typeof Ionicons.glyphMap }> = {
-  link: { label: "Link detected", icon: "link-outline" },
-  phone: { label: "Phone number detected", icon: "call-outline" },
-  message: { label: "Will analyze as a message", icon: "chatbubble-outline" },
-};
 
 function detectInputKind(text: string): DetectedKind {
   const t = text.trim();
@@ -356,6 +352,11 @@ export default function ScanScreen() {
   const [socialText, setSocialText] = useState("");
   const [socialPlatform, setSocialPlatform] = useState("");
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
+  const { data: recentScans } = useQuery({
+    queryKey: ["scans"],
+    queryFn: ShieldAPI.listScans,
+    staleTime: 30_000,
+  });
 
   useEffect(() => {
     if (params.type) {
@@ -525,115 +526,86 @@ export default function ScanScreen() {
             <Text style={{ color: colors.primaryBright, fontSize: 15 }}>← Back</Text>
           </Pressable>
         )}
-        {/* Universal scan — paste anything, we detect what it is */}
-        <View
-          style={{
-            backgroundColor: colors.glassDeep,
-            borderRadius: 24,
-            borderWidth: 1,
-            borderColor: `${colors.primaryBright}33`,
-            padding: spacing.lg,
-            overflow: "hidden",
-            marginBottom: spacing.md,
-          }}
-        >
-          <Text style={{ color: colors.text, fontSize: 26, fontWeight: "900", letterSpacing: -1, marginBottom: 6 }}>
-            Scan anything.
-          </Text>
-          <Text style={{ color: colors.textMuted, fontSize: 14, lineHeight: 21, marginBottom: spacing.md }}>
-            Paste a link, phone number, or message — we figure out the rest.
-          </Text>
-          <TextInput
-            placeholder="Paste or type anything suspicious..."
-            placeholderTextColor={colors.textMuted}
-            multiline
-            autoCapitalize="none"
-            value={universalText}
-            onChangeText={setUniversalText}
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+          <Pressable onPress={() => router.back()} hitSlop={12} style={{ width: 32 }}>
+            <Ionicons name="chevron-back" size={23} color={colors.textDim} />
+          </Pressable>
+          <Text style={{ color: colors.text, fontSize: 16, fontWeight: "800" }}>Shield AI Multi-Scanner</Text>
+          <Pressable onPress={() => router.push("/profile")} hitSlop={12} style={{ width: 32, alignItems: "flex-end" }}>
+            <Ionicons name="person-circle-outline" size={23} color={colors.textDim} />
+          </Pressable>
+        </View>
+
+        {/* Stitch scanner viewfinder */}
+        <View style={{ height: 214, borderRadius: radius.md, overflow: "hidden", backgroundColor: "#02070B", marginBottom: 10 }}>
+          <View style={{ position: "absolute", left: "50%", top: 0, bottom: 0, width: 1, backgroundColor: `${colors.primaryBright}16` }} />
+          <View style={{ position: "absolute", top: "50%", left: 0, right: 0, height: 1, backgroundColor: `${colors.primaryBright}16` }} />
+          <CornerBrackets color={colors.accent} />
+          <ScanBeam height={214} />
+          <Pressable
+            onPress={runImage}
             style={{
-              backgroundColor: colors.bg,
-              borderColor: `${colors.primaryBright}44`,
-              borderWidth: 1,
-              borderRadius: radius.md,
-              color: colors.text,
-              padding: spacing.md,
-              minHeight: 88,
-              textAlignVertical: "top",
-              marginBottom: spacing.sm,
+              position: "absolute", left: "50%", top: "50%", marginLeft: -28, marginTop: -28,
+              width: 56, height: 56, borderRadius: 28, backgroundColor: `${colors.accent}22`,
+              borderWidth: 1, borderColor: colors.accent, alignItems: "center", justifyContent: "center",
+              ...glowStyle(colors.accent, "md"),
             }}
-          />
-          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: spacing.sm }}>
-            {universalText.trim() ? (
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                <Ionicons
-                  name={DETECT_HINT[detectInputKind(universalText)].icon}
-                  size={14}
-                  color={colors.accent}
-                />
-                <Text style={{ ...mono, fontSize: 12, fontWeight: "600" }}>
-                  {DETECT_HINT[detectInputKind(universalText)].label}
-                </Text>
-              </View>
-            ) : (
-              <View />
-            )}
+          >
+            <Ionicons name="camera-outline" size={28} color={colors.accent} />
+          </Pressable>
+          <View style={{ position: "absolute", left: 0, right: 0, top: "50%", marginTop: -62, alignItems: "center" }}>
+            <Text style={{ color: colors.text, fontSize: 14, fontWeight: "700" }}>Scan QR Code or Mail</Text>
+          </View>
+        </View>
+
+        <View style={{ backgroundColor: colors.glassDeep, borderRadius: radius.md, borderWidth: 1, borderColor: `${colors.primaryBright}5f`, padding: 9, marginBottom: spacing.md }}>
+          <View style={{ flexDirection: "row", backgroundColor: colors.surface, borderRadius: radius.pill, borderWidth: 1, borderColor: `${colors.primaryBright}77`, padding: 2, marginBottom: 10 }}>
+            {(["link", "image", "message"] as ScanMode[]).map((item) => (
+              <Pressable
+                key={item}
+                onPress={() => {
+                  if (item === "image") runImage();
+                  else setMode(item);
+                }}
+                style={{ flex: 1, height: 27, borderRadius: radius.pill, backgroundColor: mode === item ? colors.accent : "transparent", alignItems: "center", justifyContent: "center" }}
+              >
+                <Text style={{ color: mode === item ? colors.bg : colors.textMuted, fontSize: 11, fontWeight: "700", textTransform: "capitalize" }}>{item}</Text>
+              </Pressable>
+            ))}
+          </View>
+
+          <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: colors.bg, borderRadius: 9, borderWidth: 1, borderColor: colors.accent, minHeight: mode === "message" ? 72 : 42, paddingHorizontal: 10, marginBottom: 9, ...glowStyle(colors.accent, "sm") }}>
+            <TextInput
+              placeholder={mode === "message" ? "Paste message to analyze" : "Paste Link to Analyze"}
+              placeholderTextColor={colors.textMuted}
+              multiline={mode === "message"}
+              autoCapitalize="none"
+              value={universalText}
+              onChangeText={setUniversalText}
+              style={{ color: colors.text, flex: 1, fontSize: 12, textAlignVertical: mode === "message" ? "top" : "center", paddingVertical: 9 }}
+            />
             <Pressable onPress={() => pasteText(setUniversalText)} hitSlop={8}>
-              <Text style={{ color: colors.primaryBright, fontSize: 13, fontWeight: "800" }}>Paste</Text>
+              <Ionicons name="clipboard-outline" size={17} color={colors.primaryBright} />
             </Pressable>
           </View>
           <GradientButton
-            label="Scan It"
-            icon="scan"
+            label={mode === "message" ? "Analyze Message" : "Analyze Link"}
+            icon={mode === "message" ? "chatbubble-outline" : "link-outline"}
             onPress={runUniversal}
             disabled={!universalText.trim()}
             loading={loading && !advancedOpen}
           />
           {loading && !advancedOpen ? <AnalyzingOverlay /> : null}
-
-          {/* Photo / QR shortcuts */}
-          <View style={{ flexDirection: "row", gap: spacing.sm, marginTop: spacing.md }}>
-            <Pressable
-              onPress={runImage}
-              style={({ pressed }) => ({
-                flex: 1,
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: spacing.sm,
-                paddingVertical: spacing.md,
-                borderRadius: radius.md,
-                backgroundColor: pressed ? colors.glassActive : colors.glass,
-                borderWidth: 1,
-                borderColor: colors.borderHi,
-              })}
-            >
-              <Ionicons name="image-outline" size={18} color={colors.teal} />
-              <Text style={{ color: colors.text, fontWeight: "700", fontSize: 13 }}>Screenshot</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => {
-                setMode("qr");
-                setAdvancedOpen(true);
-                setError(null);
-              }}
-              style={({ pressed }) => ({
-                flex: 1,
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: spacing.sm,
-                paddingVertical: spacing.md,
-                borderRadius: radius.md,
-                backgroundColor: pressed ? colors.glassActive : colors.glass,
-                borderWidth: 1,
-                borderColor: colors.borderHi,
-              })}
-            >
-              <Ionicons name="qr-code-outline" size={18} color={colors.rose} />
-              <Text style={{ color: colors.text, fontWeight: "700", fontSize: 13 }}>QR Code</Text>
-            </Pressable>
-          </View>
         </View>
+
+        {!!recentScans?.length && (
+          <View style={{ marginBottom: spacing.md }}>
+            <Text style={{ color: colors.text, fontSize: 15, fontWeight: "800", marginBottom: 7 }}>Recent Scans</Text>
+            {recentScans.slice(0, 2).map((scan) => (
+              <ScanCard key={scan.id} scan={scan} onPress={() => navigate(scan)} />
+            ))}
+          </View>
+        )}
 
         {/* Scam coach — for situations, not artifacts */}
         <Pressable

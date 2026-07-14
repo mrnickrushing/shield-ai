@@ -2,6 +2,7 @@
 import axios from "axios";
 import Constants from "expo-constants";
 import * as SecureStore from "expo-secure-store";
+import { Platform } from "react-native";
 
 export const API_URL =
   (Constants.expoConfig?.extra?.apiUrl as string) ??
@@ -13,15 +14,36 @@ export const api = axios.create({ baseURL: `${API_URL}/api/v1`, timeout: 30000 }
 const ACCESS_KEY = "shield_access_token";
 const REFRESH_KEY = "shield_refresh_token";
 
+async function storageSet(key: string, value: string) {
+  if (Platform.OS === "web") {
+    globalThis.localStorage?.setItem(key, value);
+    return;
+  }
+  await SecureStore.setItemAsync(key, value);
+}
+
+async function storageGet(key: string) {
+  if (Platform.OS === "web") return globalThis.localStorage?.getItem(key) ?? null;
+  return SecureStore.getItemAsync(key);
+}
+
+async function storageDelete(key: string) {
+  if (Platform.OS === "web") {
+    globalThis.localStorage?.removeItem(key);
+    return;
+  }
+  await SecureStore.deleteItemAsync(key);
+}
+
 export async function saveTokens(access: string, refresh: string) {
-  await SecureStore.setItemAsync(ACCESS_KEY, access);
-  await SecureStore.setItemAsync(REFRESH_KEY, refresh);
+  await storageSet(ACCESS_KEY, access);
+  await storageSet(REFRESH_KEY, refresh);
 }
 export async function clearTokens() {
-  await SecureStore.deleteItemAsync(ACCESS_KEY);
-  await SecureStore.deleteItemAsync(REFRESH_KEY);
+  await storageDelete(ACCESS_KEY);
+  await storageDelete(REFRESH_KEY);
 }
-export async function getAccessToken() { return SecureStore.getItemAsync(ACCESS_KEY); }
+export async function getAccessToken() { return storageGet(ACCESS_KEY); }
 
 api.interceptors.request.use(async (config) => {
   const token = await getAccessToken();
@@ -35,7 +57,7 @@ api.interceptors.response.use(
     const original = error.config;
     if (error.response?.status === 401 && !original._retry) {
       original._retry = true;
-      const refresh = await SecureStore.getItemAsync(REFRESH_KEY);
+      const refresh = await storageGet(REFRESH_KEY);
       if (refresh) {
         try {
           const { data } = await axios.post(`${API_URL}/api/v1/auth/refresh`, { refresh_token: refresh });

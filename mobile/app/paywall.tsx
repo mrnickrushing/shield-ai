@@ -4,7 +4,6 @@ import React, { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, Text, View } from "react-native";
 import { PurchasesOffering, PurchasesPackage } from "react-native-purchases";
 
-import { Button, Eyebrow, FadeIn, GlowOrb, Surface } from "@/components/ui";
 import { ShieldAPI } from "@/lib/api";
 import {
   familyPackages,
@@ -13,23 +12,12 @@ import {
   purchasePackage,
   purchasesSupported,
   restorePurchases,
-  TRIAL_DAYS,
 } from "@/lib/revenuecat";
 import { useAuth, useIsPremium } from "@/state/auth";
-import { colors, gradients, radius, spacing, withAlpha } from "@/theme/theme";
+import { colors } from "@/theme/theme";
 
 const TERMS_URL = "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/";
 const PRIVACY_URL = "https://shieldai.rushingtechnologies.com/privacy";
-
-const OUTCOMES = [
-  "5,576 scam numbers blocked before they ring",
-  "Every link, screenshot, and text checked before you act",
-  "Dangerous sites stopped before they load — not after",
-  "Know the moment your email or password leaks, not after",
-  "A weekly report of exactly what got blocked, for you",
-  "Guided removal from 16 data-broker sites",
-  "Family alerts shared the second something looks wrong",
-];
 
 const BILLING_SETUP_MESSAGE =
   "Subscriptions aren't available right now — please try again in a moment.";
@@ -42,7 +30,6 @@ export default function Paywall() {
   const refreshUser = useAuth((s) => s.refreshUser);
   const logout = useAuth((s) => s.logout);
 
-  const [annual, setAnnual] = useState(true);
   const [family, setFamily] = useState(false);
   const [offering, setOffering] = useState<PurchasesOffering | null>(null);
   const [loadingOffering, setLoadingOffering] = useState(true);
@@ -79,19 +66,15 @@ export default function Paywall() {
   // Family products appear here automatically once they exist in the
   // RevenueCat offering; until then the plan selector stays hidden.
   const familyPkgs = familyPackages(offering);
-  const familyAvailable = familyPkgs.length > 0;
   const familyMonthly = familyPkgs.find((p) => p.packageType === "MONTHLY") ?? null;
-  const familyAnnual = familyPkgs.find((p) => p.packageType === "ANNUAL") ?? null;
 
   const monthlyPkg = (family ? familyMonthly : offering?.monthly) ?? null;
-  const annualPkg = (family ? familyAnnual : offering?.annual) ?? null;
   const fallbackPkg = (family ? familyPkgs[0] : offering?.availablePackages[0]) ?? null;
-  const selectedPkg = annual ? annualPkg ?? fallbackPkg : monthlyPkg ?? fallbackPkg;
+  const selectedPkg = monthlyPkg ?? fallbackPkg;
   const hasPurchasablePackage = Boolean(selectedPkg);
 
-  const monthlyPrice = monthlyPkg?.product.priceString ?? "$4.99";
-  const annualPrice = annualPkg?.product.priceString ?? "$35.99";
-  const annualPerMonth = annualPkg ? `${(annualPkg.product.price / 12).toFixed(2)}` : "3.00";
+  const individualMonthlyPrice = offering?.monthly?.product.priceString ?? "$9.99";
+  const familyMonthlyPrice = familyMonthly?.product.priceString ?? "$19.99";
 
   const finishIfPremium = async (info: Awaited<ReturnType<typeof purchasePackage>>) => {
     if (!info || !hasPremium(info)) return false;
@@ -170,175 +153,79 @@ export default function Paywall() {
     );
   };
 
+  const featureRows = [
+    ["AI Scan Types", true, true, true],
+    ["Live Safe Browser", true, true, true],
+    ["Breach Monitoring", true, true, true],
+    ["Identity Theft Reports", true, true, true],
+    ["Data Broker Removal", true, true, true],
+    ["Family Sharing", false, true, true],
+    ["Trusted Contacts", false, true, true],
+    ["API Access", false, false, true],
+  ] as const;
+
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ padding: spacing.lg, paddingBottom: 64 }}>
-      <FadeIn>
-        <View style={{ alignItems: "center", paddingVertical: spacing.xl, position: "relative" }}>
-          <GlowOrb color={colors.low} size={220} opacity={0.3} style={{ top: -20 }} />
-          <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: withAlpha(colors.low, "22"), alignItems: "center", justifyContent: "center", marginBottom: spacing.md, borderWidth: 2, borderColor: withAlpha(colors.low, "44") }}>
-            <Ionicons name="star" size={36} color={colors.low} />
-          </View>
-          <Text style={{ color: colors.text, fontSize: 28, fontWeight: "900", letterSpacing: -0.8, textAlign: "center" }}>Turn on Shield AI</Text>
-          <Text style={{ color: colors.textMuted, fontSize: 15, textAlign: "center", marginTop: 8, lineHeight: 22 }}>
-            Start your {TRIAL_DAYS}-day free trial —{"\n"}protection starts the moment you do.
-          </Text>
+    <ScrollView style={{ flex: 1, backgroundColor: "#07142C" }} contentContainerStyle={{ paddingBottom: 36 }}>
+      <View style={{ paddingHorizontal: 16, paddingTop: 18 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 15 }}>
+          <Pressable onPress={() => router.back()} hitSlop={12}><Ionicons name="arrow-back" size={23} color={colors.text} /></Pressable>
+          <Text style={{ color: colors.text, fontSize: 16, fontWeight: "800" }}>Subscription Tiers</Text>
+          <Ionicons name="person-circle-outline" size={24} color={colors.text} />
         </View>
-      </FadeIn>
+        <Text style={{ color: colors.text, fontSize: 21, fontWeight: "900", textAlign: "center" }}>Choose Your Protection Level</Text>
+        <Text style={{ color: colors.textDim, fontSize: 11, textAlign: "center", marginTop: 4, marginBottom: 16 }}>AI-powered scam, fraud, and identity protection assistant</Text>
 
-      {!purchasesSupported() ? (
-        <Surface style={{ marginBottom: spacing.lg }}>
-          <Text style={{ color: colors.textMuted, fontSize: 14, textAlign: "center" }}>
-            Subscriptions are managed through the App Store and are available on iPhone.
-          </Text>
-        </Surface>
-      ) : loadingOffering ? (
-        <Surface style={{ marginBottom: spacing.lg, alignItems: "center", paddingVertical: spacing.xl }}>
-          <ActivityIndicator color={colors.primaryBright} />
-          <Text style={{ color: colors.textMuted, fontSize: 13, marginTop: spacing.sm }}>Loading plans…</Text>
-        </Surface>
-      ) : !offering || offering.availablePackages.length === 0 ? (
-        <Surface style={{ marginBottom: spacing.lg, alignItems: "center" }}>
-          <Text style={{ color: colors.textMuted, fontSize: 14, textAlign: "center", marginBottom: spacing.md }}>
-            Premium subscription options aren&apos;t available right now.
-          </Text>
-          <Button label="Try Again" variant="secondary" onPress={loadOffering} />
-        </Surface>
-      ) : (
-        <>
-          {/* Plan tier — appears once Family products exist in the offering */}
-          {familyAvailable && (
-            <FadeIn delay={40}>
-              <View style={{ flexDirection: "row", gap: spacing.sm, marginBottom: spacing.md }}>
-                {([
-                  { isFamily: false, title: "Individual", caption: "Just you" },
-                  { isFamily: true, title: "Family", caption: "You + your family" },
-                ] as const).map((tier) => {
-                  const selected = family === tier.isFamily;
-                  return (
-                    <Pressable
-                      key={tier.title}
-                      onPress={() => setFamily(tier.isFamily)}
-                      style={{
-                        flex: 1,
-                        borderRadius: radius.lg,
-                        borderWidth: 2,
-                        borderColor: selected ? colors.primaryBright : colors.border,
-                        backgroundColor: selected ? withAlpha(colors.primaryBright, "14") : colors.surface,
-                        padding: spacing.md,
-                        alignItems: "center",
-                      }}
-                    >
-                      <Text style={{ color: selected ? colors.primaryBright : colors.text, fontWeight: "800", fontSize: 15 }}>
-                        {tier.title}
-                      </Text>
-                      <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>{tier.caption}</Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </FadeIn>
-          )}
-
-          {/* Billing toggle */}
-          <FadeIn delay={60}>
-            <View style={{ flexDirection: "row", backgroundColor: colors.surface, borderRadius: radius.lg, padding: 4, marginBottom: spacing.lg }}>
-              <Pressable onPress={() => setAnnual(false)} style={{ flex: 1, paddingVertical: spacing.sm, borderRadius: radius.md, backgroundColor: !annual ? colors.primary : "transparent", alignItems: "center" }}>
-                <Text style={{ color: !annual ? "#fff" : colors.textMuted, fontWeight: "700" }}>Monthly</Text>
+        <View style={{ flexDirection: "row", gap: 6 }}>
+          {[
+            { title: "Premium", price: individualMonthlyPrice, family: false, lines: ["Live Safe Browser", "Breach Monitoring", "Identity Breach Report", "Data Broker Exposure Checklist"] },
+            { title: "Family", price: familyMonthlyPrice, family: true, lines: ["Everything in Premium", "Shared across multiple members", "Trusted Contact Escalation"] },
+          ].map((tier) => {
+            const selected = family === tier.family;
+            return (
+              <Pressable key={tier.title} onPress={() => setFamily(tier.family)} style={{ flex: 1, minHeight: 196, borderRadius: 9, borderWidth: selected ? 2 : 1, borderColor: selected ? colors.primaryBright : "#73839A", backgroundColor: selected ? "#142E59" : "#102445", padding: 9 }}>
+                <Text style={{ color: colors.text, textAlign: "center", fontSize: 12, fontWeight: "800" }}>{tier.title}</Text>
+                <Text style={{ color: colors.text, textAlign: "center", fontSize: 18, fontWeight: "900", marginTop: 9 }}>{tier.price}<Text style={{ fontSize: 9, fontWeight: "400" }}>/month</Text></Text>
+                <View style={{ marginTop: 10, flex: 1 }}>{tier.lines.map((line) => <Text key={line} style={{ color: colors.textDim, fontSize: 8.5, lineHeight: 13 }}>• {line}</Text>)}</View>
+                <View style={{ height: 28, borderRadius: 14, backgroundColor: selected ? "#FFFFFF" : "transparent", borderWidth: 1, borderColor: "#FFFFFF", alignItems: "center", justifyContent: "center" }}><Text style={{ color: selected ? "#0B1730" : "#FFFFFF", fontSize: 9, fontWeight: "700" }}>Select {tier.title}</Text></View>
               </Pressable>
-              <Pressable onPress={() => setAnnual(true)} style={{ flex: 1, paddingVertical: spacing.sm, borderRadius: radius.md, backgroundColor: annual ? colors.primary : "transparent", alignItems: "center" }}>
-                <View style={{ flexDirection: "row", gap: 6, alignItems: "center" }}>
-                  <Text style={{ color: annual ? "#fff" : colors.textMuted, fontWeight: "700" }}>Annual</Text>
-                  {annual && (
-                    <View style={{ backgroundColor: colors.safe, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 1 }}>
-                      <Text style={{ color: "#000", fontSize: 10, fontWeight: "800" }}>SAVE 40%</Text>
-                    </View>
-                  )}
-                </View>
-              </Pressable>
-            </View>
-          </FadeIn>
+            );
+          })}
+          <Pressable onPress={() => Linking.openURL("mailto:sales@rushingtechnologies.com?subject=Shield%20AI%20B2B")} style={{ flex: 1, minHeight: 196, borderRadius: 9, borderWidth: 1, borderColor: "#73839A", backgroundColor: "#102445", padding: 9 }}>
+            <Text style={{ color: colors.text, textAlign: "center", fontSize: 12, fontWeight: "800" }}>B2B</Text>
+            <Text style={{ color: colors.textDim, textAlign: "center", fontSize: 7 }}>(Contact Sales)</Text>
+            <Text style={{ color: colors.text, textAlign: "center", fontSize: 14, fontWeight: "900", marginTop: 9 }}>Contact Sales</Text>
+            <View style={{ marginTop: 12 }}><Text style={{ color: colors.textDim, fontSize: 8.5, lineHeight: 13 }}>• API, white-label workflows</Text><Text style={{ color: colors.textDim, fontSize: 8.5, lineHeight: 13 }}>• Employee anti-phishing benefits</Text></View>
+          </Pressable>
+        </View>
 
-          {/* Price hero */}
-          <FadeIn delay={100}>
-            <Surface accent={colors.primaryBright} glow={withAlpha(colors.primary, "30")} style={{ alignItems: "center", marginBottom: spacing.lg }}>
-              <Text style={{ color: colors.primaryBright, fontSize: 48, fontWeight: "900", letterSpacing: -1 }}>
-                {annual ? annualPrice : monthlyPrice}
-              </Text>
-              <Text style={{ color: colors.textMuted, fontSize: 14 }}>
-                {annual ? `per year · ~${annualPerMonth}/month` : "per month"}
-              </Text>
-              <Text style={{ color: colors.safe, fontSize: 13, fontWeight: "700", marginTop: 4 }}>{TRIAL_DAYS}-day free trial included</Text>
-            </Surface>
-          </FadeIn>
-        </>
-      )}
-
-      {/* Outcomes */}
-      <FadeIn delay={140}>
-        <Eyebrow style={{ marginBottom: spacing.sm }}>WHAT PROTECTION LOOKS LIKE</Eyebrow>
-        <Surface accent={colors.purple} style={{ marginBottom: spacing.lg, gap: spacing.sm }}>
-          {OUTCOMES.map((f) => (
-            <View key={f} style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
-              <Ionicons name="checkmark-circle" size={20} color={colors.safe} />
-              <Text style={{ color: colors.text, fontSize: 15, flex: 1 }}>{f}</Text>
+        <View style={{ borderRadius: 10, borderWidth: 1, borderColor: "#5D6F87", backgroundColor: "#102445", marginTop: 14, overflow: "hidden" }}>
+          <View style={{ flexDirection: "row", paddingHorizontal: 10, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: "#52647D" }}>
+            <Text style={{ color: colors.text, fontSize: 10, fontWeight: "800", flex: 1 }}>Plan Features</Text>
+            {['Premium', 'Family', 'B2B'].map((label) => <Text key={label} style={{ color: colors.text, fontSize: 8, fontWeight: "700", width: 46, textAlign: "center" }}>{label}</Text>)}
+          </View>
+          {featureRows.map(([label, premium, familyPlan, b2b]) => (
+            <View key={label} style={{ minHeight: 27, flexDirection: "row", alignItems: "center", paddingHorizontal: 10, borderBottomWidth: 1, borderBottomColor: "#263A59" }}>
+              <Text style={{ color: colors.textDim, fontSize: 8.5, flex: 1 }}>{label}</Text>
+              {[premium, familyPlan, b2b].map((enabled, index) => <View key={index} style={{ width: 46, alignItems: "center" }}><Ionicons name={enabled ? "checkmark-circle" : "ellipse"} size={13} color={enabled ? colors.safe : "#6D7786"} /></View>)}
             </View>
           ))}
-        </Surface>
-      </FadeIn>
-
-      {error && (
-        <View style={{ backgroundColor: withAlpha(colors.suspicious, "18"), borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.md }}>
-          <Text style={{ color: colors.textMuted, textAlign: "center", fontSize: 13 }}>{error}</Text>
-        </View>
-      )}
-
-      {/* CTA */}
-      <FadeIn delay={200}>
-        <Button
-          label={busy === "purchase" ? "Starting…" : "Start Free Trial →"}
-          onPress={() => buy(selectedPkg)}
-          loading={busy === "purchase"}
-          disabled={busy !== null || !hasPurchasablePackage}
-          gradient={gradients.primary}
-          style={{ marginBottom: spacing.sm }}
-        />
-        <Text style={{ color: colors.primaryBright, fontSize: 12, marginBottom: spacing.md, textAlign: "center" }}>
-          {hasPurchasablePackage ? `Cancel anytime · No charge for ${TRIAL_DAYS} days` : "Subscriptions aren't available right now"}
-        </Text>
-
-        {purchasesSupported() && (
-          <Pressable onPress={restore} disabled={busy !== null} style={{ padding: spacing.sm, alignItems: "center" }}>
-            <Text style={{ color: colors.text, fontSize: 14, fontWeight: "600" }}>
-              {busy === "restore" ? "Restoring…" : "Restore Purchases"}
-            </Text>
-          </Pressable>
-        )}
-
-        <View style={{ flexDirection: "row", justifyContent: "center", gap: spacing.lg, marginTop: spacing.sm }}>
-          <Pressable onPress={() => Linking.openURL(TERMS_URL)}>
-            <Text style={{ color: colors.textMuted, fontSize: 12, textDecorationLine: "underline" }}>Terms of Use</Text>
-          </Pressable>
-          <Pressable onPress={() => Linking.openURL(PRIVACY_URL)}>
-            <Text style={{ color: colors.textMuted, fontSize: 12, textDecorationLine: "underline" }}>Privacy Policy</Text>
-          </Pressable>
         </View>
 
-        <Text style={{ color: colors.textMuted, fontSize: 11, textAlign: "center", marginTop: spacing.md }}>
-          Subscription auto-renews after the trial. Cancel anytime in Settings.
-        </Text>
-
-        <View style={{ flexDirection: "row", justifyContent: "center", gap: spacing.lg, marginTop: spacing.sm }}>
-          <Pressable onPress={signOut} style={{ padding: spacing.md }}>
-            <Text style={{ color: colors.textMuted, fontSize: 13 }}>Sign out</Text>
-          </Pressable>
-          {/* Apple 5.1.1(v): account deletion must stay reachable even for
-              users without an active subscription — this screen is the only
-              one they can access. */}
-          <Pressable onPress={confirmDeleteAccount} style={{ padding: spacing.md }}>
-            <Text style={{ color: colors.textMuted, fontSize: 13 }}>Delete account</Text>
-          </Pressable>
+        {loadingOffering ? <ActivityIndicator color={colors.primaryBright} style={{ marginTop: 12 }} /> : null}
+        {error ? <Text style={{ color: colors.suspicious, fontSize: 10, textAlign: "center", marginTop: 9 }}>{error}</Text> : null}
+        <Pressable onPress={() => buy(selectedPkg)} disabled={busy !== null || !hasPurchasablePackage} style={{ height: 50, borderRadius: 25, backgroundColor: "#2458FF", alignItems: "center", justifyContent: "center", marginTop: 14, opacity: hasPurchasablePackage ? 1 : 0.55 }}>
+          <Text style={{ color: "#FFFFFF", fontSize: 15, fontWeight: "900" }}>{busy === "purchase" ? "Starting…" : "Secure My Account"}</Text>
+        </Pressable>
+        <View style={{ flexDirection: "row", justifyContent: "center", gap: 14, marginTop: 12 }}>
+          <Pressable onPress={restore}><Text style={{ color: colors.textMuted, fontSize: 9 }}>Restore Purchases</Text></Pressable>
+          <Pressable onPress={() => Linking.openURL(TERMS_URL)}><Text style={{ color: colors.textMuted, fontSize: 9 }}>Terms & Conditions</Text></Pressable>
+          <Pressable onPress={() => Linking.openURL(PRIVACY_URL)}><Text style={{ color: colors.textMuted, fontSize: 9 }}>Privacy Policy</Text></Pressable>
         </View>
-      </FadeIn>
+        <View style={{ flexDirection: "row", justifyContent: "center", gap: 16, marginTop: 10 }}>
+          <Pressable onPress={signOut}><Text style={{ color: colors.textMuted, fontSize: 9 }}>Sign out</Text></Pressable>
+          <Pressable onPress={confirmDeleteAccount}><Text style={{ color: colors.textMuted, fontSize: 9 }}>Delete account</Text></Pressable>
+        </View>
+      </View>
     </ScrollView>
   );
 }

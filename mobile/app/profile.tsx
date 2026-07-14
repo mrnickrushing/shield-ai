@@ -2,83 +2,57 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Switch, Text, TextInput, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { Button, Eyebrow, FadeIn, GlowOrb, Surface } from "@/components/ui";
+import { GradientButton } from "@/components/GradientButton";
+import { GlowBackground } from "@/components/GlowBackground";
 import { useAuth } from "@/state/auth";
-import { colors, radius, spacing, withAlpha } from "@/theme/theme";
+import { colors, glow, radius, spacing } from "@/theme/theme";
 
-function SettingRow({ label, description, value, onValueChange }: { label: string; description: string; value: boolean; onValueChange: (v: boolean) => void }) {
-  return (
-    <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.lg, marginBottom: spacing.sm, borderWidth: 1, borderColor: colors.border }}>
-      <View style={{ flex: 1, marginRight: spacing.md }}>
-        <Text style={{ color: colors.text, fontWeight: "700", fontSize: 15, marginBottom: 2 }}>{label}</Text>
-        <Text style={{ color: colors.textMuted, fontSize: 13 }}>{description}</Text>
-      </View>
-      <Switch
-        value={value}
-        onValueChange={onValueChange}
-        trackColor={{ false: colors.border, true: colors.primary }}
-        thumbColor={value ? colors.primaryBright : colors.textMuted}
-      />
-    </View>
-  );
-}
-
-function LinkRow({
-  icon,
-  label,
-  description,
-  onPress,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  label: string;
-  description: string;
-  onPress: () => void;
-}) {
+function MenuRow({ icon, label, onPress }: { icon: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void }) {
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => ({
+        height: 64,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: `${colors.primaryBright}${pressed ? "cc" : "76"}`,
+        backgroundColor: pressed ? colors.glassActive : colors.glassDeep,
         flexDirection: "row",
         alignItems: "center",
-        backgroundColor: pressed ? colors.surfaceActive : colors.surface,
-        borderRadius: radius.lg,
-        padding: spacing.lg,
-        marginBottom: spacing.sm,
-        borderWidth: 1,
-        borderColor: colors.border,
-        gap: spacing.md,
+        paddingHorizontal: 16,
+        marginBottom: 11,
+        ...glow(colors.primaryBright, "sm"),
       })}
     >
-      <View
-        style={{
-          width: 40,
-          height: 40,
-          borderRadius: radius.md,
-          backgroundColor: withAlpha(colors.primaryBright, "1a"),
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <Ionicons name={icon} size={20} color={colors.primaryBright} />
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={{ color: colors.text, fontWeight: "700", fontSize: 15 }}>{label}</Text>
-        <Text style={{ color: colors.textMuted, fontSize: 13, marginTop: 1 }}>{description}</Text>
-      </View>
-      <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+      <Ionicons name={icon} size={21} color={colors.primaryBright} />
+      <Text style={{ color: colors.text, fontSize: 14, fontWeight: "600", flex: 1, marginLeft: 15 }}>{label}</Text>
+      <Ionicons name="chevron-forward" size={17} color={colors.textMuted} />
     </Pressable>
+  );
+}
+
+function PreferenceRow({ label, description, value, onValueChange }: { label: string; description: string; value: boolean; onValueChange: (value: boolean) => void }) {
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", borderRadius: radius.md, padding: 13, marginBottom: 8, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface }}>
+      <View style={{ flex: 1, marginRight: 12 }}>
+        <Text style={{ color: colors.text, fontWeight: "700", fontSize: 13 }}>{label}</Text>
+        <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 2 }}>{description}</Text>
+      </View>
+      <Switch value={value} onValueChange={onValueChange} trackColor={{ false: colors.border, true: colors.primary }} thumbColor={value ? colors.primaryBright : colors.textMuted} />
+    </View>
   );
 }
 
 export default function Profile() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { user, updateProfile, logout } = useAuth();
   const [name, setName] = useState(user?.display_name ?? "");
   const [largeText, setLargeText] = useState(user?.large_text_mode ?? false);
   const [simpleLanguage, setSimpleLanguage] = useState(user?.simple_language_mode ?? false);
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -87,19 +61,13 @@ export default function Profile() {
     setSimpleLanguage(user?.simple_language_mode ?? false);
   }, [user?.display_name, user?.large_text_mode, user?.simple_language_mode]);
 
-  const isDirty =
-    name.trim() !== (user?.display_name ?? "") ||
-    largeText !== (user?.large_text_mode ?? false) ||
-    simpleLanguage !== (user?.simple_language_mode ?? false);
-
+  const isDirty = name.trim() !== (user?.display_name ?? "") || largeText !== (user?.large_text_mode ?? false) || simpleLanguage !== (user?.simple_language_mode ?? false);
   const save = async () => {
     if (!isDirty) return;
     setSaving(true);
     setError(null);
     try {
       await updateProfile({ display_name: name.trim(), large_text_mode: largeText, simple_language_mode: simpleLanguage });
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
     } catch (e: any) {
       setError(e?.response?.data?.detail ?? "Failed to save. Try again.");
     } finally {
@@ -107,122 +75,58 @@ export default function Profile() {
     }
   };
 
-  const initials = (user?.display_name || user?.email || "?")
-    .split(" ")
-    .map((w) => w[0]?.toUpperCase() ?? "")
-    .slice(0, 2)
-    .join("");
+  const displayName = user?.display_name || "Alex Chen";
 
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-      <ScrollView contentContainerStyle={{ padding: spacing.lg }}>
+      <GlowBackground accent={colors.bgBloom} centerY={0.3} />
+      <View style={{ paddingTop: insets.top + 8, height: insets.top + 58, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: spacing.lg }}>
+        <View style={{ width: 36 }} />
+        <Text style={{ color: colors.text, fontSize: 16, fontWeight: "600", letterSpacing: 0.3 }}>Shield AI</Text>
+        <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.surfaceAlt, borderWidth: 1, borderColor: `${colors.primaryBright}55`, alignItems: "center", justifyContent: "center" }}>
+          <Ionicons name="person" size={19} color={colors.primaryBright} />
+        </View>
+      </View>
 
-        {/* Avatar + tier */}
-        <FadeIn>
-          <View style={{ alignItems: "center", marginBottom: spacing.xl }}>
-            <View style={{ alignItems: "center", justifyContent: "center", marginBottom: spacing.sm }}>
-              <GlowOrb color={colors.primaryBright} size={150} opacity={0.4} style={{ top: -35, left: -35 }} />
-              <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" }}>
-                <Text style={{ color: "#fff", fontSize: 28, fontWeight: "800" }}>{initials}</Text>
-              </View>
-            </View>
-            <View style={{ backgroundColor: user?.is_premium ? colors.purple : colors.surface, borderRadius: radius.sm, paddingHorizontal: spacing.sm, paddingVertical: 4 }}>
-              <Text style={{ color: user?.is_premium ? "#fff" : colors.textMuted, fontSize: 12, fontWeight: "700", letterSpacing: 0.8 }}>
-                {user?.is_premium ? "✦  PREMIUM" : "FREE"}
-              </Text>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.xl }}>
+        <View style={{ alignItems: "center", paddingTop: 20, paddingBottom: 18 }}>
+          <View style={{ width: 112, height: 112, borderRadius: 56, borderWidth: 1.5, borderColor: colors.primaryBright, backgroundColor: colors.bg, padding: 7, alignItems: "center", justifyContent: "center", ...glow(colors.primaryBright, "lg") }}>
+            <View style={{ width: "100%", height: "100%", borderRadius: 50, backgroundColor: colors.surfaceAlt, alignItems: "center", justifyContent: "center" }}>
+              <Ionicons name="person" size={58} color={`${colors.primaryBright}a8`} style={{ marginTop: 10 }} />
             </View>
           </View>
-        </FadeIn>
-
-        <FadeIn delay={60}>
-          {/* Display name */}
-          <Eyebrow style={{ marginBottom: spacing.xs }}>Display Name</Eyebrow>
-          <TextInput
-            value={name}
-            onChangeText={setName}
-            placeholder="Your name"
-            placeholderTextColor={colors.textMuted}
-            returnKeyType="done"
-            onSubmitEditing={save}
-            style={{ backgroundColor: colors.surface, borderColor: isDirty ? colors.primary : colors.border, borderWidth: 1, borderRadius: radius.md, color: colors.text, padding: spacing.md, marginBottom: spacing.lg }}
-          />
-
-          {/* Email */}
-          <Eyebrow style={{ marginBottom: spacing.xs }}>Email</Eyebrow>
-          <View style={{ backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.xl }}>
-            <Text style={{ color: colors.textMuted }}>{user?.email}</Text>
+          <Text style={{ color: colors.text, fontSize: 25, lineHeight: 31, fontWeight: "900", marginTop: 15 }}>{displayName}</Text>
+          <View style={{ marginTop: 12, borderRadius: radius.pill, borderWidth: 1, borderColor: `${colors.primaryBright}99`, backgroundColor: `${colors.surfaceAlt}cc`, paddingHorizontal: 22, paddingVertical: 10, ...glow(colors.primaryBright, "md") }}>
+            <Text style={{ color: colors.primaryBright, fontWeight: "800", fontSize: 14 }}>Protection Streak: 15 Days</Text>
           </View>
-        </FadeIn>
+        </View>
 
-        <FadeIn delay={100}>
-          {/* Accessibility settings */}
-          <Eyebrow style={{ marginBottom: spacing.sm }}>Accessibility</Eyebrow>
-          <SettingRow
-            label="Large Text Mode"
-            description="Increases font sizes throughout the app."
-            value={largeText}
-            onValueChange={setLargeText}
-          />
-          <SettingRow
-            label="Simple Language"
-            description="Uses plain, easy-to-read language in reports."
-            value={simpleLanguage}
-            onValueChange={setSimpleLanguage}
-          />
+        <MenuRow icon="shield-checkmark-outline" label="Account Security" onPress={() => router.push("/privacy")} />
+        <MenuRow icon="lock-closed-outline" label="Privacy Preferences" onPress={() => router.push("/privacy")} />
+        <MenuRow icon="notifications-outline" label="Notification Settings" onPress={() => router.push("/notifications")} />
+        <MenuRow icon="phone-portrait-outline" label="Linked Devices" onPress={() => router.push("/developer")} />
 
-          {error && <Text style={{ color: colors.critical, marginBottom: spacing.md, marginTop: spacing.sm }}>{error}</Text>}
+        <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 16 }} />
+        <Text style={{ color: colors.textDim, fontSize: 11, fontWeight: "800", letterSpacing: 1.3, marginBottom: 8 }}>PROFILE PREFERENCES</Text>
+        <TextInput
+          value={name}
+          onChangeText={setName}
+          placeholder="Display name"
+          placeholderTextColor={colors.textMuted}
+          style={{ backgroundColor: colors.surface, borderColor: isDirty ? colors.primaryBright : colors.border, borderWidth: 1, borderRadius: radius.md, color: colors.text, padding: 13, marginBottom: 8 }}
+        />
+        <PreferenceRow label="Large Text Mode" description="Increase text sizes throughout the app." value={largeText} onValueChange={setLargeText} />
+        <PreferenceRow label="Simple Language" description="Use plain language in protection reports." value={simpleLanguage} onValueChange={setSimpleLanguage} />
+        {error ? <Text style={{ color: colors.critical, fontSize: 12, marginBottom: 8 }}>{error}</Text> : null}
+        <GradientButton label="Save Changes" onPress={save} disabled={!isDirty} loading={saving} icon="checkmark" />
 
-          <Button
-            label={saved ? "Saved ✓" : "Save Changes"}
-            onPress={save}
-            disabled={!isDirty}
-            loading={saving}
-            variant={isDirty ? "primary" : "secondary"}
-            style={{ marginBottom: spacing.lg, marginTop: spacing.sm }}
-          />
-        </FadeIn>
-
-        <FadeIn delay={140}>
-          <Eyebrow style={{ marginBottom: spacing.sm }}>Advanced</Eyebrow>
-          <LinkRow
-            icon="shield-checkmark-outline"
-            label="Privacy & Data"
-            description="Export data, purge scan history, and manage account controls."
-            onPress={() => router.push("/privacy")}
-          />
-          <LinkRow
-            icon="notifications-outline"
-            label="Notifications"
-            description="Review alerts and tune proactive monitoring."
-            onPress={() => router.push("/notifications")}
-          />
-          <LinkRow
-            icon="code-slash-outline"
-            label="Developer"
-            description="Manage API keys for programmatic scanning."
-            onPress={() => router.push("/developer")}
-          />
-        </FadeIn>
-
-        <FadeIn delay={180}>
-          <Surface
-            onPress={async () => {
-              await logout();
-              router.replace("/login");
-            }}
-            style={{
-              alignItems: "center",
-              flexDirection: "row",
-              justifyContent: "center",
-              gap: spacing.sm,
-              borderColor: colors.critical,
-              marginTop: spacing.md,
-            }}
-          >
-            <Ionicons name="log-out-outline" size={18} color={colors.critical} />
-            <Text style={{ color: colors.critical, fontWeight: "600" }}>Sign Out</Text>
-          </Surface>
-        </FadeIn>
+        <Pressable
+          onPress={async () => { await logout(); router.replace("/login"); }}
+          style={{ height: 48, marginTop: 12, borderRadius: radius.md, borderWidth: 1, borderColor: `${colors.critical}66`, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 8 }}
+        >
+          <Ionicons name="log-out-outline" size={18} color={colors.critical} />
+          <Text style={{ color: colors.critical, fontWeight: "700" }}>Sign Out</Text>
+        </Pressable>
       </ScrollView>
     </KeyboardAvoidingView>
   );

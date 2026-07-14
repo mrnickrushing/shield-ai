@@ -2,352 +2,241 @@ import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import React, { useEffect } from "react";
-import {
-  Pressable,
-  ScrollView,
-  Text,
-  View,
-} from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
+import Svg, { Circle, Defs, LinearGradient, Path, Polyline, Stop } from "react-native-svg";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { GlassCard } from "@/components/GlassCard";
 import { GlowBackground } from "@/components/GlowBackground";
-import { GradientButton } from "@/components/GradientButton";
-import { ProtectionRing } from "@/components/ProtectionRing";
-import { ScanCard } from "@/components/ScanCard";
-import { ShieldAPI } from "@/lib/api";
+import { ShieldAPI, type Scan } from "@/lib/api";
 import { syncWidgetSnapshot } from "@/lib/widgetSync";
 import { useAuth } from "@/state/auth";
-import { colors, glow, radius, spacing, withAlpha } from "@/theme/theme";
+import { colors, glow, radius, spacing } from "@/theme/theme";
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
+const tools: {
+  title: string;
+  subtitle: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  route: string;
+}[] = [
+  { title: "Email Analyzer", subtitle: "Check for breaches", icon: "mail-outline", route: "/(tabs)/scan?type=email" },
+  { title: "Phone Lookup", subtitle: "Verify numbers", icon: "call-outline", route: "/(tabs)/scan?type=phone" },
+  { title: "Web Scanner", subtitle: "Browse safely", icon: "globe-outline", route: "/browser" },
+  { title: "QR Check", subtitle: "Scan securely", icon: "qr-code-outline", route: "/(tabs)/scan?type=qr" },
+];
+
+function RiskGauge({ score }: { score: number }) {
+  const size = 144;
+  const radiusValue = 54;
+  const circumference = 2 * Math.PI * radiusValue;
+  const arc = circumference * 0.74;
+  const filled = arc * Math.max(0, Math.min(1, score / 100));
+  const color = score >= 70 ? colors.safe : score >= 45 ? colors.suspicious : colors.critical;
   return (
-    <Text
-      style={{
-        color: colors.textMuted,
-        fontSize: 10,
-        fontWeight: "800",
-        letterSpacing: 1.8,
-        textTransform: "uppercase",
-        marginBottom: spacing.sm,
-      }}
-    >
-      {children}
-    </Text>
+    <View style={{ width: size, height: 132, alignItems: "center", justifyContent: "center" }}>
+      <Svg width={size} height={size} style={{ position: "absolute", top: 0 }}>
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radiusValue}
+          fill="none"
+          stroke={colors.border}
+          strokeWidth={10}
+          strokeLinecap="round"
+          strokeDasharray={`${arc} ${circumference}`}
+          transform={`rotate(137 ${size / 2} ${size / 2})`}
+        />
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radiusValue}
+          fill="none"
+          stroke={color}
+          strokeWidth={10}
+          strokeLinecap="round"
+          strokeDasharray={`${filled} ${circumference}`}
+          transform={`rotate(137 ${size / 2} ${size / 2})`}
+        />
+      </Svg>
+      <View style={{ alignItems: "center", marginTop: 9 }}>
+        <Text style={{ color: colors.textDim, fontSize: 11 }}>Risk Score</Text>
+        <View style={{ flexDirection: "row", alignItems: "flex-end" }}>
+          <Text style={{ color: colors.text, fontSize: 34, lineHeight: 38, fontWeight: "900" }}>{score}</Text>
+          <Text style={{ color: colors.textMuted, fontSize: 15, paddingBottom: 3 }}>/100</Text>
+        </View>
+        <Text style={{ color, fontSize: 12, fontWeight: "700" }}>
+          {score >= 70 ? "Low Risk" : score >= 45 ? "Review Needed" : "High Risk"}
+        </Text>
+      </View>
+    </View>
   );
 }
 
-function StatBox({
-  value,
-  label,
-  color = colors.primaryBright,
-}: {
-  value: number | string;
-  label: string;
-  color?: string;
-}) {
+function RiskTrend() {
   return (
-    <View style={{ flex: 1, alignItems: "center" }}>
-      <Text style={{ color, fontSize: 26, fontWeight: "900", letterSpacing: -1 }}>{value}</Text>
-      <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 1 }}>{label}</Text>
-    </View>
+    <Svg width="100%" height="112" viewBox="0 0 170 112">
+      <Defs>
+        <LinearGradient id="trend" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor={colors.primaryBright} stopOpacity="0.38" />
+          <Stop offset="1" stopColor={colors.primaryBright} stopOpacity="0" />
+        </LinearGradient>
+      </Defs>
+      <Path
+        d="M4 92 L22 78 L38 84 L54 56 L70 70 L86 18 L101 72 L118 57 L134 61 L153 41 L166 36 L166 108 L4 108 Z"
+        fill="url(#trend)"
+      />
+      <Polyline
+        points="4,92 22,78 38,84 54,56 70,70 86,18 101,72 118,57 134,61 153,41 166,36"
+        fill="none"
+        stroke={colors.primaryBright}
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+function ToolCard({ title, subtitle, icon, route }: (typeof tools)[number]) {
+  const router = useRouter();
+  return (
+    <Pressable
+      onPress={() => router.push(route as any)}
+      style={({ pressed }) => ({
+        width: "48.5%",
+        minHeight: 96,
+        borderRadius: radius.md,
+        borderWidth: 1,
+        borderColor: `${colors.primaryBright}${pressed ? "dd" : "88"}`,
+        backgroundColor: pressed ? colors.glassActive : colors.glassDeep,
+        padding: 13,
+        justifyContent: "space-between",
+        ...glow(colors.primaryBright, pressed ? "md" : "sm"),
+      })}
+    >
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+        <Ionicons name={icon} size={27} color={colors.primaryBright} />
+        <Ionicons name="search-outline" size={18} color={colors.accent} />
+      </View>
+      <View>
+        <Text style={{ color: colors.text, fontWeight: "800", fontSize: 14 }}>{title}</Text>
+        <Text style={{ color: colors.textMuted, fontSize: 10, marginTop: 2 }}>{subtitle}</Text>
+      </View>
+    </Pressable>
+  );
+}
+
+const activityMeta: Record<string, { icon: keyof typeof Ionicons.glyphMap; color: string }> = {
+  safe: { icon: "checkmark-circle", color: colors.safe },
+  low: { icon: "checkmark-circle", color: colors.safe },
+  suspicious: { icon: "alert-circle", color: colors.critical },
+  high: { icon: "alert-circle", color: colors.critical },
+  critical: { icon: "alert-circle", color: colors.critical },
+};
+
+function ActivityRow({ scan }: { scan: Scan }) {
+  const router = useRouter();
+  const level = scan.report?.risk_level ?? "safe";
+  const meta = activityMeta[level] ?? activityMeta.safe;
+  const verdict = ["safe", "low"].includes(level) ? "Safe" : "Blocked";
+  const label = scan.raw_input || `${scan.scan_type} scan`;
+  return (
+    <Pressable
+      onPress={() => router.push(`/result?id=${scan.id}` as any)}
+      style={({ pressed }) => ({
+        flexDirection: "row",
+        alignItems: "center",
+        paddingVertical: 10,
+        paddingHorizontal: 11,
+        borderBottomWidth: 1,
+        borderBottomColor: colors.border,
+        backgroundColor: pressed ? colors.glass : "transparent",
+      })}
+    >
+      <View style={{ width: 30, height: 30, borderRadius: 7, backgroundColor: `${meta.color}1a`, alignItems: "center", justifyContent: "center" }}>
+        <Ionicons name={meta.icon} size={17} color={meta.color} />
+      </View>
+      <View style={{ flex: 1, marginLeft: 10 }}>
+        <Text numberOfLines={1} style={{ color: colors.text, fontWeight: "700", fontSize: 12 }}>{label}</Text>
+        <Text style={{ color: colors.textMuted, fontSize: 10, marginTop: 1 }}>{scan.scan_type.replaceAll("_", " ")}</Text>
+      </View>
+      <Text style={{ color: meta.color, fontSize: 11, fontWeight: "700" }}>{verdict}</Text>
+      <Ionicons name="chevron-forward" size={14} color={colors.textMuted} style={{ marginLeft: 7 }} />
+    </Pressable>
   );
 }
 
 export default function Dashboard() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
-  const { data: scans, isLoading } = useQuery({
-    queryKey: ["scans"],
-    queryFn: ShieldAPI.listScans,
-    staleTime: 30_000,
-  });
-  const { data: alerts } = useQuery({
-    queryKey: ["identity-alerts"],
-    queryFn: ShieldAPI.listIdentityAlerts,
-    staleTime: 60_000,
-  });
-  const { data: protection } = useQuery({
-    queryKey: ["protection-score"],
-    queryFn: ShieldAPI.protectionScore,
-    staleTime: 5 * 60_000,
-  });
-  const { data: trends } = useQuery({
-    queryKey: ["scam-trends"],
-    queryFn: ShieldAPI.scamTrends,
-    staleTime: 30 * 60_000,
-  });
-
-  const recentScans = scans?.slice(0, 3) ?? [];
-  const todayCount =
-    scans?.filter(
-      (s) => new Date(s.created_at).toDateString() === new Date().toDateString()
-    ).length ?? 0;
-  const threatsBlocked =
-    scans?.filter(
-      (s) =>
-        s.report && ["suspicious", "high", "critical"].includes(s.report.risk_level)
-    ).length ?? 0;
-  const unreadAlerts = alerts?.filter((a) => !a.is_read).length ?? 0;
+  const user = useAuth((state) => state.user);
+  const { data: scans } = useQuery({ queryKey: ["scans"], queryFn: ShieldAPI.listScans, staleTime: 30_000 });
+  const { data: protection } = useQuery({ queryKey: ["protection-score"], queryFn: ShieldAPI.protectionScore, staleTime: 300_000 });
+  const threatsBlocked = scans?.filter((scan) => scan.report && ["suspicious", "high", "critical"].includes(scan.report.risk_level)).length ?? 0;
+  const score = protection?.score ?? (scans?.length ? Math.max(42, Math.round(100 - (threatsBlocked / scans.length) * 58)) : 85);
+  const recent = scans?.slice(0, 3) ?? [];
+  const firstName = user?.display_name?.split(" ")[0] || "Alex";
 
   useEffect(() => {
     if (!scans) return;
     const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-    const scansThisWeek = scans.filter((s) => new Date(s.created_at).getTime() >= weekAgo).length;
-    const callsProtected = scans.filter(
-      (s) => s.scan_type === "phone" && s.report && ["high", "critical"].includes(s.report.risk_level)
-    ).length;
-    syncWidgetSnapshot({ scansThisWeek, threatsBlocked, callsProtected });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scans]);
-
-  // Real protection posture from the backend; the old scan-ratio formula is
-  // only a placeholder while the first fetch is in flight.
-  const score =
-    protection?.score ??
-    (scans && scans.length > 0
-      ? Math.max(42, Math.round(100 - (threatsBlocked / scans.length) * 58))
-      : 100);
-  const topFix = protection?.fixes?.[0];
-  const topTrend = trends?.trending?.[0];
-
-  const firstName = user?.display_name?.split(" ")[0] ?? null;
+    syncWidgetSnapshot({
+      scansThisWeek: scans.filter((scan) => new Date(scan.created_at).getTime() >= weekAgo).length,
+      threatsBlocked,
+      callsProtected: scans.filter((scan) => scan.scan_type === "phone" && scan.report && ["high", "critical"].includes(scan.report.risk_level)).length,
+    });
+  }, [scans, threatsBlocked]);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <GlowBackground centerY={0.22} />
-
-      {/* Header */}
-      <View
-        style={{
-          paddingTop: insets.top + spacing.sm,
-          paddingHorizontal: spacing.lg,
-          paddingBottom: spacing.md,
-          flexDirection: "row",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
-      >
-        <View>
-          <Text style={{ color: colors.textMuted, fontSize: 13 }}>
-            {firstName ? `Hey, ${firstName} 👋` : "Welcome back 👋"}
-          </Text>
-          <Text
-            style={{
-              color: colors.text,
-              fontSize: 24,
-              fontWeight: "900",
-              letterSpacing: -0.8,
-              marginTop: 1,
-            }}
-          >
-            Shield AI
-          </Text>
-        </View>
-        <Pressable
-          onPress={() => router.push("/profile")}
-          hitSlop={12}
-          accessibilityRole="button"
-          accessibilityLabel="Account and settings"
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 6,
-            height: 44,
-            paddingHorizontal: 14,
-            borderRadius: 22,
-            backgroundColor: withAlpha(colors.primaryBright, "1A"),
-            borderWidth: 1,
-            borderColor: withAlpha(colors.primaryBright, "55"),
-          }}
-        >
-          <Ionicons name="person-circle-outline" size={24} color={colors.primaryBright} />
-          <Text style={{ color: colors.primaryBright, fontSize: 14, fontWeight: "700" }}>Account</Text>
+      <GlowBackground accent={colors.bgBloom} centerY={0.15} />
+      <View style={{ paddingTop: insets.top + 7, height: insets.top + 53, paddingHorizontal: spacing.lg, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+        <View style={{ width: 34 }} />
+        <Text style={{ color: colors.text, fontSize: 17, fontWeight: "800" }}>Shield AI v2</Text>
+        <Pressable onPress={() => router.push("/notifications")} hitSlop={12} style={{ width: 34, alignItems: "flex-end" }}>
+          <Ionicons name="notifications-outline" size={22} color={colors.primaryBright} />
         </Pressable>
       </View>
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ padding: spacing.lg, paddingTop: 0, paddingBottom: spacing.xxl }}
-      >
-        {/* Protection ring — tap to see every way to raise the score */}
-        <Pressable
-          onPress={() => router.push("/protection" as any)}
-          accessibilityRole="button"
-          accessibilityLabel="View protection checklist"
-          style={{ alignItems: "center", paddingVertical: spacing.md }}
-        >
-          <ProtectionRing score={score} />
-          <Text style={{ color: colors.primaryBright, fontSize: 13, fontWeight: "700", marginTop: spacing.sm }}>
-            How to raise your score →
-          </Text>
-        </Pressable>
-
-        {/* Stats row — glass strip */}
-        <GlassCard style={{ marginBottom: spacing.lg }}>
-          <View style={{ flexDirection: "row", paddingVertical: spacing.md }}>
-            <StatBox value={todayCount} label="Today" />
-            <View style={{ width: 1, backgroundColor: colors.border }} />
-            <StatBox value={scans?.length ?? 0} label="Total Scans" />
-            <View style={{ width: 1, backgroundColor: colors.border }} />
-            <StatBox
-              value={threatsBlocked}
-              label={threatsBlocked === 1 ? "Threat" : "Threats"}
-              color={threatsBlocked > 0 ? colors.critical : colors.safe}
-            />
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.xl }}>
+        <View style={{ borderRadius: radius.md, backgroundColor: "rgba(170,211,230,0.25)", borderWidth: 1, borderColor: `${colors.primaryBright}66`, padding: 14, flexDirection: "row", alignItems: "center", ...glow(colors.primaryBright, "md") }}>
+          <View style={{ width: 62, height: 62, borderRadius: 31, backgroundColor: colors.surfaceAlt, borderWidth: 1, borderColor: colors.primaryBright, alignItems: "center", justifyContent: "center", ...glow(colors.primaryBright, "md") }}>
+            <Text style={{ color: colors.primaryBright, fontSize: 22, fontWeight: "900" }}>AI</Text>
           </View>
-        </GlassCard>
-
-        {/* Single primary action — everything funnels through Scan */}
-        <View style={{ marginBottom: spacing.md }}>
-          <GradientButton
-            label="Scan Anything Suspicious"
-            icon="scan"
-            onPress={() => router.push("/(tabs)/scan" as any)}
-          />
+          <View style={{ flex: 1, marginLeft: 14 }}>
+            <Text style={{ color: colors.text, fontSize: 20, fontWeight: "900" }}>Hello, {firstName}.</Text>
+            <Text style={{ color: colors.textDim, fontSize: 12, marginTop: 2 }}>Your digital footprint is low risk.</Text>
+            <Text style={{ color: colors.textDim, fontSize: 12 }}>AI is monitoring actively.</Text>
+          </View>
         </View>
-        {/* Top protection fix — the single highest-impact thing to enable */}
-        {topFix && (
-          <GlassCard
-            accent={colors.suspicious}
-            onPress={() => router.push(`/${topFix.screen}` as any)}
-            style={{ marginBottom: spacing.md }}
+
+        <View style={{ flexDirection: "row", alignItems: "center", marginTop: 11, marginBottom: 7 }}>
+          <Pressable
+            onPress={() => router.push("/protection" as any)}
+            accessibilityRole="button"
+            accessibilityLabel="View protection checklist"
+            style={{ width: "46%", alignItems: "center" }}
           >
-            <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, padding: spacing.md }}>
-              <Ionicons name="trending-up" size={18} color={colors.suspicious} />
-              <View style={{ flex: 1 }}>
-                <Text style={{ color: colors.text, fontWeight: "700", fontSize: 13 }}>
-                  +{topFix.points} to your score
-                </Text>
-                <Text style={{ color: colors.textMuted, fontSize: 12 }} numberOfLines={2}>
-                  {topFix.hint}
-                </Text>
-              </View>
-              <Text style={{ color: colors.suspicious, fontWeight: "800", fontSize: 12 }}>Fix →</Text>
-            </View>
-          </GlassCard>
-        )}
+            <RiskGauge score={score} />
+          </Pressable>
+          <View style={{ flex: 1 }}><RiskTrend /></View>
+        </View>
 
-        {/* This week's scam trend from live community data */}
-        {topTrend && (
-          <GlassCard
-            accent={colors.purple}
-            onPress={() => router.push("/community" as any)}
-            style={{ marginBottom: spacing.md }}
-          >
-            <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, padding: spacing.md }}>
-              <Ionicons name="flame" size={18} color={colors.purple} />
-              <View style={{ flex: 1 }}>
-                <Text style={{ color: colors.text, fontWeight: "700", fontSize: 13 }}>
-                  Trending scam: {topTrend.category.replaceAll("_", " ")}
-                </Text>
-                <Text style={{ color: colors.textMuted, fontSize: 12 }}>
-                  {topTrend.share}% of high-risk detections this week
-                </Text>
-              </View>
-              <Text style={{ color: colors.purple, fontWeight: "800", fontSize: 12 }}>More →</Text>
-            </View>
-          </GlassCard>
-        )}
+        <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", rowGap: 10 }}>
+          {tools.map((tool) => <ToolCard key={tool.title} {...tool} />)}
+        </View>
 
-        {/* Weekly protection report */}
-        <GlassCard
-          accent={colors.teal}
-          onPress={() => router.push("/report" as any)}
-          style={{ marginBottom: spacing.md }}
-        >
-          <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, padding: spacing.md }}>
-            <Ionicons name="stats-chart" size={18} color={colors.teal} />
-            <Text style={{ color: colors.text, fontWeight: "700", fontSize: 13, flex: 1 }}>
-              Your Weekly Protection Report
-            </Text>
-            <Text style={{ color: colors.teal, fontWeight: "800", fontSize: 12 }}>View →</Text>
-          </View>
-        </GlassCard>
-
-        {unreadAlerts > 0 && (
-          <GlassCard
-            accent={colors.purple}
-            onPress={() => router.push("/identity" as any)}
-            style={{ marginBottom: spacing.lg }}
-          >
-            <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, padding: spacing.md }}>
-              <Ionicons name="shield-checkmark-outline" size={18} color={colors.purple} />
-              <Text style={{ color: colors.text, fontWeight: "700", fontSize: 13, flex: 1 }}>
-                {unreadAlerts} identity alert{unreadAlerts === 1 ? "" : "s"} need{unreadAlerts === 1 ? "s" : ""} review
-              </Text>
-              <Text style={{ color: colors.purple, fontWeight: "800", fontSize: 12 }}>Review →</Text>
-            </View>
-          </GlassCard>
-        )}
-
-        {/* Emergency Banner */}
-        <Pressable
-          onPress={() => router.push("/recovery")}
-          style={({ pressed }) => ({
-            backgroundColor: colors.criticalDim,
-            borderRadius: radius.lg,
-            borderWidth: 1,
-            borderColor: colors.critical + "50",
-            padding: spacing.md,
-            flexDirection: "row",
-            alignItems: "center",
-            gap: spacing.md,
-            marginBottom: spacing.lg,
-            transform: [{ scale: pressed ? 0.98 : 1 }],
-            ...glow(colors.critical, "sm"),
-          })}
-        >
-          <View
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: radius.md,
-              backgroundColor: colors.critical + "22",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Ionicons name="alert-circle" size={22} color={colors.critical} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: colors.text, fontWeight: "800", fontSize: 14 }}>
-              Already been scammed?
-            </Text>
-            <Text style={{ color: colors.critical + "cc", fontSize: 12, marginTop: 1 }}>
-              Get a step-by-step recovery plan →
-            </Text>
-          </View>
-        </Pressable>
-
-        {/* Recent threat feed */}
-        {!isLoading && recentScans.length > 0 && (
-          <>
-            <View
-              style={{
-                flexDirection: "row",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: spacing.sm,
-              }}
-            >
-              <SectionLabel>RECENT ACTIVITY</SectionLabel>
-              <Pressable onPress={() => router.push("/(tabs)/history")}>
-                <Text style={{ color: colors.primaryBright, fontSize: 12, fontWeight: "700" }}>
-                  View all →
-                </Text>
-              </Pressable>
-            </View>
-            {recentScans.map((scan) => (
-              <ScanCard
-                key={scan.id}
-                scan={scan}
-                onPress={() => router.push(`/result?id=${scan.id}` as any)}
-              />
-            ))}
-          </>
-        )}
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 18, marginBottom: 4 }}>
+          <Text style={{ color: colors.text, fontSize: 16, fontWeight: "900" }}>Recent Activity</Text>
+          <Pressable onPress={() => router.push("/(tabs)/history")}><Text style={{ color: colors.primaryBright, fontSize: 11, fontWeight: "700" }}>View all</Text></Pressable>
+        </View>
+        <View style={{ borderRadius: radius.md, borderWidth: 1, borderColor: `${colors.primaryBright}25`, backgroundColor: colors.glassDeep, overflow: "hidden" }}>
+          {recent.length ? recent.map((scan) => <ActivityRow key={scan.id} scan={scan} />) : (
+            <Pressable onPress={() => router.push("/(tabs)/scan")} style={{ padding: 18, alignItems: "center" }}>
+              <Text style={{ color: colors.textDim, fontSize: 12 }}>No scans yet</Text>
+              <Text style={{ color: colors.primaryBright, fontSize: 12, fontWeight: "800", marginTop: 4 }}>Run your first scan</Text>
+            </Pressable>
+          )}
+        </View>
       </ScrollView>
     </View>
   );

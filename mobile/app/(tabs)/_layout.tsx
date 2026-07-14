@@ -2,61 +2,16 @@ import { Ionicons } from "@expo/vector-icons";
 import * as SecureStore from "expo-secure-store";
 import { Tabs } from "expo-router";
 import React, { useEffect, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Platform, View } from "react-native";
 
 import AppTour from "@/components/AppTour";
 import { colors } from "@/theme/theme";
-
-function ScanTabButton(props: any) {
-  const focused = props.accessibilityState?.selected ?? false;
-  return (
-    <Pressable
-      onPress={props.onPress}
-      hitSlop={8}
-      style={{ flex: 1, alignItems: "center", justifyContent: "flex-end", paddingBottom: 6 }}
-    >
-      <View
-        style={{
-          width: 56,
-          height: 56,
-          borderRadius: 28,
-          backgroundColor: focused ? colors.primary : colors.surfaceAlt,
-          borderWidth: 1.5,
-          borderColor: colors.primaryBright + (focused ? "dd" : "55"),
-          alignItems: "center",
-          justifyContent: "center",
-          marginTop: -22,
-          shadowColor: colors.primaryBright,
-          shadowOffset: { width: 0, height: 0 },
-          shadowOpacity: focused ? 0.7 : 0.3,
-          shadowRadius: 18,
-          elevation: 12,
-        }}
-      >
-        <Ionicons
-          name="scan"
-          size={22}
-          color={focused ? "#fff" : colors.primaryBright}
-        />
-      </View>
-      <Text
-        style={{
-          color: focused ? colors.primaryBright : colors.textMuted,
-          fontSize: 10,
-          fontWeight: "700",
-          marginTop: 4,
-        }}
-      >
-        Scan
-      </Text>
-    </Pressable>
-  );
-}
 
 export default function TabsLayout() {
   const [showTour, setShowTour] = useState(false);
 
   useEffect(() => {
+    if (Platform.OS === "web") return;
     Promise.all([
       SecureStore.getItemAsync("hasSeenTour"),
       SecureStore.getItemAsync("pendingTour"),
@@ -68,6 +23,10 @@ export default function TabsLayout() {
   }, []);
 
   const handleTourDone = async () => {
+    if (Platform.OS === "web") {
+      setShowTour(false);
+      return;
+    }
     await SecureStore.setItemAsync("hasSeenTour", "true");
     await SecureStore.deleteItemAsync("pendingTour");
     setShowTour(false);
@@ -79,24 +38,24 @@ export default function TabsLayout() {
         screenOptions={{
           headerShown: false,
           tabBarStyle: {
-            backgroundColor: "rgba(10,10,18,0.94)",
-            borderTopColor: colors.borderHi,
+            backgroundColor: "rgba(5,10,15,0.98)",
+            borderTopColor: `${colors.primaryBright}28`,
             borderTopWidth: 1,
-            height: 72,
-            paddingBottom: 8,
-            overflow: "visible",
+            height: 70,
+            paddingTop: 7,
+            paddingBottom: 7,
           },
           tabBarActiveTintColor: colors.primaryBright,
           tabBarInactiveTintColor: colors.textMuted,
-          tabBarLabelStyle: { fontSize: 10, fontWeight: "700", marginTop: 2 },
+          tabBarLabelStyle: { fontSize: 9, fontWeight: "600", marginTop: 2 },
         }}
       >
         <Tabs.Screen
           name="dashboard"
           options={{
-            title: "Home",
+            title: "Dashboard",
             tabBarIcon: ({ color, size }) => (
-              <Ionicons name="shield-checkmark-outline" size={22} color={color} />
+              <Ionicons name="grid-outline" size={21} color={color} />
             ),
           }}
         />
@@ -104,13 +63,15 @@ export default function TabsLayout() {
           name="scan"
           options={{
             title: "Scan",
-            tabBarButton: (props) => <ScanTabButton {...props} />,
+            tabBarIcon: ({ color }) => (
+              <Ionicons name="scan-outline" size={22} color={color} />
+            ),
           }}
         />
         <Tabs.Screen
           name="protect"
           options={{
-            title: "Protect",
+            title: "Protection",
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="lock-closed-outline" size={22} color={color} />
             ),
@@ -122,6 +83,15 @@ export default function TabsLayout() {
             title: "History",
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="time-outline" size={22} color={color} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="settings"
+          options={{
+            title: "Settings",
+            tabBarIcon: ({ color }) => (
+              <Ionicons name="settings-outline" size={21} color={color} />
             ),
           }}
         />
