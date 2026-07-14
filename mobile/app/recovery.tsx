@@ -5,6 +5,7 @@ import React, { useState } from "react";
 import { Alert, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { PressableFX } from "@/components/PressableFX";
 import { Button, Eyebrow, FadeIn, Surface } from "@/components/ui";
 import { ShieldAPI } from "@/lib/api";
 import { colors, radius, spacing, withAlpha } from "@/theme/theme";
@@ -89,14 +90,15 @@ export default function RecoveryScreen() {
             {SCAM_TYPES.filter((item) => showAllTypes || ["bank_transfer", "gift_card", "marketplace"].includes(item.key)).map((item) => {
               const selected = selectedType === item.key;
               return (
-                <Pressable
+                <PressableFX
                   key={item.key}
                   onPress={() => setSelectedType(item.key)}
-                  style={({ pressed }) => ({
+                  style={{
                     minHeight: 72, borderRadius: 13, backgroundColor: "#FFFFFF", borderWidth: selected ? 2 : 1,
                     borderColor: selected ? "#2587E8" : "#E0E5E8", paddingHorizontal: 18, flexDirection: "row", alignItems: "center",
-                    shadowColor: "#000", shadowOffset: { width: 0, height: 3 }, shadowOpacity: pressed ? 0.15 : 0.08, shadowRadius: 8, elevation: 3,
-                  })}
+                    shadowColor: "#000", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 3,
+                  }}
+                  pressedStyle={{ shadowOpacity: 0.15 }}
                 >
                   <Ionicons name={item.icon} size={35} color={item.iconColor} />
                   <View style={{ flex: 1, marginLeft: 17 }}>
@@ -104,7 +106,7 @@ export default function RecoveryScreen() {
                     <Text style={{ color: "#46515B", fontSize: 11, marginTop: 2 }}>{item.description}</Text>
                   </View>
                   {selected ? <Ionicons name="checkmark-circle" size={22} color="#2587E8" /> : null}
-                </Pressable>
+                </PressableFX>
               );
             })}
           </View>

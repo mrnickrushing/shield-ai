@@ -1,6 +1,7 @@
 import React from "react";
-import { Pressable, View, type StyleProp, type ViewStyle } from "react-native";
+import { View, type StyleProp, type ViewStyle } from "react-native";
 
+import { PressableFX } from "@/components/PressableFX";
 import { colors, glow, radius } from "@/theme/theme";
 
 type GlassCardProps = {
@@ -51,16 +52,13 @@ export function GlassCard({ children, accent, elevated, onPress, style }: GlassC
 
   if (onPress) {
     return (
-      <Pressable
+      <PressableFX
         onPress={onPress}
-        style={({ pressed }) => [
-          base,
-          pressed && { backgroundColor: colors.glassActive, transform: [{ scale: 0.97 }] },
-          style,
-        ]}
+        style={[base, style]}
+        pressedStyle={{ backgroundColor: colors.glassActive, transform: [{ scale: 0.97 }] }}
       >
         {inner}
-      </Pressable>
+      </PressableFX>
     );
   }
   return <View style={[base, style]}>{inner}</View>;

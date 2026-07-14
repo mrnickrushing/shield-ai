@@ -6,30 +6,32 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { GradientButton } from "@/components/GradientButton";
 import { GlowBackground } from "@/components/GlowBackground";
+import { PressableFX } from "@/components/PressableFX";
 import { useAuth } from "@/state/auth";
 import { colors, glow, radius, spacing } from "@/theme/theme";
 
 function MenuRow({ icon, label, onPress }: { icon: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void }) {
   return (
-    <Pressable
+    <PressableFX
       onPress={onPress}
-      style={({ pressed }) => ({
+      style={{
         height: 64,
         borderRadius: 12,
         borderWidth: 1,
-        borderColor: `${colors.primaryBright}${pressed ? "cc" : "76"}`,
-        backgroundColor: pressed ? colors.glassActive : colors.glassDeep,
+        borderColor: `${colors.primaryBright}76`,
+        backgroundColor: colors.glassDeep,
         flexDirection: "row",
         alignItems: "center",
         paddingHorizontal: 16,
         marginBottom: 11,
         ...glow(colors.primaryBright, "sm"),
-      })}
+      }}
+      pressedStyle={{ borderColor: `${colors.primaryBright}cc`, backgroundColor: colors.glassActive }}
     >
       <Ionicons name={icon} size={21} color={colors.primaryBright} />
       <Text style={{ color: colors.text, fontSize: 14, fontWeight: "600", flex: 1, marginLeft: 15 }}>{label}</Text>
       <Ionicons name="chevron-forward" size={17} color={colors.textMuted} />
-    </Pressable>
+    </PressableFX>
   );
 }
 
