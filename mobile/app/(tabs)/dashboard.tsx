@@ -16,12 +16,13 @@ const tools: {
   title: string;
   subtitle: string;
   icon: keyof typeof Ionicons.glyphMap;
+  secondaryIcon: keyof typeof Ionicons.glyphMap;
   route: string;
 }[] = [
-  { title: "Email Check", subtitle: "Spot phishing & spoofing", icon: "mail-outline", route: "/(tabs)/scan?type=email" },
-  { title: "Phone Lookup", subtitle: "Verify unknown numbers", icon: "call-outline", route: "/(tabs)/scan?type=phone" },
-  { title: "Safe Browser", subtitle: "Browse with a bodyguard", icon: "globe-outline", route: "/browser" },
-  { title: "QR Check", subtitle: "Preview before opening", icon: "qr-code-outline", route: "/(tabs)/scan?type=qr" },
+  { title: "Email Check", subtitle: "Spot phishing & spoofing", icon: "mail-outline", secondaryIcon: "search-outline", route: "/(tabs)/scan?type=email" },
+  { title: "Phone Lookup", subtitle: "Verify unknown numbers", icon: "call-outline", secondaryIcon: "globe-outline", route: "/(tabs)/scan?type=phone" },
+  { title: "Safe Browser", subtitle: "Browse with a bodyguard", icon: "globe-outline", secondaryIcon: "shield-checkmark-outline", route: "/browser" },
+  { title: "QR Check", subtitle: "Preview before opening", icon: "qr-code-outline", secondaryIcon: "qr-code-outline", route: "/(tabs)/scan?type=qr" },
 ];
 
 function BrandMark({ size = 30 }: { size?: number }) {
@@ -64,14 +65,14 @@ function BrandMark({ size = 30 }: { size?: number }) {
 }
 
 function RiskGauge({ score }: { score: number }) {
-  const size = 138;
-  const radiusValue = 52;
+  const size = 136;
+  const radiusValue = 51;
   const circumference = 2 * Math.PI * radiusValue;
   const arc = circumference * 0.74;
   const filled = arc * Math.max(0, Math.min(1, score / 100));
   const color = score >= 70 ? colors.safe : score >= 45 ? colors.suspicious : colors.critical;
   return (
-    <View style={{ width: size, minHeight: 126, alignItems: "center", justifyContent: "center" }}>
+    <View style={{ width: size, height: 124, alignItems: "center", justifyContent: "center" }}>
       <Svg width={size} height={size} style={{ position: "absolute", top: 0 }}>
         <Circle
           cx={size / 2}
@@ -96,13 +97,13 @@ function RiskGauge({ score }: { score: number }) {
           transform={`rotate(137 ${size / 2} ${size / 2})`}
         />
       </Svg>
-      <View style={{ alignItems: "center", marginTop: 8 }}>
-        <Text style={{ color: colors.textDim, fontSize: 10 }}>Protection Score</Text>
+      <View style={{ width: 104, alignItems: "center", marginTop: 7 }}>
+        <Text numberOfLines={1} maxFontSizeMultiplier={1.1} style={{ color: colors.textDim, fontSize: 9 }}>Protection Score</Text>
         <View style={{ flexDirection: "row", alignItems: "flex-end" }}>
-          <Text style={{ color: colors.text, fontSize: 33, lineHeight: 37, fontWeight: "900" }}>{score}</Text>
-          <Text style={{ color: colors.textMuted, fontSize: 14, paddingBottom: 3 }}>/100</Text>
+          <Text maxFontSizeMultiplier={1.05} style={{ color: colors.text, fontSize: score >= 100 ? 29 : 33, lineHeight: 36, fontWeight: "900" }}>{score}</Text>
+          <Text maxFontSizeMultiplier={1.05} style={{ color: colors.textMuted, fontSize: 13, paddingBottom: 3 }}>/100</Text>
         </View>
-        <Text style={{ color, fontSize: 11, fontWeight: "700" }}>
+        <Text numberOfLines={1} maxFontSizeMultiplier={1.1} style={{ color, fontSize: 11, fontWeight: "700" }}>
           {score >= 70 ? "Protected" : score >= 45 ? "Needs attention" : "At risk"}
         </Text>
       </View>
@@ -122,6 +123,7 @@ function ActivityTrend({ scans }: { scans: Scan[] | undefined }) {
     if (age >= 0 && age < days) counts[days - 1 - age] += 1;
   }
   const peak = Math.max(...counts, 1);
+  const hasActivity = counts.some((count) => count > 0);
   const w = 170;
   const h = 112;
   const step = (w - 16) / (days - 1);
@@ -129,54 +131,70 @@ function ActivityTrend({ scans }: { scans: Scan[] | undefined }) {
     .map((count, i) => `${8 + i * step},${h - 24 - (count / peak) * (h - 52)}`)
     .join(" ");
   return (
-    <View>
-      <Svg width="100%" height="106" viewBox={`0 0 ${w} ${h}`}>
+    <View style={{ flex: 1 }}>
+      <Svg width="100%" height="100" viewBox={`0 0 ${w} ${h}`}>
         <Defs>
           <LinearGradient id="trend" x1="0" y1="0" x2="0" y2="1">
             <Stop offset="0" stopColor={colors.primaryBright} stopOpacity="0.38" />
             <Stop offset="1" stopColor={colors.primaryBright} stopOpacity="0" />
           </LinearGradient>
         </Defs>
-        <Path d={`M${points.replaceAll(" ", " L")} L${8 + (days - 1) * step} ${h - 8} L8 ${h - 8} Z`} fill="url(#trend)" />
-        <Polyline
-          points={points}
-          fill="none"
-          stroke={colors.primaryBright}
-          strokeWidth="2.2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
+        {hasActivity ? (
+          <>
+            <Path d={`M${points.replaceAll(" ", " L")} L${8 + (days - 1) * step} ${h - 8} L8 ${h - 8} Z`} fill="url(#trend)" />
+            <Polyline
+              points={points}
+              fill="none"
+              stroke={colors.primaryBright}
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </>
+        ) : (
+          <Path d="M8 82 H162" fill="none" stroke={colors.borderHi} strokeWidth="1.5" strokeDasharray="4 6" />
+        )}
       </Svg>
-      <Text style={{ color: colors.textDim, fontSize: 9, textAlign: "center", marginTop: -6 }}>
-        Scans · last 7 days
+      <Text numberOfLines={1} maxFontSizeMultiplier={1.1} style={{ color: colors.textDim, fontSize: 9, textAlign: "center", marginTop: -5 }}>
+        {hasActivity ? "Scans · last 7 days" : "No scans this week"}
       </Text>
     </View>
   );
 }
 
-function ToolCard({ title, subtitle, icon, route }: (typeof tools)[number]) {
+function ToolCard({ title, subtitle, icon, secondaryIcon, route }: (typeof tools)[number]) {
   const router = useRouter();
   return (
-    <Pressable
-      onPress={() => router.push(route as any)}
-      style={({ pressed }) => ({
+    <View
+      style={{
         width: "48.5%",
-        minHeight: 82,
+        height: 82,
         borderRadius: radius.md,
         borderWidth: 1,
-        borderColor: `${colors.primaryBright}${pressed ? "dd" : "88"}`,
-        backgroundColor: pressed ? colors.glassActive : colors.glassDeep,
+        borderColor: `${colors.primaryBright}A8`,
+        backgroundColor: "rgba(56,72,86,0.52)",
         padding: 11,
         justifyContent: "space-between",
-        ...glow(colors.primaryBright, pressed ? "md" : "sm"),
-      })}
+        overflow: "hidden",
+        ...glow(colors.primaryBright, "sm"),
+      }}
     >
-      <Ionicons name={icon} size={24} color={colors.primaryBright} />
-      <View>
-        <Text numberOfLines={1} style={{ color: colors.text, fontWeight: "800", fontSize: 13 }}>{title}</Text>
-        <Text numberOfLines={1} style={{ color: colors.textMuted, fontSize: 11, marginTop: 1 }}>{subtitle}</Text>
+      <View pointerEvents="none" style={{ position: "absolute", top: 0, left: 0, right: 0, height: 1, backgroundColor: "rgba(210,247,255,0.42)" }} />
+      <View pointerEvents="none" style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+        <Ionicons name={icon} size={24} color={colors.primaryBright} />
+        <Ionicons name={secondaryIcon} size={20} color={colors.accent} />
       </View>
-    </Pressable>
+      <View pointerEvents="none">
+        <Text numberOfLines={1} maxFontSizeMultiplier={1.15} style={{ color: colors.text, fontWeight: "800", fontSize: 13 }}>{title}</Text>
+        <Text numberOfLines={1} maxFontSizeMultiplier={1.1} style={{ color: colors.textDim, fontSize: 10, marginTop: 1 }}>{subtitle}</Text>
+      </View>
+      <Pressable
+        onPress={() => router.push(route as any)}
+        accessibilityRole="button"
+        accessibilityLabel={`${title}. ${subtitle}`}
+        style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0 }}
+      />
+    </View>
   );
 }
 
@@ -243,36 +261,40 @@ function scanRowText(scan: Scan): { title: string; detail: string } {
   }
 }
 
-function ActivityRow({ scan }: { scan: Scan }) {
+function ActivityRow({ scan, isLast }: { scan: Scan; isLast: boolean }) {
   const router = useRouter();
   const level = scan.report?.risk_level ?? "safe";
   const meta = activityMeta[level] ?? activityMeta.safe;
   const { title, detail } = scanRowText(scan);
   return (
-    <Pressable
-      onPress={() => router.push(`/result?id=${scan.id}` as any)}
-      style={({ pressed }) => ({
+    <View
+      style={{
+        height: 56,
         flexDirection: "row",
         alignItems: "center",
-        paddingVertical: 10,
         paddingHorizontal: 11,
-        borderBottomWidth: 1,
+        borderBottomWidth: isLast ? 0 : 1,
         borderBottomColor: colors.border,
-        backgroundColor: pressed ? colors.glass : "transparent",
-      })}
+      }}
     >
-      <View style={{ width: 30, height: 30, borderRadius: 7, backgroundColor: `${meta.color}1a`, alignItems: "center", justifyContent: "center" }}>
+      <View pointerEvents="none" style={{ width: 32, height: 32, flexShrink: 0, borderRadius: 8, backgroundColor: `${meta.color}1a`, alignItems: "center", justifyContent: "center" }}>
         <Ionicons name={meta.icon} size={17} color={meta.color} />
       </View>
-      <View style={{ flex: 1, marginLeft: 10 }}>
-        <Text numberOfLines={1} style={{ color: colors.text, fontWeight: "700", fontSize: 13 }}>{title}</Text>
-        <Text numberOfLines={1} style={{ color: colors.textMuted, fontSize: 11, marginTop: 1 }}>{detail}</Text>
+      <View pointerEvents="none" style={{ flex: 1, minWidth: 0, marginLeft: 10, marginRight: 8 }}>
+        <Text numberOfLines={1} maxFontSizeMultiplier={1.15} style={{ color: colors.text, fontWeight: "700", fontSize: 12 }}>{title}</Text>
+        <Text numberOfLines={1} maxFontSizeMultiplier={1.1} style={{ color: colors.textMuted, fontSize: 10, marginTop: 1 }}>{detail}</Text>
       </View>
-      <View style={{ backgroundColor: `${meta.color}1a`, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 }}>
-        <Text style={{ color: meta.color, fontSize: 11, fontWeight: "700" }}>{meta.verdict}</Text>
+      <View pointerEvents="none" style={{ flexShrink: 0, backgroundColor: `${meta.color}1a`, borderRadius: 999, paddingHorizontal: 7, paddingVertical: 3 }}>
+        <Text numberOfLines={1} maxFontSizeMultiplier={1.1} style={{ color: meta.color, fontSize: 10, fontWeight: "700" }}>{meta.verdict}</Text>
       </View>
-      <Ionicons name="chevron-forward" size={14} color={colors.textMuted} style={{ marginLeft: 7 }} />
-    </Pressable>
+      <Ionicons pointerEvents="none" name="chevron-forward" size={14} color={colors.textMuted} style={{ marginLeft: 6 }} />
+      <Pressable
+        onPress={() => router.push(`/result?id=${scan.id}` as any)}
+        accessibilityRole="button"
+        accessibilityLabel={`${title}. ${detail}. ${meta.verdict}`}
+        style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0 }}
+      />
+    </View>
   );
 }
 
@@ -337,19 +359,14 @@ export default function Dashboard() {
           </View>
         </View>
 
-        {/* Score + activity as one anchored unit, not two floating charts */}
+        {/* Stitch keeps the gauge and sparkline floating as one visual band. */}
         <View
           style={{
             flexDirection: "row",
             alignItems: "center",
-            marginTop: 10,
-            marginBottom: 4,
-            borderRadius: radius.md,
-            borderWidth: 1,
-            borderColor: `${colors.primaryBright}25`,
-            backgroundColor: colors.glassDeep,
-            paddingVertical: 8,
-            paddingHorizontal: 4,
+            height: 132,
+            marginTop: 6,
+            marginBottom: 6,
           }}
         >
           <Pressable
@@ -360,34 +377,40 @@ export default function Dashboard() {
           >
             <RiskGauge score={score} />
           </Pressable>
-          <View style={{ flex: 1 }}><ActivityTrend scans={scans} /></View>
+          <View style={{ flex: 1, paddingLeft: 4 }}><ActivityTrend scans={scans} /></View>
         </View>
 
-        {/* The single highest-impact fix — one card, never a stack */}
         {topFix && (
-          <Pressable
-            onPress={() => router.push(`/${topFix.screen}` as any)}
-            style={({ pressed }) => ({
+          <View
+            style={{
+              minHeight: 54,
               flexDirection: "row",
               alignItems: "center",
               gap: 10,
-              marginBottom: 6,
+              marginBottom: 8,
               borderRadius: radius.md,
               borderWidth: 1,
               borderColor: `${colors.suspicious}40`,
-              backgroundColor: pressed ? colors.glassActive : colors.glassDeep,
-              padding: 11,
-            })}
+              backgroundColor: colors.glassDeep,
+              paddingHorizontal: 11,
+              paddingVertical: 8,
+            }}
           >
-            <Ionicons name="trending-up" size={18} color={colors.suspicious} />
-            <View style={{ flex: 1 }}>
-              <Text style={{ color: colors.text, fontWeight: "800", fontSize: 12 }}>
+            <Ionicons pointerEvents="none" name="trending-up" size={18} color={colors.suspicious} />
+            <View pointerEvents="none" style={{ flex: 1, minWidth: 0 }}>
+              <Text numberOfLines={1} maxFontSizeMultiplier={1.1} style={{ color: colors.text, fontWeight: "800", fontSize: 12 }}>
                 +{topFix.points} to your score
               </Text>
-              <Text numberOfLines={1} style={{ color: colors.textMuted, fontSize: 11 }}>{topFix.hint}</Text>
+              <Text numberOfLines={1} maxFontSizeMultiplier={1.1} style={{ color: colors.textMuted, fontSize: 10 }}>{topFix.hint}</Text>
             </View>
-            <Text style={{ color: colors.suspicious, fontWeight: "800", fontSize: 12 }}>Fix →</Text>
-          </Pressable>
+            <Text numberOfLines={1} maxFontSizeMultiplier={1.1} style={{ color: colors.suspicious, fontWeight: "800", fontSize: 11 }}>Fix →</Text>
+            <Pressable
+              onPress={() => router.push(`/${topFix.screen}` as any)}
+              accessibilityRole="button"
+              accessibilityLabel={`${topFix.hint}. Add ${topFix.points} points to your score.`}
+              style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0 }}
+            />
+          </View>
         )}
 
         <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", rowGap: 10 }}>
@@ -399,7 +422,7 @@ export default function Dashboard() {
           <Pressable onPress={() => router.push("/(tabs)/history")}><Text style={{ color: colors.primaryBright, fontSize: 11, fontWeight: "700" }}>View all</Text></Pressable>
         </View>
         <View style={{ borderRadius: radius.md, borderWidth: 1, borderColor: `${colors.primaryBright}25`, backgroundColor: colors.glassDeep, overflow: "hidden" }}>
-          {recent.length ? recent.map((scan) => <ActivityRow key={scan.id} scan={scan} />) : (
+          {recent.length ? recent.map((scan, index) => <ActivityRow key={scan.id} scan={scan} isLast={index === recent.length - 1} />) : (
             <Pressable onPress={() => router.push("/(tabs)/scan")} style={{ paddingVertical: 22, paddingHorizontal: 16, alignItems: "center" }}>
               <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: `${colors.primaryBright}1a`, alignItems: "center", justifyContent: "center", marginBottom: 8 }}>
                 <Ionicons name="scan-outline" size={20} color={colors.primaryBright} />
