@@ -21,6 +21,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { GlowBackground } from "@/components/GlowBackground";
 import { GradientButton } from "@/components/GradientButton";
+import { PressableFX } from "@/components/PressableFX";
 import { CornerBrackets, ScanBeam } from "@/components/ScanBeam";
 import { ScanCard } from "@/components/ScanCard";
 import { ShieldAPI } from "@/lib/api";
@@ -608,19 +609,20 @@ export default function ScanScreen() {
         )}
 
         {/* Scam coach — for situations, not artifacts */}
-        <Pressable
+        <PressableFX
           onPress={() => router.push("/coach" as any)}
-          style={({ pressed }) => ({
+          style={{
             flexDirection: "row",
             alignItems: "center",
             gap: spacing.sm,
             padding: spacing.md,
             borderRadius: radius.md,
-            backgroundColor: pressed ? colors.glassActive : colors.glass,
+            backgroundColor: colors.glass,
             borderWidth: 1,
             borderColor: colors.borderHi,
             marginBottom: spacing.lg,
-          })}
+          }}
+          pressedStyle={{ backgroundColor: colors.glassActive }}
         >
           <Ionicons name="chatbubbles-outline" size={18} color={colors.primaryBright} />
           <View style={{ flex: 1 }}>
@@ -630,7 +632,7 @@ export default function ScanScreen() {
             </Text>
           </View>
           <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-        </Pressable>
+        </PressableFX>
 
         {/* Advanced: specific scan types */}
         <Pressable

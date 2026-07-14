@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { PressableFX } from "@/components/PressableFX";
 import { Button, Eyebrow, FadeIn, Surface } from "@/components/ui";
 import { ShieldAPI, BreachResult, IdentityAlert, MonitoredIdentity } from "@/lib/api";
 import { colors, radius, spacing, withAlpha } from "@/theme/theme";
@@ -433,17 +434,18 @@ export default function IdentityScreen() {
                 )}
               </View>
               {alerts.map((alert: IdentityAlert) => (
-                <Pressable
+                <PressableFX
                   key={alert.id}
                   onPress={() => !alert.is_read && markRead.mutate(alert.id)}
-                  style={({ pressed }) => ({
-                    backgroundColor: alert.is_read ? colors.bg : pressed ? colors.surfaceActive : withAlpha(colors.critical, "12"),
+                  style={{
+                    backgroundColor: alert.is_read ? colors.bg : withAlpha(colors.critical, "12"),
                     borderRadius: radius.md,
                     padding: spacing.md,
                     marginBottom: spacing.xs,
                     borderLeftWidth: 3,
                     borderLeftColor: alert.is_read ? colors.border : colors.critical,
-                  })}
+                  }}
+                  pressedStyle={alert.is_read ? undefined : { backgroundColor: colors.surfaceActive }}
                 >
                   <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
                     <Text style={{ color: colors.text, fontWeight: "600", fontSize: 14 }}>{alert.email}</Text>
@@ -462,7 +464,7 @@ export default function IdentityScreen() {
                   <Text style={{ color: colors.textMuted, fontSize: 12 }}>
                     {(alert.detail as any)?.breach_count} breach{(alert.detail as any)?.breach_count !== 1 ? "es" : ""} detected
                   </Text>
-                </Pressable>
+                </PressableFX>
               ))}
             </Surface>
           </FadeIn>

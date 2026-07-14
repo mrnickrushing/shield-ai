@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
 
+import { PressableFX } from "@/components/PressableFX";
 import { RiskBadge } from "@/components/RiskBadge";
 import { type Scan } from "@/lib/api";
 import { colors, glow, radius, spacing } from "@/theme/theme";
@@ -47,17 +48,18 @@ export function ScanCard({ scan, onPress }: { scan: Scan; onPress: () => void })
   const accentColor = riskLevel ? (RISK_COLOR[riskLevel] ?? meta.color) : meta.color;
 
   return (
-    <Pressable
+    <PressableFX
       onPress={onPress}
-      style={({ pressed }) => ({
-        backgroundColor: pressed ? colors.glassActive : colors.glassDeep,
+      style={{
+        backgroundColor: colors.glassDeep,
         borderRadius: radius.lg,
         borderWidth: 1,
         borderColor: `${accentColor}30`,
         marginBottom: spacing.sm,
         flexDirection: "row",
         overflow: "hidden",
-      })}
+      }}
+      pressedStyle={{ backgroundColor: colors.glassActive }}
     >
       {/* Left accent bar with glow */}
       <View style={{ width: 3, backgroundColor: accentColor, borderRadius: 2, ...glow(accentColor, "sm") }} />
@@ -104,6 +106,6 @@ export function ScanCard({ scan, onPress }: { scan: Scan; onPress: () => void })
           )}
         </View>
       </View>
-    </Pressable>
+    </PressableFX>
   );
 }

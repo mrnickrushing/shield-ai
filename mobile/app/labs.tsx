@@ -2,9 +2,10 @@ import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import React from "react";
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
+import { ActivityIndicator, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { PressableFX } from "@/components/PressableFX";
 import { ShieldAPI } from "@/lib/api";
 import { colors, radius, shadow, spacing } from "@/theme/theme";
 
@@ -47,11 +48,11 @@ export default function Labs() {
         ) : (
           <View style={{ gap: spacing.md }}>
             {data.map((v) => (
-              <Pressable
+              <PressableFX
                 key={v.key}
                 onPress={() => router.push(`/vertical/${v.key}` as any)}
-                style={({ pressed }) => ({
-                  backgroundColor: pressed ? colors.surfaceActive : colors.surface,
+                style={{
+                  backgroundColor: colors.surface,
                   borderRadius: radius.xl,
                   borderWidth: 1,
                   borderColor: `${v.accent}33`,
@@ -60,7 +61,8 @@ export default function Labs() {
                   alignItems: "center",
                   gap: spacing.md,
                   ...shadow.sm,
-                })}
+                }}
+                pressedStyle={{ backgroundColor: colors.surfaceActive }}
               >
                 <View
                   style={{
@@ -79,7 +81,7 @@ export default function Labs() {
                   <Text style={{ color: colors.textMuted, fontSize: 13, lineHeight: 18 }}>{v.tagline}</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-              </Pressable>
+              </PressableFX>
             ))}
           </View>
         )}

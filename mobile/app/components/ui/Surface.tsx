@@ -1,6 +1,7 @@
 import React from "react";
-import { Pressable, View, ViewStyle } from "react-native";
+import { View, ViewStyle } from "react-native";
 
+import { PressableFX } from "@/components/PressableFX";
 import { colors, radius, withAlpha } from "@/theme/theme";
 
 export function Surface({
@@ -43,11 +44,12 @@ export function Surface({
   }
 
   return (
-    <Pressable
+    <PressableFX
       onPress={onPress}
-      style={({ pressed }) => [base, pressed && { backgroundColor: colors.surfaceActive }, style]}
+      style={[base, style]}
+      pressedStyle={{ backgroundColor: colors.surfaceActive }}
     >
       {children}
-    </Pressable>
+    </PressableFX>
   );
 }
