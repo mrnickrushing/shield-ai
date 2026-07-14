@@ -73,17 +73,14 @@ export default function TabsLayout() {
           options={{
             title: "Protection",
             tabBarIcon: ({ color, size }) => (
-              <Ionicons name="lock-closed-outline" size={22} color={color} />
+              <Ionicons name="shield-checkmark-outline" size={22} color={color} />
             ),
           }}
         />
         <Tabs.Screen
           name="history"
           options={{
-            title: "History",
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="time-outline" size={22} color={color} />
-            ),
+            href: null,
           }}
         />
         <Tabs.Screen
