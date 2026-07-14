@@ -359,26 +359,33 @@ export default function Dashboard() {
           </View>
         </View>
 
-        {/* Stitch keeps the gauge and sparkline floating as one visual band. */}
-        <View
+        {/* Score + 7-day trend anchored in one card, not floating loose. */}
+        <Pressable
+          onPress={() => router.push("/protection" as any)}
+          accessibilityRole="button"
+          accessibilityLabel="View protection checklist"
           style={{
-            flexDirection: "row",
-            alignItems: "center",
-            height: 132,
-            marginTop: 6,
-            marginBottom: 6,
+            marginTop: 12,
+            marginBottom: 12,
+            borderRadius: radius.lg,
+            borderWidth: 1,
+            borderColor: `${colors.primaryBright}30`,
+            backgroundColor: colors.glassDeep,
+            overflow: "hidden",
+            ...glow(colors.primaryBright, "sm"),
           }}
         >
-          <Pressable
-            onPress={() => router.push("/protection" as any)}
-            accessibilityRole="button"
-            accessibilityLabel="View protection checklist"
-            style={{ width: "46%", alignItems: "center" }}
-          >
-            <RiskGauge score={score} />
-          </Pressable>
-          <View style={{ flex: 1, paddingLeft: 4 }}><ActivityTrend scans={scans} /></View>
-        </View>
+          <View pointerEvents="none" style={{ position: "absolute", top: 0, left: 0, right: 0, height: 1, backgroundColor: "rgba(210,247,255,0.26)" }} />
+          <View pointerEvents="none" style={{ flexDirection: "row", alignItems: "center", paddingVertical: 12, paddingHorizontal: 6 }}>
+            <View style={{ width: "44%", alignItems: "center" }}>
+              <RiskGauge score={score} />
+            </View>
+            <View style={{ width: 1, height: 92, backgroundColor: colors.border }} />
+            <View style={{ flex: 1, paddingHorizontal: 8 }}>
+              <ActivityTrend scans={scans} />
+            </View>
+          </View>
+        </Pressable>
 
         {topFix && (
           <View
@@ -387,7 +394,7 @@ export default function Dashboard() {
               flexDirection: "row",
               alignItems: "center",
               gap: 10,
-              marginBottom: 8,
+              marginBottom: 12,
               borderRadius: radius.md,
               borderWidth: 1,
               borderColor: `${colors.suspicious}40`,
