@@ -18,10 +18,10 @@ const tools: {
   icon: keyof typeof Ionicons.glyphMap;
   route: string;
 }[] = [
-  { title: "Email Analyzer", subtitle: "Check for breaches", icon: "mail-outline", route: "/(tabs)/scan?type=email" },
-  { title: "Phone Lookup", subtitle: "Verify numbers", icon: "call-outline", route: "/(tabs)/scan?type=phone" },
-  { title: "Web Scanner", subtitle: "Browse safely", icon: "globe-outline", route: "/browser" },
-  { title: "QR Check", subtitle: "Scan securely", icon: "qr-code-outline", route: "/(tabs)/scan?type=qr" },
+  { title: "Email Check", subtitle: "Spot phishing & spoofing", icon: "mail-outline", route: "/(tabs)/scan?type=email" },
+  { title: "Phone Lookup", subtitle: "Verify unknown numbers", icon: "call-outline", route: "/(tabs)/scan?type=phone" },
+  { title: "Safe Browser", subtitle: "Browse with a bodyguard", icon: "globe-outline", route: "/browser" },
+  { title: "QR Check", subtitle: "Preview before opening", icon: "qr-code-outline", route: "/(tabs)/scan?type=qr" },
 ];
 
 function BrandMark({ size = 30 }: { size?: number }) {
@@ -71,7 +71,7 @@ function RiskGauge({ score }: { score: number }) {
   const filled = arc * Math.max(0, Math.min(1, score / 100));
   const color = score >= 70 ? colors.safe : score >= 45 ? colors.suspicious : colors.critical;
   return (
-    <View style={{ width: size, height: 126, alignItems: "center", justifyContent: "center" }}>
+    <View style={{ width: size, minHeight: 126, alignItems: "center", justifyContent: "center" }}>
       <Svg width={size} height={size} style={{ position: "absolute", top: 0 }}>
         <Circle
           cx={size / 2}
@@ -97,41 +97,60 @@ function RiskGauge({ score }: { score: number }) {
         />
       </Svg>
       <View style={{ alignItems: "center", marginTop: 8 }}>
-        <Text style={{ color: colors.textDim, fontSize: 10 }}>Risk Score</Text>
+        <Text style={{ color: colors.textDim, fontSize: 10 }}>Protection Score</Text>
         <View style={{ flexDirection: "row", alignItems: "flex-end" }}>
           <Text style={{ color: colors.text, fontSize: 33, lineHeight: 37, fontWeight: "900" }}>{score}</Text>
           <Text style={{ color: colors.textMuted, fontSize: 14, paddingBottom: 3 }}>/100</Text>
         </View>
         <Text style={{ color, fontSize: 11, fontWeight: "700" }}>
-          {score >= 70 ? "Low Risk" : score >= 45 ? "Review Needed" : "High Risk"}
+          {score >= 70 ? "Protected" : score >= 45 ? "Needs attention" : "At risk"}
         </Text>
       </View>
     </View>
   );
 }
 
-function RiskTrend() {
+/** Scans over the trailing week, one point per day — real data, not decoration. */
+function ActivityTrend({ scans }: { scans: Scan[] | undefined }) {
+  const days = 7;
+  const counts = new Array<number>(days).fill(0);
+  const dayMs = 24 * 60 * 60 * 1000;
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  for (const scan of scans ?? []) {
+    const age = Math.floor((startOfToday.getTime() + dayMs - new Date(scan.created_at).getTime()) / dayMs);
+    if (age >= 0 && age < days) counts[days - 1 - age] += 1;
+  }
+  const peak = Math.max(...counts, 1);
+  const w = 170;
+  const h = 112;
+  const step = (w - 16) / (days - 1);
+  const points = counts
+    .map((count, i) => `${8 + i * step},${h - 24 - (count / peak) * (h - 52)}`)
+    .join(" ");
   return (
-    <Svg width="100%" height="106" viewBox="0 0 170 112">
-      <Defs>
-        <LinearGradient id="trend" x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0" stopColor={colors.primaryBright} stopOpacity="0.38" />
-          <Stop offset="1" stopColor={colors.primaryBright} stopOpacity="0" />
-        </LinearGradient>
-      </Defs>
-      <Path
-        d="M4 92 L22 78 L38 84 L54 56 L70 70 L86 18 L101 72 L118 57 L134 61 L153 41 L166 36 L166 108 L4 108 Z"
-        fill="url(#trend)"
-      />
-      <Polyline
-        points="4,92 22,78 38,84 54,56 70,70 86,18 101,72 118,57 134,61 153,41 166,36"
-        fill="none"
-        stroke={colors.primaryBright}
-        strokeWidth="2.2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </Svg>
+    <View>
+      <Svg width="100%" height="106" viewBox={`0 0 ${w} ${h}`}>
+        <Defs>
+          <LinearGradient id="trend" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor={colors.primaryBright} stopOpacity="0.38" />
+            <Stop offset="1" stopColor={colors.primaryBright} stopOpacity="0" />
+          </LinearGradient>
+        </Defs>
+        <Path d={`M${points.replaceAll(" ", " L")} L${8 + (days - 1) * step} ${h - 8} L8 ${h - 8} Z`} fill="url(#trend)" />
+        <Polyline
+          points={points}
+          fill="none"
+          stroke={colors.primaryBright}
+          strokeWidth="2.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </Svg>
+      <Text style={{ color: colors.textDim, fontSize: 9, textAlign: "center", marginTop: -6 }}>
+        Scans · last 7 days
+      </Text>
+    </View>
   );
 }
 
@@ -142,7 +161,7 @@ function ToolCard({ title, subtitle, icon, route }: (typeof tools)[number]) {
       onPress={() => router.push(route as any)}
       style={({ pressed }) => ({
         width: "48.5%",
-        height: 82,
+        minHeight: 82,
         borderRadius: radius.md,
         borderWidth: 1,
         borderColor: `${colors.primaryBright}${pressed ? "dd" : "88"}`,
@@ -152,39 +171,79 @@ function ToolCard({ title, subtitle, icon, route }: (typeof tools)[number]) {
         ...glow(colors.primaryBright, pressed ? "md" : "sm"),
       })}
     >
-      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-        <Ionicons name={icon} size={24} color={colors.primaryBright} />
-        <Ionicons name="search-outline" size={17} color={colors.accent} />
-      </View>
+      <Ionicons name={icon} size={24} color={colors.primaryBright} />
       <View>
         <Text numberOfLines={1} style={{ color: colors.text, fontWeight: "800", fontSize: 13 }}>{title}</Text>
-        <Text numberOfLines={1} style={{ color: colors.textMuted, fontSize: 9, marginTop: 1 }}>{subtitle}</Text>
+        <Text numberOfLines={1} style={{ color: colors.textMuted, fontSize: 11, marginTop: 1 }}>{subtitle}</Text>
       </View>
     </Pressable>
   );
 }
 
-const activityMeta: Record<string, { icon: keyof typeof Ionicons.glyphMap; color: string }> = {
-  safe: { icon: "checkmark-circle", color: colors.safe },
-  low: { icon: "checkmark-circle", color: colors.safe },
-  suspicious: { icon: "alert-circle", color: colors.critical },
-  high: { icon: "alert-circle", color: colors.critical },
-  critical: { icon: "alert-circle", color: colors.critical },
+// Suspicious is amber, not the same red as a confirmed threat — and nothing
+// here was "Blocked"; scans are verdicts, so say what the verdict was.
+const activityMeta: Record<string, { icon: keyof typeof Ionicons.glyphMap; color: string; verdict: string }> = {
+  safe: { icon: "checkmark-circle", color: colors.safe, verdict: "Safe" },
+  low: { icon: "checkmark-circle", color: colors.safe, verdict: "Safe" },
+  suspicious: { icon: "alert-circle", color: colors.suspicious, verdict: "Caution" },
+  high: { icon: "warning", color: colors.critical, verdict: "High risk" },
+  critical: { icon: "warning", color: colors.critical, verdict: "High risk" },
 };
+
+const SCAN_TYPE_LABEL: Record<string, string> = {
+  link: "Link",
+  image: "Screenshot",
+  qr: "QR code",
+  message: "Message",
+  email: "Email",
+  phone: "Phone number",
+  marketplace: "Marketplace",
+  social: "Social",
+  vertical: "Shield Labs",
+  voice: "Voicemail",
+};
+
+function timeAgo(dateStr: string): string {
+  const minutes = Math.floor((Date.now() - new Date(dateStr).getTime()) / 60000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
+
+/** Human title per scan: domains for links, never raw OCR text or enum names. */
+function scanTitle(scan: Scan): string {
+  const input = (scan.raw_input || "").trim();
+  switch (scan.scan_type) {
+    case "link":
+    case "qr": {
+      const domain = input.replace(/^https?:\/\//i, "").replace(/^www\./i, "").split(/[/?#]/)[0];
+      return domain || `${SCAN_TYPE_LABEL[scan.scan_type]} scan`;
+    }
+    case "phone":
+      return input || "Phone number scan";
+    case "message":
+    case "marketplace":
+    case "social":
+      return input ? `“${input.slice(0, 48)}${input.length > 48 ? "…" : ""}”` : `${SCAN_TYPE_LABEL[scan.scan_type]} scan`;
+    default:
+      // Screenshots and documents carry OCR text in raw_input — junk as a title.
+      return `${SCAN_TYPE_LABEL[scan.scan_type] ?? "Scan"} scan`;
+  }
+}
 
 function ActivityRow({ scan }: { scan: Scan }) {
   const router = useRouter();
   const level = scan.report?.risk_level ?? "safe";
   const meta = activityMeta[level] ?? activityMeta.safe;
-  const verdict = ["safe", "low"].includes(level) ? "Safe" : "Blocked";
-  const label = scan.raw_input || `${scan.scan_type} scan`;
   return (
     <Pressable
       onPress={() => router.push(`/result?id=${scan.id}` as any)}
       style={({ pressed }) => ({
         flexDirection: "row",
         alignItems: "center",
-        paddingVertical: 8,
+        paddingVertical: 10,
         paddingHorizontal: 11,
         borderBottomWidth: 1,
         borderBottomColor: colors.border,
@@ -195,10 +254,14 @@ function ActivityRow({ scan }: { scan: Scan }) {
         <Ionicons name={meta.icon} size={17} color={meta.color} />
       </View>
       <View style={{ flex: 1, marginLeft: 10 }}>
-        <Text numberOfLines={1} style={{ color: colors.text, fontWeight: "700", fontSize: 12 }}>{label}</Text>
-        <Text style={{ color: colors.textMuted, fontSize: 10, marginTop: 1 }}>{scan.scan_type.replaceAll("_", " ")}</Text>
+        <Text numberOfLines={1} style={{ color: colors.text, fontWeight: "700", fontSize: 13 }}>{scanTitle(scan)}</Text>
+        <Text numberOfLines={1} style={{ color: colors.textMuted, fontSize: 11, marginTop: 1 }}>
+          {SCAN_TYPE_LABEL[scan.scan_type] ?? scan.scan_type} · {timeAgo(scan.created_at)}
+        </Text>
       </View>
-      <Text style={{ color: meta.color, fontSize: 11, fontWeight: "700" }}>{verdict}</Text>
+      <View style={{ backgroundColor: `${meta.color}1a`, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 }}>
+        <Text style={{ color: meta.color, fontSize: 11, fontWeight: "700" }}>{meta.verdict}</Text>
+      </View>
       <Ionicons name="chevron-forward" size={14} color={colors.textMuted} style={{ marginLeft: 7 }} />
     </Pressable>
   );
@@ -213,7 +276,14 @@ export default function Dashboard() {
   const threatsBlocked = scans?.filter((scan) => scan.report && ["suspicious", "high", "critical"].includes(scan.report.risk_level)).length ?? 0;
   const score = protection?.score ?? (scans?.length ? Math.max(42, Math.round(100 - (threatsBlocked / scans.length) * 58)) : 85);
   const recent = scans?.slice(0, 3) ?? [];
-  const firstName = user?.display_name?.split(" ")[0] || "Alex";
+  const firstName = user?.display_name?.split(" ")[0] || "";
+  // The hero should tell the truth: tie its copy to the actual score.
+  const heroStatus =
+    score >= 70
+      ? "Your digital footprint is low risk."
+      : score >= 45
+        ? "A few protections still need setup."
+        : "Your protection needs attention.";
 
   useEffect(() => {
     if (!scans) return;
@@ -249,9 +319,11 @@ export default function Dashboard() {
         <View style={{ minHeight: 80, borderRadius: radius.md, backgroundColor: "rgba(170,211,230,0.25)", borderWidth: 1, borderColor: `${colors.primaryBright}66`, padding: 10, flexDirection: "row", alignItems: "center", ...glow(colors.primaryBright, "md") }}>
           <BrandMark size={58} />
           <View style={{ flex: 1, marginLeft: 12 }}>
-            <Text numberOfLines={1} style={{ color: colors.text, fontSize: 19, fontWeight: "900" }}>Hello, {firstName}.</Text>
-            <Text numberOfLines={1} style={{ color: colors.textDim, fontSize: 11, marginTop: 1 }}>Your digital footprint is low risk.</Text>
-            <Text numberOfLines={1} style={{ color: colors.textDim, fontSize: 11 }}>AI is monitoring actively.</Text>
+            <Text numberOfLines={1} style={{ color: colors.text, fontSize: 19, fontWeight: "900" }}>
+              {firstName ? `Hello, ${firstName}.` : "Hello."}
+            </Text>
+            <Text numberOfLines={1} style={{ color: colors.textDim, fontSize: 11, marginTop: 1 }}>{heroStatus}</Text>
+            <Text numberOfLines={1} style={{ color: colors.textDim, fontSize: 11 }}>Monitoring is active.</Text>
           </View>
         </View>
 
@@ -264,7 +336,7 @@ export default function Dashboard() {
           >
             <RiskGauge score={score} />
           </Pressable>
-          <View style={{ flex: 1 }}><RiskTrend /></View>
+          <View style={{ flex: 1 }}><ActivityTrend scans={scans} /></View>
         </View>
 
         <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", rowGap: 10 }}>
