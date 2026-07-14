@@ -11,6 +11,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { CoachMessage, ShieldAPI } from "@/lib/api";
 import { colors, radius, spacing, withAlpha } from "@/theme/theme";
@@ -24,6 +25,7 @@ const STARTERS = [
 
 export default function CoachScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const listRef = useRef<FlatList>(null);
   const [messages, setMessages] = useState<CoachMessage[]>([]);
   const [input, setInput] = useState("");
@@ -60,6 +62,11 @@ export default function CoachScreen() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
     >
+      <View style={{ height: insets.top + 56, paddingTop: insets.top, paddingHorizontal: spacing.lg, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderBottomWidth: 1, borderBottomColor: `${colors.primaryBright}20` }}>
+        <Pressable onPress={() => router.back()} hitSlop={12}><Ionicons name="chevron-back" size={22} color={colors.textDim} /></Pressable>
+        <Text style={{ color: colors.text, fontSize: 16, fontWeight: "800" }}>Shield AI</Text>
+        <Pressable onPress={() => router.push("/profile")} hitSlop={12}><Ionicons name="person-circle-outline" size={22} color={colors.primaryBright} /></Pressable>
+      </View>
       {messages.length === 0 ? (
         <View style={{ flex: 1, padding: spacing.lg, justifyContent: "center" }}>
           <View style={{ alignItems: "center", marginBottom: spacing.xl }}>
@@ -74,14 +81,13 @@ export default function CoachScreen() {
                 marginBottom: spacing.md,
               }}
             >
-              <Ionicons name="chatbubbles" size={30} color={colors.primaryBright} />
+              <Text style={{ color: colors.primaryBright, fontSize: 20, fontWeight: "900" }}>AI</Text>
             </View>
             <Text style={{ color: colors.text, fontSize: 22, fontWeight: "900", letterSpacing: -0.5, textAlign: "center" }}>
-              Ask about a situation
+              Shield AI Assistant Chat
             </Text>
             <Text style={{ color: colors.textMuted, fontSize: 14, textAlign: "center", marginTop: 6, lineHeight: 20 }}>
-              Describe what happened — a call, a text, a deal, a request — and get a
-              straight answer on whether it looks like a scam.
+              Hello! How can I help with your security today?
             </Text>
           </View>
           {STARTERS.map((s) => (
@@ -112,14 +118,16 @@ export default function CoachScreen() {
             <View
               style={{
                 alignSelf: item.role === "user" ? "flex-end" : "flex-start",
-                backgroundColor: item.role === "user" ? colors.primary : colors.surface,
+                backgroundColor: item.role === "user" ? colors.surfaceHigh : colors.surface,
+                borderWidth: 1,
+                borderColor: item.role === "user" ? colors.borderHi : colors.border,
                 borderRadius: radius.lg,
                 padding: spacing.md,
                 marginBottom: spacing.sm,
                 maxWidth: "85%",
               }}
             >
-              <Text style={{ color: item.role === "user" ? "#fff" : colors.text, fontSize: 15, lineHeight: 22 }}>
+              <Text style={{ color: colors.text, fontSize: 15, lineHeight: 22 }}>
                 {item.content}
               </Text>
             </View>
@@ -177,12 +185,12 @@ export default function CoachScreen() {
             width: 40,
             height: 40,
             borderRadius: 20,
-            backgroundColor: input.trim() && !busy ? colors.primary : colors.surface,
+            backgroundColor: input.trim() && !busy ? colors.primaryBright : colors.surface,
             alignItems: "center",
             justifyContent: "center",
           }}
         >
-          <Ionicons name="arrow-up" size={20} color={input.trim() && !busy ? "#fff" : colors.textMuted} />
+          <Ionicons name="arrow-up" size={20} color={input.trim() && !busy ? colors.bg : colors.textMuted} />
         </Pressable>
       </View>
     </KeyboardAvoidingView>

@@ -115,7 +115,7 @@ export default function History() {
             letterSpacing: -0.7,
           }}
         >
-          History
+          Scan History
         </Text>
 
         {/* Search bar */}

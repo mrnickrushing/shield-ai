@@ -12,8 +12,9 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { Button, Eyebrow, FadeIn, GlowOrb, Surface } from "@/components/ui";
+import { Button, Eyebrow, FadeIn, Surface } from "@/components/ui";
 import { ShieldAPI, BreachResult, IdentityAlert, MonitoredIdentity } from "@/lib/api";
 import { colors, radius, spacing, withAlpha } from "@/theme/theme";
 
@@ -38,6 +39,7 @@ const SEVERITY_COLORS: Record<string, string> = {
 
 export default function IdentityScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
 
   const [email, setEmail] = useState("");
@@ -142,26 +144,30 @@ export default function IdentityScreen() {
       style={{ flex: 1, backgroundColor: colors.bg }}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxl }}>
-        <Pressable onPress={() => router.back()} style={{ marginBottom: spacing.md }} hitSlop={12}>
-          <Text style={{ color: colors.primaryBright, fontSize: 15 }}>← Back</Text>
-        </Pressable>
+      <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingTop: insets.top + 8, paddingBottom: spacing.xxl }}>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+          <Pressable onPress={() => router.back()} hitSlop={12} style={{ width: 35 }}><Ionicons name="chevron-back" size={22} color={colors.textDim} /></Pressable>
+          <Text style={{ color: colors.text, fontSize: 16, fontWeight: "800" }}>Identity Protection Center</Text>
+          <Pressable onPress={() => router.push("/profile")} hitSlop={12} style={{ width: 35, alignItems: "flex-end" }}><Ionicons name="settings-outline" size={21} color={colors.textDim} /></Pressable>
+        </View>
 
         <FadeIn>
-          <Surface
-            accent={colors.primaryBright}
-            glow={withAlpha(colors.primary, "30")}
-            style={{ marginBottom: spacing.lg, position: "relative" }}
-          >
-            <GlowOrb color={colors.primaryBright} size={200} opacity={0.3} style={{ top: -60, right: -50 }} />
-            <Eyebrow style={{ marginBottom: spacing.sm }}>IDENTITY PROTECTION</Eyebrow>
-            <Text style={{ color: colors.text, fontSize: 24, fontWeight: "900", letterSpacing: -0.6, marginBottom: 6 }}>
-              Check your exposure.
-            </Text>
-            <Text style={{ color: colors.textMuted, fontSize: 14, lineHeight: 21 }}>
-              See if your email or password appeared in a known breach, and review the alerts we&apos;ve already flagged for you.
-            </Text>
-          </Surface>
+          <View style={{ borderRadius: radius.md, borderWidth: 1, borderColor: `${colors.primaryBright}99`, backgroundColor: colors.glassDeep, padding: 10, marginBottom: spacing.lg, ...({ shadowColor: colors.primaryBright, shadowOpacity: 0.28, shadowRadius: 13, shadowOffset: { width: 0, height: 0 } }) }}>
+            <Text style={{ color: colors.text, fontSize: 15, fontWeight: "900", marginBottom: 8 }}>Monitoring Status</Text>
+            <View style={{ flexDirection: "row", gap: 7 }}>
+              {[
+                { icon: "shield-checkmark-outline" as const, color: colors.safe, title: "Email Breach\nMonitoring", value: `${(monitoredTargets ?? []).filter((target) => target.target_type === "email" && target.is_active).length} Breaches\nFound` },
+                { icon: "lock-closed-outline" as const, color: colors.primaryBright, title: "Credit Freeze\nGuidance", value: "Freeze Active\n(3 Bureaus)" },
+                { icon: "eye-off-outline" as const, color: colors.purple, title: "Data Broker\nExposure", value: "Review\nSources" },
+              ].map((status) => (
+                <View key={status.title} style={{ flex: 1, minHeight: 130, borderRadius: 10, borderWidth: 1, borderColor: status.color, backgroundColor: `${status.color}15`, alignItems: "center", paddingHorizontal: 5, paddingVertical: 10 }}>
+                  <Ionicons name={status.icon} size={27} color={status.color} />
+                  <Text style={{ color: colors.text, fontSize: 10, lineHeight: 12, textAlign: "center", fontWeight: "800", marginTop: 8 }}>{status.title}</Text>
+                  <Text style={{ color: colors.textDim, fontSize: 9, lineHeight: 11, textAlign: "center", marginTop: 4 }}>{status.value}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
         </FadeIn>
 
         <FadeIn delay={30}>

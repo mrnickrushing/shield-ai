@@ -22,9 +22,9 @@ export function GlassCard({ children, accent, elevated, onPress, style }: GlassC
     backgroundColor: colors.glassDeep,
     borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: accent ? `${accent}40` : colors.borderHi,
+    borderColor: accent ? `${accent}72` : `${colors.primaryBright}35`,
     overflow: "hidden",
-    ...(elevated && accent ? glow(accent, "sm") : null),
+    ...(elevated ? glow(accent ?? colors.primaryBright, "sm") : null),
   };
 
   const inner = (

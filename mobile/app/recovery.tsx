@@ -3,8 +3,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useState } from "react";
 import { Alert, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { Button, Eyebrow, FadeIn, GlowOrb, Surface } from "@/components/ui";
+import { Button, Eyebrow, FadeIn, Surface } from "@/components/ui";
 import { ShieldAPI } from "@/lib/api";
 import { colors, radius, spacing, withAlpha } from "@/theme/theme";
 
@@ -25,6 +26,7 @@ const URGENCY_COLOR: Record<string, string> = {
 
 export default function RecoveryScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ scanId?: string }>();
   const qc = useQueryClient();
   const [phase, setPhase] = useState<"select" | "steps" | "evidence">("select");
@@ -33,6 +35,7 @@ export default function RecoveryScreen() {
   const [checkedSteps, setCheckedSteps] = useState<string[]>([]);
   const [evidenceText, setEvidenceText] = useState("");
   const [evidenceLabel, setEvidenceLabel] = useState("");
+  const [showAllTypes, setShowAllTypes] = useState(false);
 
   const { data: steps } = useQuery({
     queryKey: ["wizard", selectedType],
@@ -68,38 +71,55 @@ export default function RecoveryScreen() {
 
   if (phase === "select") {
     return (
-      <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxl }}>
-        <FadeIn>
-          <Surface accent={colors.critical} glow={withAlpha(colors.critical, "30")} style={{ marginBottom: spacing.lg, position: "relative" }}>
-            <GlowOrb color={colors.critical} size={200} opacity={0.26} style={{ top: -60, right: -50 }} />
-            <Eyebrow style={{ color: colors.critical, marginBottom: spacing.sm }}>RECOVERY</Eyebrow>
-            <Text style={{ color: colors.text, fontSize: 26, fontWeight: "900", letterSpacing: -0.5, marginBottom: 4 }}>Scam Recovery</Text>
-            <Text style={{ color: colors.textMuted, fontSize: 14, lineHeight: 21 }}>
-              What type of scam happened? We&apos;ll give you a step-by-step plan.
-            </Text>
-          </Surface>
-        </FadeIn>
-
-        <FadeIn delay={60}>
-          <View style={{ gap: spacing.sm }}>
-            {SCAM_TYPES.map((t) => (
-              <Surface
-                key={t.key}
-                onPress={() => { setSelectedType(t.key); createIncident.mutate(t.key); }}
-                style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}
-              >
-                <View style={{ width: 42, height: 42, borderRadius: radius.md, backgroundColor: withAlpha(t.iconColor, "22"), alignItems: "center", justifyContent: "center" }}>
-                  <Ionicons name={t.icon} size={20} color={t.iconColor} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ color: colors.text, fontWeight: "700", fontSize: 16, letterSpacing: -0.2 }}>{t.label}</Text>
-                  <Text style={{ color: colors.textMuted, fontSize: 13 }}>{t.description}</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-              </Surface>
-            ))}
+      <ScrollView style={{ flex: 1, backgroundColor: "#F3F6F8" }} contentContainerStyle={{ paddingBottom: 36 }}>
+        <View style={{ height: insets.top + 58, paddingTop: insets.top, paddingHorizontal: 16, flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "#FFFFFF", borderBottomWidth: 1, borderBottomColor: "#D8DEE3" }}>
+          <Pressable onPress={() => router.back()} hitSlop={12}><Ionicons name="close" size={25} color="#17212B" /></Pressable>
+          <Text style={{ color: "#17212B", fontSize: 16, fontWeight: "800" }}>Scam Recovery Wizard</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}><Ionicons name="help-circle-outline" size={18} color="#17212B" /><Text style={{ color: "#17212B", fontSize: 12 }}>Help</Text></View>
+        </View>
+        <View style={{ paddingHorizontal: 24, paddingTop: 20 }}>
+          <Text style={{ color: "#27323B", fontSize: 12, textAlign: "center" }}>Step 1 of 3: Report Incident</Text>
+          <View style={{ flexDirection: "row", height: 5, borderRadius: 3, overflow: "hidden", marginTop: 11, marginBottom: 26 }}>
+            <View style={{ flex: 1, backgroundColor: "#2587E8" }} />
+            <View style={{ flex: 2, backgroundColor: "#D8DEE3", marginLeft: 2 }} />
           </View>
-        </FadeIn>
+          <Text style={{ color: "#101820", fontSize: 22, fontWeight: "900", marginBottom: 6 }}>We&apos;re here to help you recover.</Text>
+          <Text style={{ color: "#303A43", fontSize: 13, lineHeight: 18, marginBottom: 22 }}>Select the type of scam you experienced. This will guide us to provide the best support.</Text>
+          <View style={{ gap: 11 }}>
+            {SCAM_TYPES.filter((item) => showAllTypes || ["bank_transfer", "gift_card", "marketplace"].includes(item.key)).map((item) => {
+              const selected = selectedType === item.key;
+              return (
+                <Pressable
+                  key={item.key}
+                  onPress={() => setSelectedType(item.key)}
+                  style={({ pressed }) => ({
+                    minHeight: 72, borderRadius: 13, backgroundColor: "#FFFFFF", borderWidth: selected ? 2 : 1,
+                    borderColor: selected ? "#2587E8" : "#E0E5E8", paddingHorizontal: 18, flexDirection: "row", alignItems: "center",
+                    shadowColor: "#000", shadowOffset: { width: 0, height: 3 }, shadowOpacity: pressed ? 0.15 : 0.08, shadowRadius: 8, elevation: 3,
+                  })}
+                >
+                  <Ionicons name={item.icon} size={35} color={item.iconColor} />
+                  <View style={{ flex: 1, marginLeft: 17 }}>
+                    <Text style={{ color: "#101820", fontSize: 16, fontWeight: "700" }}>{item.label}{item.key === "bank_transfer" ? " Fraud" : item.key === "gift_card" ? " Scam" : item.key === "marketplace" ? " Scam" : ""}</Text>
+                    <Text style={{ color: "#46515B", fontSize: 11, marginTop: 2 }}>{item.description}</Text>
+                  </View>
+                  {selected ? <Ionicons name="checkmark-circle" size={22} color="#2587E8" /> : null}
+                </Pressable>
+              );
+            })}
+          </View>
+          <Pressable
+            onPress={() => selectedType && createIncident.mutate(selectedType)}
+            disabled={!selectedType || createIncident.isPending}
+            style={{ height: 50, borderRadius: 9, backgroundColor: selectedType ? "#2587E8" : "#AEBBC6", alignItems: "center", justifyContent: "center", marginTop: 24 }}
+          >
+            <Text style={{ color: "#FFFFFF", fontSize: 16, fontWeight: "700" }}>{createIncident.isPending ? "Preparing…" : "Continue"}</Text>
+          </Pressable>
+          <Text style={{ color: "#4D5963", fontSize: 10, textAlign: "center", marginTop: 11 }}>Contact support directly for immediate assistance.</Text>
+          <Pressable onPress={() => setShowAllTypes((value) => !value)} style={{ alignItems: "center", paddingVertical: 12 }}>
+            <Text style={{ color: "#2587E8", fontSize: 11, fontWeight: "700" }}>{showAllTypes ? "Show fewer options" : "More incident types"}</Text>
+          </Pressable>
+        </View>
       </ScrollView>
     );
   }

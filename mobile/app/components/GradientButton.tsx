@@ -4,7 +4,7 @@ import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 
-import { glow, gradients, spacing } from "@/theme/theme";
+import { colors, glow, gradients, spacing } from "@/theme/theme";
 
 let gradientIdCounter = 0;
 
@@ -37,6 +37,7 @@ export function GradientButton({
   const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
   const corona = glowColor ?? stops[Math.floor(stops.length / 2)];
   const inactive = disabled || loading;
+  const textColor = stops === gradients.primary ? colors.bg : "#fff";
   const [gradientId] = React.useState(() => `gbtn-${gradientIdCounter++}`);
 
   return (
@@ -47,8 +48,8 @@ export function GradientButton({
         onPressIn={() => (scale.value = withSpring(0.96, { damping: 18 }))}
         onPressOut={() => (scale.value = withSpring(1, { damping: 14 }))}
         style={{
-          height: 52,
-          borderRadius: 14,
+          height: 48,
+          borderRadius: 12,
           overflow: "hidden",
           alignItems: "center",
           justifyContent: "center",
@@ -66,11 +67,11 @@ export function GradientButton({
           <Rect x="0" y="0" width="100%" height="100%" fill={`url(#${gradientId})`} />
         </Svg>
         {loading ? (
-          <ActivityIndicator color="#fff" />
+          <ActivityIndicator color={textColor} />
         ) : (
           <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
-            {icon ? <Ionicons name={icon} size={18} color="#fff" /> : null}
-            <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15, letterSpacing: 0.2 }}>
+            {icon ? <Ionicons name={icon} size={18} color={textColor} /> : null}
+            <Text style={{ color: textColor, fontWeight: "800", fontSize: 15, letterSpacing: 0.2 }}>
               {label}
             </Text>
           </View>
