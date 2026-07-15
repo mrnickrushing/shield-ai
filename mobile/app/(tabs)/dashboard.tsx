@@ -66,50 +66,56 @@ function BrandMark({ size = 30 }: { size?: number }) {
 }
 
 function RiskGauge({ score }: { score: number }) {
-  const size = 152;
-  // Keep the overall card footprint compact while giving the score enough
-  // clear space inside the ring (especially for the widest value, 100/100).
-  const radiusValue = 66;
+  // Only the number lives inside the ring; the label and status sit above and
+  // below it, using the full column width, so they can never collide with the
+  // arc (which is what clipped "Protection Score" / "Needs attention" before).
+  const size = 128;
+  const radiusValue = 55;
   const circumference = 2 * Math.PI * radiusValue;
   const arc = circumference * 0.74;
   const filled = arc * Math.max(0, Math.min(1, score / 100));
   const color = score >= 70 ? colors.safe : score >= 45 ? colors.suspicious : colors.critical;
+  const status = score >= 70 ? "Protected" : score >= 45 ? "Needs attention" : "At risk";
   return (
-    <View style={{ width: size, height: 142, alignItems: "center", justifyContent: "center" }}>
-      <Svg width={size} height={size} style={{ position: "absolute", top: 0 }}>
-        <Circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radiusValue}
-          fill="none"
-          stroke={colors.border}
-          strokeWidth={10}
-          strokeLinecap="round"
-          strokeDasharray={`${arc} ${circumference}`}
-          transform={`rotate(137 ${size / 2} ${size / 2})`}
-        />
-        <Circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radiusValue}
-          fill="none"
-          stroke={color}
-          strokeWidth={10}
-          strokeLinecap="round"
-          strokeDasharray={`${filled} ${circumference}`}
-          transform={`rotate(137 ${size / 2} ${size / 2})`}
-        />
-      </Svg>
-      <View style={{ width: 142, alignItems: "center", marginTop: 8 }}>
-        <Text numberOfLines={1} maxFontSizeMultiplier={1.05} style={{ color: colors.textDim, fontSize: 11, fontWeight: "700", letterSpacing: 0.2 }}>Protection Score</Text>
-        <View style={{ flexDirection: "row", alignItems: "flex-end" }}>
-          <Text maxFontSizeMultiplier={1.05} style={{ color: colors.text, fontSize: score >= 100 ? 32 : 36, lineHeight: 40, fontWeight: "900" }}>{score}</Text>
-          <Text maxFontSizeMultiplier={1.1} style={{ color: colors.textDim, fontSize: 15, paddingBottom: 4 }}>/100</Text>
+    <View style={{ alignItems: "center", width: "100%" }}>
+      <Text numberOfLines={1} maxFontSizeMultiplier={1.1} style={{ color: colors.textDim, fontSize: 11, fontWeight: "700", letterSpacing: 0.3, marginBottom: 4 }}>
+        Protection Score
+      </Text>
+      <View style={{ width: size, height: size }}>
+        <Svg width={size} height={size} style={{ position: "absolute", top: 0, left: 0 }}>
+          <Circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radiusValue}
+            fill="none"
+            stroke={colors.border}
+            strokeWidth={10}
+            strokeLinecap="round"
+            strokeDasharray={`${arc} ${circumference}`}
+            transform={`rotate(137 ${size / 2} ${size / 2})`}
+          />
+          <Circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radiusValue}
+            fill="none"
+            stroke={color}
+            strokeWidth={10}
+            strokeLinecap="round"
+            strokeDasharray={`${filled} ${circumference}`}
+            transform={`rotate(137 ${size / 2} ${size / 2})`}
+          />
+        </Svg>
+        <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center" }}>
+          <View style={{ flexDirection: "row", alignItems: "flex-end" }}>
+            <Text maxFontSizeMultiplier={1.05} style={{ color: colors.text, fontSize: score >= 100 ? 34 : 40, lineHeight: 44, fontWeight: "900" }}>{score}</Text>
+            <Text maxFontSizeMultiplier={1.05} style={{ color: colors.textDim, fontSize: 14, paddingBottom: 5 }}>/100</Text>
+          </View>
         </View>
-        <Text numberOfLines={1} maxFontSizeMultiplier={1.15} style={{ color, fontSize: 13, fontWeight: "800" }}>
-          {score >= 70 ? "Protected" : score >= 45 ? "Needs attention" : "At risk"}
-        </Text>
       </View>
+      <Text numberOfLines={1} maxFontSizeMultiplier={1.1} style={{ color, fontSize: 12, fontWeight: "800", marginTop: 4 }}>
+        {status}
+      </Text>
     </View>
   );
 }
@@ -449,7 +455,7 @@ export default function Dashboard() {
             <View style={{ width: "47%", alignItems: "center" }}>
               <RiskGauge score={score} />
             </View>
-            <View style={{ width: 1, height: 116, backgroundColor: colors.borderHi }} />
+            <View style={{ width: 1, height: 150, backgroundColor: colors.borderHi }} />
             <View style={{ flex: 1, paddingHorizontal: 10 }}>
               <ActivityTrend scans={scans} />
               <View
