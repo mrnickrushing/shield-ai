@@ -50,7 +50,7 @@ function PreferenceRow({ label, description, value, onValueChange }: { label: st
 export default function Profile() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { user, updateProfile, logout } = useAuth();
+  const { user, rcPremium, updateProfile, logout } = useAuth();
   const [name, setName] = useState(user?.display_name ?? "");
   const [largeText, setLargeText] = useState(user?.large_text_mode ?? false);
   const [simpleLanguage, setSimpleLanguage] = useState(user?.simple_language_mode ?? false);
@@ -86,6 +86,7 @@ export default function Profile() {
       <View style={{ paddingTop: insets.top + 8, height: insets.top + 58, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: spacing.lg }}>
         <View style={{ width: 36 }} />
         <Text
+          maxFontSizeMultiplier={1.1}
           style={{
             fontSize: 20,
             fontWeight: "900",
@@ -114,7 +115,7 @@ export default function Profile() {
           <View style={{ marginTop: 12, flexDirection: "row", alignItems: "center", gap: 7, borderRadius: radius.pill, borderWidth: 1, borderColor: `${colors.primaryBright}99`, backgroundColor: `${colors.surfaceAlt}cc`, paddingHorizontal: 20, paddingVertical: 10, ...glow(colors.primaryBright, "md") }}>
             <Ionicons name="shield-checkmark" size={15} color={colors.primaryBright} />
             <Text style={{ color: colors.primaryBright, fontWeight: "800", fontSize: 14 }}>
-              {user?.is_premium ? "Premium protection active" : "Protection active"}
+              {user?.is_premium || rcPremium ? "Premium protection active" : "Protection active"}
             </Text>
           </View>
         </View>

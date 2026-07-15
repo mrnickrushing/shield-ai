@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -11,13 +11,16 @@ import { colors, spacing } from "@/theme/theme";
 
 type AlertFilter = "All" | "Critical" | "Info";
 
-// Notifications carry no explicit severity, so classify from the risk wording
-// the backend puts in the title/body. Anything that reads as a threat is
-// "Critical"; safe/completed/informational alerts fall under "Info".
-const CRITICAL_PATTERN = /critical|high risk|suspicious|breach|fraud|scam|warning|danger|exposed|malicious|phishing|blocked/i;
+// Scan notifications encode the verdict in the title ("… — <level> risk"), so
+// classify from that, never the body — a *safe* scan's explanation often
+// contains words like "suspicious" or "scam" and must not be miscounted as
+// critical. Non-scan alerts (breach, fraud) are matched on the title alone.
+const TITLE_THREAT_PATTERN = /critical|high risk|suspicious|breach|fraud|scam|exposed|malicious|urgent|warning/i;
 
 function isCriticalAlert(item: Notification): boolean {
-  return CRITICAL_PATTERN.test(`${item.title} ${item.body}`);
+  const level = /—\s*(safe|low|suspicious|high|critical)\s+risk/i.exec(item.title)?.[1]?.toLowerCase();
+  if (level) return level === "suspicious" || level === "high" || level === "critical";
+  return TITLE_THREAT_PATTERN.test(item.title);
 }
 
 function NotifItem({ item, onPress, onClear }: { item: Notification; onPress: () => void; onClear: () => void }) {
@@ -96,8 +99,12 @@ export default function NotificationsScreen() {
   }
 
   const unreadCount = notifications?.filter((n) => !n.is_read).length ?? 0;
-  const visible = (notifications ?? []).filter((n) =>
-    filter === "All" ? true : filter === "Critical" ? isCriticalAlert(n) : !isCriticalAlert(n)
+  const visible = useMemo(
+    () =>
+      (notifications ?? []).filter((n) =>
+        filter === "All" ? true : filter === "Critical" ? isCriticalAlert(n) : !isCriticalAlert(n)
+      ),
+    [notifications, filter]
   );
 
   const header = (
@@ -114,7 +121,7 @@ export default function NotificationsScreen() {
             <Pressable
               key={label}
               onPress={() => setFilter(label)}
-              accessibilityRole="button"
+              accessibilityRole="tab"
               accessibilityState={{ selected: active }}
               style={{ flex: 1, borderRadius: 7, backgroundColor: active ? colors.primaryBright : "transparent", alignItems: "center", justifyContent: "center" }}
             >

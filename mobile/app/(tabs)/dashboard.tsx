@@ -236,7 +236,7 @@ function ToolCard({ title, subtitle, icon, secondaryIcon, route }: (typeof tools
     <View
       style={{
         width: "48.5%",
-        height: 92,
+        minHeight: 92,
         borderRadius: radius.md,
         borderWidth: 1,
         borderColor: `${colors.primaryBright}55`,

@@ -68,9 +68,10 @@ export default function Paywall() {
   const familyPkgs = familyPackages(offering);
   const familyMonthly = familyPkgs.find((p) => p.packageType === "MONTHLY") ?? null;
 
-  const monthlyPkg = (family ? familyMonthly : offering?.monthly) ?? null;
-  const fallbackPkg = (family ? familyPkgs[0] : offering?.availablePackages[0]) ?? null;
-  const selectedPkg = monthlyPkg ?? fallbackPkg;
+  // The tier cards only ever display a per-month price, so purchase the monthly
+  // package exclusively — never fall back to an annual package, which would
+  // charge a yearly amount under a "/month" label.
+  const selectedPkg = (family ? familyMonthly : offering?.monthly) ?? null;
   const hasPurchasablePackage = Boolean(selectedPkg);
 
   const individualMonthlyPrice = offering?.monthly?.product.priceString ?? "$4.99";
