@@ -1,12 +1,13 @@
 """Authentication routes: register, login, refresh, me, social."""
 import hashlib
 import hmac
+import io
 import secrets
 from datetime import datetime, timedelta, timezone
 from urllib.parse import quote
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from fastapi.responses import RedirectResponse
 import jwt
 from sqlalchemy.orm import Session
@@ -191,6 +192,7 @@ def _user_out(user: User) -> UserOut:
         email=user.email,
         is_premium=user.is_premium,
         display_name=profile.display_name if profile else "",
+        avatar_url=profile.avatar_url if profile else "",
         simple_language_mode=profile.simple_language_mode if profile else False,
         large_text_mode=profile.large_text_mode if profile else False,
     )
@@ -494,6 +496,59 @@ def update_me(
         profile.large_text_mode = payload.large_text_mode
     db.commit()
     db.refresh(profile)
+    db.refresh(user)
+    return _user_out(user)
+
+
+@router.post("/me/avatar", response_model=UserOut)
+async def upload_avatar(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Accept an image, normalize it to a square JPEG, store it in R2, and
+    persist the public URL on the user's profile."""
+    import uuid as _uuid
+
+    from PIL import Image, ImageOps, UnidentifiedImageError
+
+    from app.services.object_storage import StorageNotConfigured, storage_configured, upload_bytes
+
+    if not storage_configured():
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Avatar uploads aren't available yet.")
+
+    raw = await file.read()
+    if not raw:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Empty file.")
+    if len(raw) > settings.AVATAR_MAX_MB * 1024 * 1024:
+        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, f"Image must be under {settings.AVATAR_MAX_MB} MB.")
+
+    try:
+        image = Image.open(io.BytesIO(raw))
+        image.verify()  # detect truncated/forged files before decoding
+        image = Image.open(io.BytesIO(raw))
+        # Honor EXIF orientation, then drop all metadata by re-encoding.
+        image = ImageOps.exif_transpose(image).convert("RGB")
+    except (UnidentifiedImageError, OSError):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "That file isn't a valid image.")
+
+    # Center-crop to a square and cap the resolution — avatars never need more.
+    image = ImageOps.fit(image, (512, 512), method=Image.LANCZOS)
+    buffer = io.BytesIO()
+    image.save(buffer, format="JPEG", quality=85, optimize=True)
+
+    key = f"avatars/{user.id}/{_uuid.uuid4().hex}.jpg"
+    try:
+        url = upload_bytes(key, buffer.getvalue(), "image/jpeg")
+    except StorageNotConfigured:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Avatar uploads aren't available yet.")
+
+    profile = user.profile
+    if profile is None:
+        profile = Profile(user_id=user.id)
+        db.add(profile)
+    profile.avatar_url = url
+    db.commit()
     db.refresh(user)
     return _user_out(user)
 

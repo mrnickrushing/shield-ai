@@ -18,6 +18,7 @@ type AuthState = {
   register: (email: string, password: string, name: string) => Promise<void>;
   loginWithSocial: (provider: "apple" | "google", token: string, email?: string, displayName?: string, nonce?: string) => Promise<void>;
   updateProfile: (patch: ProfilePatch) => Promise<void>;
+  uploadAvatar: (uri: string) => Promise<void>;
   logout: () => Promise<void>;
 };
 
@@ -77,6 +78,11 @@ export const useAuth = create<AuthState>((set) => ({
 
   updateProfile: async (patch) => {
     const user = await ShieldAPI.updateProfile(patch);
+    set({ user });
+  },
+
+  uploadAvatar: async (uri) => {
+    const user = await ShieldAPI.uploadAvatar(uri);
     set({ user });
   },
 
