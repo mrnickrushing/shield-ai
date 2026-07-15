@@ -46,8 +46,8 @@ export default function TabsLayout() {
             paddingBottom: 7,
           },
           tabBarActiveTintColor: colors.primaryBright,
-          tabBarInactiveTintColor: colors.textMuted,
-          tabBarLabelStyle: { fontSize: 9, fontWeight: "600", marginTop: 2 },
+          tabBarInactiveTintColor: colors.textDim,
+          tabBarLabelStyle: { fontSize: 11, fontWeight: "700", marginTop: 2 },
         }}
       >
         <Tabs.Screen
@@ -63,8 +63,21 @@ export default function TabsLayout() {
           name="scan"
           options={{
             title: "Scan",
-            tabBarIcon: ({ color }) => (
-              <Ionicons name="scan-outline" size={22} color={color} />
+            tabBarIcon: ({ focused }) => (
+              <View
+                style={{
+                  width: 36,
+                  height: 30,
+                  borderRadius: 10,
+                  borderWidth: 1,
+                  borderColor: `${colors.primaryBright}${focused ? "CC" : "66"}`,
+                  backgroundColor: focused ? colors.primaryBright : colors.primaryDim,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Ionicons name="scan-outline" size={21} color={focused ? colors.bg : colors.primaryBright} />
+              </View>
             ),
           }}
         />
