@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { BrandWordmark } from "@/components/BrandWordmark";
 import { CoachMessage, ShieldAPI } from "@/lib/api";
 import { colors, radius, spacing, withAlpha } from "@/theme/theme";
 
@@ -64,7 +65,7 @@ export default function CoachScreen() {
     >
       <View style={{ height: insets.top + 56, paddingTop: insets.top, paddingHorizontal: spacing.lg, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderBottomWidth: 1, borderBottomColor: `${colors.primaryBright}20` }}>
         <Pressable onPress={() => router.back()} hitSlop={12}><Ionicons name="chevron-back" size={22} color={colors.textDim} /></Pressable>
-        <Text style={{ color: colors.text, fontSize: 16, fontWeight: "800" }}>Shield AI</Text>
+        <BrandWordmark size={22} />
         <Pressable onPress={() => router.push("/profile")} hitSlop={12}><Ionicons name="person-circle-outline" size={22} color={colors.primaryBright} /></Pressable>
       </View>
       {messages.length === 0 ? (

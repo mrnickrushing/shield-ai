@@ -531,7 +531,21 @@ export default function ScanScreen() {
           <Pressable onPress={() => router.back()} hitSlop={12} style={{ width: 32 }}>
             <Ionicons name="chevron-back" size={23} color={colors.textDim} />
           </Pressable>
-          <Text style={{ color: colors.text, fontSize: 16, fontWeight: "800" }}>Shield AI Multi-Scanner</Text>
+          <Text
+            maxFontSizeMultiplier={1.1}
+            numberOfLines={1}
+            style={{
+              color: colors.text,
+              fontSize: 19,
+              fontWeight: "900",
+              letterSpacing: 0.3,
+              textShadowColor: colors.primaryBright,
+              textShadowOffset: { width: 0, height: 0 },
+              textShadowRadius: 11,
+            }}
+          >
+            <Text style={{ color: colors.primaryBright }}>Shield</Text> AI Multi-Scanner
+          </Text>
           <Pressable onPress={() => router.push("/profile")} hitSlop={12} style={{ width: 32, alignItems: "flex-end" }}>
             <Ionicons name="person-circle-outline" size={23} color={colors.textDim} />
           </Pressable>

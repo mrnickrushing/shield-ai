@@ -6,6 +6,7 @@ import { Pressable, ScrollView, Text, View } from "react-native";
 import Svg, { Circle, Defs, LinearGradient, Path, Polyline, RadialGradient, Stop } from "react-native-svg";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { BrandWordmark } from "@/components/BrandWordmark";
 import { GlowBackground } from "@/components/GlowBackground";
 import { ShieldAPI, type Scan } from "@/lib/api";
 import { syncWidgetSnapshot } from "@/lib/widgetSync";
@@ -401,21 +402,8 @@ export default function Dashboard() {
       <View style={{ paddingTop: insets.top + 4, height: insets.top + 48, paddingHorizontal: spacing.lg, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
         <View style={{ width: 34 }} />
         <View style={{ flexDirection: "row", alignItems: "center", gap: 9 }}>
-          <BrandMark size={32} />
-          <Text
-            maxFontSizeMultiplier={1.1}
-            style={{
-              fontSize: 23,
-              fontWeight: "900",
-              letterSpacing: 0.4,
-              color: colors.text,
-              textShadowColor: colors.primaryBright,
-              textShadowOffset: { width: 0, height: 0 },
-              textShadowRadius: 13,
-            }}
-          >
-            <Text style={{ color: colors.primaryBright }}>Shield</Text> AI
-          </Text>
+          <BrandMark size={34} />
+          <BrandWordmark size={27} />
         </View>
         <Pressable
           onPress={() => router.push("/notifications")}

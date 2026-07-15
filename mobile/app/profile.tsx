@@ -5,6 +5,7 @@ import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, Switch, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { BrandWordmark } from "@/components/BrandWordmark";
 import { GradientButton } from "@/components/GradientButton";
 import { GlowBackground } from "@/components/GlowBackground";
 import { PressableFX } from "@/components/PressableFX";
@@ -116,20 +117,7 @@ export default function Profile() {
       <GlowBackground accent={colors.bgBloom} centerY={0.3} />
       <View style={{ paddingTop: insets.top + 8, height: insets.top + 58, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: spacing.lg }}>
         <View style={{ width: 36 }} />
-        <Text
-          maxFontSizeMultiplier={1.1}
-          style={{
-            fontSize: 20,
-            fontWeight: "900",
-            letterSpacing: 0.4,
-            color: colors.text,
-            textShadowColor: colors.primaryBright,
-            textShadowOffset: { width: 0, height: 0 },
-            textShadowRadius: 12,
-          }}
-        >
-          <Text style={{ color: colors.primaryBright }}>Shield</Text> AI
-        </Text>
+        <BrandWordmark size={24} />
         <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.surfaceAlt, borderWidth: 1, borderColor: `${colors.primaryBright}55`, alignItems: "center", justifyContent: "center" }}>
           <Ionicons name="person" size={19} color={colors.primaryBright} />
         </View>
