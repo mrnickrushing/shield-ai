@@ -360,7 +360,7 @@ class Notification(Base):
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
     title: Mapped[str] = mapped_column(String)
     body: Mapped[str] = mapped_column(Text, default="")
-    scan_id: Mapped[str | None] = mapped_column(ForeignKey("scan_history.id"), nullable=True)
+    scan_id: Mapped[str | None] = mapped_column(ForeignKey("scan_history.id"), nullable=True, index=True)
     is_read: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
@@ -476,7 +476,7 @@ class Incident(Base):
     amount_lost: Mapped[float | None] = mapped_column(Float, nullable=True)
     currency: Mapped[str] = mapped_column(String, default="USD")
     notes: Mapped[str] = mapped_column(Text, default="")
-    linked_scan_id: Mapped[str | None] = mapped_column(ForeignKey("scan_history.id"), nullable=True)
+    linked_scan_id: Mapped[str | None] = mapped_column(ForeignKey("scan_history.id"), nullable=True, index=True)
     steps_completed: Mapped[list] = mapped_column(JSON, default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
@@ -574,7 +574,7 @@ class CommunityReport(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
     user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
-    scan_id: Mapped[str | None] = mapped_column(ForeignKey("scan_history.id"), nullable=True)
+    scan_id: Mapped[str | None] = mapped_column(ForeignKey("scan_history.id"), nullable=True, index=True)
     report_type: Mapped[str] = mapped_column(String)
     artifact_text: Mapped[str] = mapped_column(Text, default="")
     category: Mapped[str] = mapped_column(String, default="")

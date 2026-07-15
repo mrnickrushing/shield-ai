@@ -5,9 +5,11 @@ from time import monotonic
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy import text
 
 from app.api.v1 import admin, auth, billing, coach, community, developer, education, family, identity, message_filter, monitoring, notifications, phone_reputation, recovery, scans, url_reputation, verticals
 from app.core.config import settings, validate_runtime_settings
+from app.db.session import get_engine
 
 _RATE_LIMIT_BUCKETS: dict[str, list[float]] = {}
 
@@ -126,6 +128,11 @@ def apple_app_site_association():
 
 @app.get("/health", tags=["system"])
 def health():
+    try:
+        with get_engine().connect() as conn:
+            conn.execute(text("SELECT 1"))
+    except Exception:
+        return JSONResponse(status_code=503, content={"status": "unavailable", "app": settings.APP_NAME, "version": "0.6.0"})
     return {"status": "ok", "app": settings.APP_NAME, "version": "0.6.0"}
 
 

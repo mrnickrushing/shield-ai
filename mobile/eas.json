@@ -5,6 +5,7 @@
   "build": {
     "production": {
       "channel": "production",
+      "autoIncrement": true,
       "env": {
         "EXPO_PUBLIC_API_URL": "https://api.shieldai.rushingtechnologies.com"
       },
