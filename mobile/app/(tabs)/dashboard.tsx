@@ -69,8 +69,8 @@ function RiskGauge({ score }: { score: number }) {
   // Only the number lives inside the ring; the label and status sit above and
   // below it, using the full column width, so they can never collide with the
   // arc (which is what clipped "Protection Score" / "Needs attention" before).
-  const size = 128;
-  const radiusValue = 55;
+  const size = 150;
+  const radiusValue = 64;
   const circumference = 2 * Math.PI * radiusValue;
   const arc = circumference * 0.74;
   const filled = arc * Math.max(0, Math.min(1, score / 100));
@@ -78,7 +78,7 @@ function RiskGauge({ score }: { score: number }) {
   const status = score >= 70 ? "Protected" : score >= 45 ? "Needs attention" : "At risk";
   return (
     <View style={{ alignItems: "center", width: "100%" }}>
-      <Text numberOfLines={1} maxFontSizeMultiplier={1.1} style={{ color: colors.textDim, fontSize: 11, fontWeight: "700", letterSpacing: 0.3, marginBottom: 4 }}>
+      <Text numberOfLines={1} maxFontSizeMultiplier={1.1} style={{ color: colors.textDim, fontSize: 12, fontWeight: "800", letterSpacing: 0.4, marginBottom: 6 }}>
         Protection Score
       </Text>
       <View style={{ width: size, height: size }}>
@@ -108,12 +108,12 @@ function RiskGauge({ score }: { score: number }) {
         </Svg>
         <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center" }}>
           <View style={{ flexDirection: "row", alignItems: "flex-end" }}>
-            <Text maxFontSizeMultiplier={1.05} style={{ color: colors.text, fontSize: score >= 100 ? 34 : 40, lineHeight: 44, fontWeight: "900" }}>{score}</Text>
-            <Text maxFontSizeMultiplier={1.05} style={{ color: colors.textDim, fontSize: 14, paddingBottom: 5 }}>/100</Text>
+            <Text maxFontSizeMultiplier={1.05} style={{ color: colors.text, fontSize: score >= 100 ? 40 : 48, lineHeight: 52, fontWeight: "900" }}>{score}</Text>
+            <Text maxFontSizeMultiplier={1.05} style={{ color: colors.textDim, fontSize: 16, paddingBottom: 6 }}>/100</Text>
           </View>
         </View>
       </View>
-      <Text numberOfLines={1} maxFontSizeMultiplier={1.1} style={{ color, fontSize: 12, fontWeight: "800", marginTop: 4 }}>
+      <Text numberOfLines={1} maxFontSizeMultiplier={1.1} style={{ color, fontSize: 13, fontWeight: "800", marginTop: 6 }}>
         {status}
       </Text>
     </View>
@@ -440,22 +440,22 @@ export default function Dashboard() {
           accessibilityRole="button"
           accessibilityLabel={`View protection details. Score ${score} out of 100.`}
           style={{
-            marginTop: 14,
-            marginBottom: 14,
-            borderRadius: radius.lg,
-            borderWidth: 1.5,
-            borderColor: `${colors.primaryBright}80`,
-            backgroundColor: "rgba(7,25,40,0.97)",
+            marginTop: 16,
+            marginBottom: 26,
+            borderRadius: radius.xl,
+            borderWidth: 2,
+            borderColor: colors.primaryBright,
+            backgroundColor: "rgba(9,32,52,0.98)",
             overflow: "hidden",
-            ...glow(colors.primaryBright, "md"),
+            ...glow(colors.primaryBright, "lg"),
           }}
         >
-          <View pointerEvents="none" style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, backgroundColor: "rgba(210,247,255,0.48)" }} />
-          <View pointerEvents="none" style={{ flexDirection: "row", alignItems: "center", paddingVertical: 16, paddingHorizontal: 7 }}>
+          <View pointerEvents="none" style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, backgroundColor: "rgba(210,247,255,0.7)" }} />
+          <View pointerEvents="none" style={{ flexDirection: "row", alignItems: "center", paddingVertical: 24, paddingHorizontal: 8 }}>
             <View style={{ width: "47%", alignItems: "center" }}>
               <RiskGauge score={score} />
             </View>
-            <View style={{ width: 1, height: 150, backgroundColor: colors.borderHi }} />
+            <View style={{ width: 1, height: 172, backgroundColor: colors.borderHi }} />
             <View style={{ flex: 1, paddingHorizontal: 10 }}>
               <ActivityTrend scans={scans} />
               <View
