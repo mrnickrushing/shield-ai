@@ -50,7 +50,7 @@ function PreferenceRow({ label, description, value, onValueChange }: { label: st
 export default function Profile() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { user, updateProfile, logout } = useAuth();
+  const { user, rcPremium, updateProfile, logout } = useAuth();
   const [name, setName] = useState(user?.display_name ?? "");
   const [largeText, setLargeText] = useState(user?.large_text_mode ?? false);
   const [simpleLanguage, setSimpleLanguage] = useState(user?.simple_language_mode ?? false);
@@ -77,14 +77,28 @@ export default function Profile() {
     }
   };
 
-  const displayName = user?.display_name || "Alex Chen";
+  // Fall back to the email handle, never a hardcoded sample name.
+  const displayName = user?.display_name?.trim() || user?.email?.split("@")[0] || "Your account";
 
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <GlowBackground accent={colors.bgBloom} centerY={0.3} />
       <View style={{ paddingTop: insets.top + 8, height: insets.top + 58, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: spacing.lg }}>
         <View style={{ width: 36 }} />
-        <Text style={{ color: colors.text, fontSize: 16, fontWeight: "600", letterSpacing: 0.3 }}>Shield AI</Text>
+        <Text
+          maxFontSizeMultiplier={1.1}
+          style={{
+            fontSize: 20,
+            fontWeight: "900",
+            letterSpacing: 0.4,
+            color: colors.text,
+            textShadowColor: colors.primaryBright,
+            textShadowOffset: { width: 0, height: 0 },
+            textShadowRadius: 12,
+          }}
+        >
+          <Text style={{ color: colors.primaryBright }}>Shield</Text> AI
+        </Text>
         <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.surfaceAlt, borderWidth: 1, borderColor: `${colors.primaryBright}55`, alignItems: "center", justifyContent: "center" }}>
           <Ionicons name="person" size={19} color={colors.primaryBright} />
         </View>
@@ -97,9 +111,12 @@ export default function Profile() {
               <Ionicons name="person" size={58} color={`${colors.primaryBright}a8`} style={{ marginTop: 10 }} />
             </View>
           </View>
-          <Text style={{ color: colors.text, fontSize: 25, lineHeight: 31, fontWeight: "900", marginTop: 15 }}>{displayName}</Text>
-          <View style={{ marginTop: 12, borderRadius: radius.pill, borderWidth: 1, borderColor: `${colors.primaryBright}99`, backgroundColor: `${colors.surfaceAlt}cc`, paddingHorizontal: 22, paddingVertical: 10, ...glow(colors.primaryBright, "md") }}>
-            <Text style={{ color: colors.primaryBright, fontWeight: "800", fontSize: 14 }}>Protection Streak: 15 Days</Text>
+          <Text numberOfLines={1} style={{ color: colors.text, fontSize: 25, lineHeight: 31, fontWeight: "900", marginTop: 15 }}>{displayName}</Text>
+          <View style={{ marginTop: 12, flexDirection: "row", alignItems: "center", gap: 7, borderRadius: radius.pill, borderWidth: 1, borderColor: `${colors.primaryBright}99`, backgroundColor: `${colors.surfaceAlt}cc`, paddingHorizontal: 20, paddingVertical: 10, ...glow(colors.primaryBright, "md") }}>
+            <Ionicons name="shield-checkmark" size={15} color={colors.primaryBright} />
+            <Text style={{ color: colors.primaryBright, fontWeight: "800", fontSize: 14 }}>
+              {user?.is_premium || rcPremium ? "Premium protection active" : "Protection active"}
+            </Text>
           </View>
         </View>
 

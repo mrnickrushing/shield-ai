@@ -68,13 +68,14 @@ export default function Paywall() {
   const familyPkgs = familyPackages(offering);
   const familyMonthly = familyPkgs.find((p) => p.packageType === "MONTHLY") ?? null;
 
-  const monthlyPkg = (family ? familyMonthly : offering?.monthly) ?? null;
-  const fallbackPkg = (family ? familyPkgs[0] : offering?.availablePackages[0]) ?? null;
-  const selectedPkg = monthlyPkg ?? fallbackPkg;
+  // The tier cards only ever display a per-month price, so purchase the monthly
+  // package exclusively — never fall back to an annual package, which would
+  // charge a yearly amount under a "/month" label.
+  const selectedPkg = (family ? familyMonthly : offering?.monthly) ?? null;
   const hasPurchasablePackage = Boolean(selectedPkg);
 
-  const individualMonthlyPrice = offering?.monthly?.product.priceString ?? "$9.99";
-  const familyMonthlyPrice = familyMonthly?.product.priceString ?? "$19.99";
+  const individualMonthlyPrice = offering?.monthly?.product.priceString ?? "$4.99";
+  const familyMonthlyPrice = familyMonthly?.product.priceString ?? "$9.99";
 
   const finishIfPremium = async (info: Awaited<ReturnType<typeof purchasePackage>>) => {
     if (!info || !hasPremium(info)) return false;
@@ -213,6 +214,11 @@ export default function Paywall() {
 
         {loadingOffering ? <ActivityIndicator color={colors.primaryBright} style={{ marginTop: 12 }} /> : null}
         {error ? <Text style={{ color: colors.suspicious, fontSize: 10, textAlign: "center", marginTop: 9 }}>{error}</Text> : null}
+        {!loadingOffering && !error && family && !hasPurchasablePackage ? (
+          <Text style={{ color: colors.suspicious, fontSize: 10, textAlign: "center", marginTop: 9 }}>
+            The Family plan isn&apos;t available yet — choose Premium to get protected now.
+          </Text>
+        ) : null}
         <Pressable onPress={() => buy(selectedPkg)} disabled={busy !== null || !hasPurchasablePackage} style={{ height: 50, borderRadius: 25, backgroundColor: "#2458FF", alignItems: "center", justifyContent: "center", marginTop: 14, opacity: hasPurchasablePackage ? 1 : 0.55 }}>
           <Text style={{ color: "#FFFFFF", fontSize: 15, fontWeight: "900" }}>{busy === "purchase" ? "Starting…" : "Secure My Account"}</Text>
         </Pressable>
