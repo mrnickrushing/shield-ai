@@ -8,7 +8,16 @@ import { colors } from "@/theme/theme";
  * that scales with the font size. Used in every screen header so the brand reads
  * loud and consistent instead of fading into the chrome.
  */
-export function BrandWordmark({ size = 24, style }: { size?: number; style?: TextStyle }) {
+export function BrandWordmark({
+  size = 24,
+  style,
+  children,
+}: {
+  size?: number;
+  style?: TextStyle;
+  /** Optional suffix rendered after "AI" (e.g. " Multi-Scanner"), same glow. */
+  children?: React.ReactNode;
+}) {
   return (
     <Text
       maxFontSizeMultiplier={1.1}
@@ -24,7 +33,7 @@ export function BrandWordmark({ size = 24, style }: { size?: number; style?: Tex
         ...style,
       }}
     >
-      <Text style={{ color: colors.primaryBright }}>Shield</Text> AI
+      <Text style={{ color: colors.primaryBright }}>Shield</Text> AI{children}
     </Text>
   );
 }
