@@ -19,6 +19,7 @@ import {
 import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from "expo-speech-recognition";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { BrandWordmark } from "@/components/BrandWordmark";
 import { GlowBackground } from "@/components/GlowBackground";
 import { GradientButton } from "@/components/GradientButton";
 import { PressableFX } from "@/components/PressableFX";
@@ -531,7 +532,9 @@ export default function ScanScreen() {
           <Pressable onPress={() => router.back()} hitSlop={12} style={{ width: 32 }}>
             <Ionicons name="chevron-back" size={23} color={colors.textDim} />
           </Pressable>
-          <Text style={{ color: colors.text, fontSize: 16, fontWeight: "800" }}>Shield AI Multi-Scanner</Text>
+          <View style={{ flex: 1, alignItems: "center", paddingHorizontal: 6 }}>
+            <BrandWordmark size={19}> Multi-Scanner</BrandWordmark>
+          </View>
           <Pressable onPress={() => router.push("/profile")} hitSlop={12} style={{ width: 32, alignItems: "flex-end" }}>
             <Ionicons name="person-circle-outline" size={23} color={colors.textDim} />
           </Pressable>

@@ -16,6 +16,7 @@ import {
 } from "react-native";
 import * as WebBrowser from "expo-web-browser";
 
+import { BrandWordmark } from "@/components/BrandWordmark";
 import { Button, FadeIn, GlowOrb } from "@/components/ui";
 import { ShieldAPI } from "@/lib/api";
 import { useAuth } from "@/state/auth";
@@ -352,7 +353,7 @@ export default function Login() {
               <Ionicons name="shield-checkmark" size={40} color={colors.primaryBright} />
             </View>
           </View>
-          <Text style={{ color: colors.text, fontSize: 30, fontWeight: "900", letterSpacing: -0.8 }}>Shield AI</Text>
+          <BrandWordmark size={40} />
           <Text style={{ color: colors.textMuted, fontSize: 14, marginTop: 6, textAlign: "center" }}>
             Before you click. Before you pay.{"\n"}Before you trust.
           </Text>

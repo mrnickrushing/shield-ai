@@ -6,6 +6,7 @@ import { Pressable, ScrollView, Text, View } from "react-native";
 import Svg, { Circle, Defs, LinearGradient, Path, Polyline, RadialGradient, Stop } from "react-native-svg";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { BrandWordmark } from "@/components/BrandWordmark";
 import { GlowBackground } from "@/components/GlowBackground";
 import { ShieldAPI, type Scan } from "@/lib/api";
 import { syncWidgetSnapshot } from "@/lib/widgetSync";
@@ -65,50 +66,56 @@ function BrandMark({ size = 30 }: { size?: number }) {
 }
 
 function RiskGauge({ score }: { score: number }) {
-  const size = 152;
-  // Keep the overall card footprint compact while giving the score enough
-  // clear space inside the ring (especially for the widest value, 100/100).
-  const radiusValue = 66;
+  // Only the number lives inside the ring; the label and status sit above and
+  // below it, using the full column width, so they can never collide with the
+  // arc (which is what clipped "Protection Score" / "Needs attention" before).
+  const size = 150;
+  const radiusValue = 64;
   const circumference = 2 * Math.PI * radiusValue;
   const arc = circumference * 0.74;
   const filled = arc * Math.max(0, Math.min(1, score / 100));
   const color = score >= 70 ? colors.safe : score >= 45 ? colors.suspicious : colors.critical;
+  const status = score >= 70 ? "Protected" : score >= 45 ? "Needs attention" : "At risk";
   return (
-    <View style={{ width: size, height: 142, alignItems: "center", justifyContent: "center" }}>
-      <Svg width={size} height={size} style={{ position: "absolute", top: 0 }}>
-        <Circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radiusValue}
-          fill="none"
-          stroke={colors.border}
-          strokeWidth={10}
-          strokeLinecap="round"
-          strokeDasharray={`${arc} ${circumference}`}
-          transform={`rotate(137 ${size / 2} ${size / 2})`}
-        />
-        <Circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radiusValue}
-          fill="none"
-          stroke={color}
-          strokeWidth={10}
-          strokeLinecap="round"
-          strokeDasharray={`${filled} ${circumference}`}
-          transform={`rotate(137 ${size / 2} ${size / 2})`}
-        />
-      </Svg>
-      <View style={{ width: 142, alignItems: "center", marginTop: 8 }}>
-        <Text numberOfLines={1} maxFontSizeMultiplier={1.05} style={{ color: colors.textDim, fontSize: 11, fontWeight: "700", letterSpacing: 0.2 }}>Protection Score</Text>
-        <View style={{ flexDirection: "row", alignItems: "flex-end" }}>
-          <Text maxFontSizeMultiplier={1.05} style={{ color: colors.text, fontSize: score >= 100 ? 32 : 36, lineHeight: 40, fontWeight: "900" }}>{score}</Text>
-          <Text maxFontSizeMultiplier={1.1} style={{ color: colors.textDim, fontSize: 15, paddingBottom: 4 }}>/100</Text>
+    <View style={{ alignItems: "center", width: "100%" }}>
+      <Text numberOfLines={1} maxFontSizeMultiplier={1.1} style={{ color: colors.textDim, fontSize: 12, fontWeight: "800", letterSpacing: 0.4, marginBottom: 6 }}>
+        Protection Score
+      </Text>
+      <View style={{ width: size, height: size }}>
+        <Svg width={size} height={size} style={{ position: "absolute", top: 0, left: 0 }}>
+          <Circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radiusValue}
+            fill="none"
+            stroke={colors.border}
+            strokeWidth={10}
+            strokeLinecap="round"
+            strokeDasharray={`${arc} ${circumference}`}
+            transform={`rotate(137 ${size / 2} ${size / 2})`}
+          />
+          <Circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radiusValue}
+            fill="none"
+            stroke={color}
+            strokeWidth={10}
+            strokeLinecap="round"
+            strokeDasharray={`${filled} ${circumference}`}
+            transform={`rotate(137 ${size / 2} ${size / 2})`}
+          />
+        </Svg>
+        <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center" }}>
+          <View style={{ flexDirection: "row", alignItems: "flex-end" }}>
+            <Text maxFontSizeMultiplier={1.05} style={{ color: colors.text, fontSize: score >= 100 ? 40 : 48, lineHeight: 52, fontWeight: "900" }}>{score}</Text>
+            <Text maxFontSizeMultiplier={1.05} style={{ color: colors.textDim, fontSize: 16, paddingBottom: 6 }}>/100</Text>
+          </View>
         </View>
-        <Text numberOfLines={1} maxFontSizeMultiplier={1.15} style={{ color, fontSize: 13, fontWeight: "800" }}>
-          {score >= 70 ? "Protected" : score >= 45 ? "Needs attention" : "At risk"}
-        </Text>
       </View>
+      <Text numberOfLines={1} maxFontSizeMultiplier={1.1} style={{ color, fontSize: 13, fontWeight: "800", marginTop: 6 }}>
+        {status}
+      </Text>
     </View>
   );
 }
@@ -401,21 +408,8 @@ export default function Dashboard() {
       <View style={{ paddingTop: insets.top + 4, height: insets.top + 48, paddingHorizontal: spacing.lg, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
         <View style={{ width: 34 }} />
         <View style={{ flexDirection: "row", alignItems: "center", gap: 9 }}>
-          <BrandMark size={32} />
-          <Text
-            maxFontSizeMultiplier={1.1}
-            style={{
-              fontSize: 23,
-              fontWeight: "900",
-              letterSpacing: 0.4,
-              color: colors.text,
-              textShadowColor: colors.primaryBright,
-              textShadowOffset: { width: 0, height: 0 },
-              textShadowRadius: 13,
-            }}
-          >
-            <Text style={{ color: colors.primaryBright }}>Shield</Text> AI
-          </Text>
+          <BrandMark size={34} />
+          <BrandWordmark size={27} />
         </View>
         <Pressable
           onPress={() => router.push("/notifications")}
@@ -446,22 +440,22 @@ export default function Dashboard() {
           accessibilityRole="button"
           accessibilityLabel={`View protection details. Score ${score} out of 100.`}
           style={{
-            marginTop: 14,
-            marginBottom: 14,
-            borderRadius: radius.lg,
-            borderWidth: 1.5,
-            borderColor: `${colors.primaryBright}80`,
-            backgroundColor: "rgba(7,25,40,0.97)",
+            marginTop: 16,
+            marginBottom: 26,
+            borderRadius: radius.xl,
+            borderWidth: 2,
+            borderColor: colors.primaryBright,
+            backgroundColor: "rgba(9,32,52,0.98)",
             overflow: "hidden",
-            ...glow(colors.primaryBright, "md"),
+            ...glow(colors.primaryBright, "lg"),
           }}
         >
-          <View pointerEvents="none" style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, backgroundColor: "rgba(210,247,255,0.48)" }} />
-          <View pointerEvents="none" style={{ flexDirection: "row", alignItems: "center", paddingVertical: 16, paddingHorizontal: 7 }}>
+          <View pointerEvents="none" style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, backgroundColor: "rgba(210,247,255,0.7)" }} />
+          <View pointerEvents="none" style={{ flexDirection: "row", alignItems: "center", paddingVertical: 24, paddingHorizontal: 8 }}>
             <View style={{ width: "47%", alignItems: "center" }}>
               <RiskGauge score={score} />
             </View>
-            <View style={{ width: 1, height: 116, backgroundColor: colors.borderHi }} />
+            <View style={{ width: 1, height: 172, backgroundColor: colors.borderHi }} />
             <View style={{ flex: 1, paddingHorizontal: 10 }}>
               <ActivityTrend scans={scans} />
               <View
