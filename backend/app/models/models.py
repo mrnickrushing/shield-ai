@@ -11,6 +11,7 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Integer,
+    LargeBinary,
     String,
     Text,
     UniqueConstraint,
@@ -103,6 +104,18 @@ class Profile(Base):
     large_text_mode: Mapped[bool] = mapped_column(Boolean, default=False)
 
     user: Mapped[User] = relationship(back_populates="profile")
+
+
+class AvatarImage(Base):
+    """User avatar bytes, kept in their own table so the (frequently loaded)
+    user/profile rows stay lean — the image is only read by the serve endpoint."""
+
+    __tablename__ = "avatar_images"
+
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    data: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    content_type: Mapped[str] = mapped_column(String, nullable=False, default="image/jpeg")
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
 
 
 class SocialIdentity(Base):

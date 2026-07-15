@@ -63,16 +63,11 @@ class Settings(BaseSettings):
     # --- Phase 3 optional APIs ---
     HIBP_API_KEY: str = ""         # HaveIBeenPwned v3 breach lookup
 
-    # --- Cloudflare R2 object storage (S3-compatible) for profile avatars ---
-    # Avatar upload is a no-op (503) until all of these are configured.
-    R2_ACCOUNT_ID: str = ""
-    R2_ACCESS_KEY_ID: str = ""
-    R2_SECRET_ACCESS_KEY: str = ""
-    R2_BUCKET: str = ""
-    # Public base URL the bucket is served from (r2.dev URL or a custom domain),
-    # e.g. "https://cdn.shieldai.example". Uploaded objects are exposed as
-    # "{R2_PUBLIC_BASE_URL}/{key}".
-    R2_PUBLIC_BASE_URL: str = ""
+    # --- Profile avatars ---
+    # Avatars are stored in the app database and served back by the API, so the
+    # only config needed is the public base URL of this API (used to build the
+    # absolute avatar_url the mobile app loads).
+    PUBLIC_API_BASE_URL: str = "https://api.shieldai.rushingtechnologies.com"
     AVATAR_MAX_MB: int = 5
 
     # --- Phone reputation / CallKit Call Directory sync ---

@@ -5,6 +5,7 @@ os.environ["DATABASE_URL"] = "sqlite+pysqlite:///:memory:"
 os.environ["ENVIRONMENT"] = "development"
 
 import base64
+import io
 import json
 import uuid
 
@@ -186,24 +187,34 @@ def _avatar_headers() -> dict:
     return {"Authorization": f"Bearer {reg.json()['access_token']}"}
 
 
-def test_avatar_upload_unconfigured_returns_503():
-    # Without R2 credentials the endpoint must fail cleanly, not 500.
+def _png_bytes() -> bytes:
+    from PIL import Image
+
+    buf = io.BytesIO()
+    Image.new("RGB", (64, 96), (12, 200, 180)).save(buf, format="PNG")
+    return buf.getvalue()
+
+
+def test_avatar_upload_and_serve():
     headers = _avatar_headers()
-    png = base64.b64decode(
-        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
-    )
     r = client.post(
         "/api/v1/auth/me/avatar",
-        files={"file": ("a.png", png, "image/png")},
+        files={"file": ("me.png", _png_bytes(), "image/png")},
         headers=headers,
     )
-    assert r.status_code == 503, r.text
+    assert r.status_code == 200, r.text
+    avatar_url = r.json()["avatar_url"]
+    assert "/auth/avatar/" in avatar_url and "v=" in avatar_url
+
+    # The serve endpoint returns the normalized JPEG bytes, unauthenticated.
+    path = avatar_url.split("/api/v1", 1)[1]
+    got = client.get(f"/api/v1{path}")
+    assert got.status_code == 200, got.text
+    assert got.headers["content-type"] == "image/jpeg"
+    assert got.content[:2] == b"\xff\xd8"  # JPEG magic
 
 
-def test_avatar_upload_rejects_non_image(monkeypatch):
-    from app.services import object_storage
-
-    monkeypatch.setattr(object_storage, "storage_configured", lambda: True)
+def test_avatar_upload_rejects_non_image():
     headers = _avatar_headers()
     r = client.post(
         "/api/v1/auth/me/avatar",
@@ -211,6 +222,10 @@ def test_avatar_upload_rejects_non_image(monkeypatch):
         headers=headers,
     )
     assert r.status_code == 400, r.text
+
+
+def test_serve_missing_avatar_404():
+    assert client.get("/api/v1/auth/avatar/does-not-exist").status_code == 404
 
 
 def test_account_export_purge_and_delete_controls():

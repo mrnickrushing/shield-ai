@@ -25,6 +25,7 @@ from app.db.session import get_db
 from app.models.models import (
     AuthSession,
     AuditLog,
+    AvatarImage,
     CommunityReport,
     Device,
     IdentityAlert,
@@ -506,16 +507,9 @@ async def upload_avatar(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """Accept an image, normalize it to a square JPEG, store it in R2, and
-    persist the public URL on the user's profile."""
-    import uuid as _uuid
-
+    """Accept an image, normalize it to a square JPEG, store the bytes in the
+    app database, and point the profile at the API's serve endpoint."""
     from PIL import Image, ImageOps, UnidentifiedImageError
-
-    from app.services.object_storage import StorageNotConfigured, storage_configured, upload_bytes
-
-    if not storage_configured():
-        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Avatar uploads aren't available yet.")
 
     raw = await file.read()
     if not raw:
@@ -536,21 +530,44 @@ async def upload_avatar(
     image = ImageOps.fit(image, (512, 512), method=Image.LANCZOS)
     buffer = io.BytesIO()
     image.save(buffer, format="JPEG", quality=85, optimize=True)
+    data = buffer.getvalue()
 
-    key = f"avatars/{user.id}/{_uuid.uuid4().hex}.jpg"
-    try:
-        url = upload_bytes(key, buffer.getvalue(), "image/jpeg")
-    except StorageNotConfigured:
-        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Avatar uploads aren't available yet.")
+    avatar = db.get(AvatarImage, user.id)
+    if avatar is None:
+        avatar = AvatarImage(user_id=user.id, data=data, content_type="image/jpeg")
+        db.add(avatar)
+    else:
+        avatar.data = data
+        avatar.content_type = "image/jpeg"
 
     profile = user.profile
     if profile is None:
         profile = Profile(user_id=user.id)
         db.add(profile)
-    profile.avatar_url = url
+    # Version the URL with a content hash so the app (and any CDN) refetches
+    # when the photo changes but caches it otherwise.
+    version = hashlib.sha256(data).hexdigest()[:12]
+    base = settings.PUBLIC_API_BASE_URL.rstrip("/")
+    profile.avatar_url = f"{base}{settings.API_V1_PREFIX}/auth/avatar/{user.id}?v={version}"
     db.commit()
     db.refresh(user)
     return _user_out(user)
+
+
+@router.get("/avatar/{user_id}")
+def serve_avatar(user_id: str, db: Session = Depends(get_db)):
+    """Public read of a user's avatar bytes. Unauthenticated so <Image> can load
+    it directly; user ids are unguessable UUIDs and avatars aren't sensitive."""
+    from fastapi import Response
+
+    avatar = db.get(AvatarImage, user_id)
+    if avatar is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No avatar.")
+    return Response(
+        content=avatar.data,
+        media_type=avatar.content_type or "image/jpeg",
+        headers={"Cache-Control": "public, max-age=31536000, immutable"},
+    )
 
 
 def _get_privacy_pref(db: Session, user_id: str) -> PrivacyPreference:
