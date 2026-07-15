@@ -1,13 +1,24 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
-import React from "react";
+import React, { useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Button, FadeIn, Surface } from "@/components/ui";
 import { Notification, ShieldAPI } from "@/lib/api";
 import { colors, spacing } from "@/theme/theme";
+
+type AlertFilter = "All" | "Critical" | "Info";
+
+// Notifications carry no explicit severity, so classify from the risk wording
+// the backend puts in the title/body. Anything that reads as a threat is
+// "Critical"; safe/completed/informational alerts fall under "Info".
+const CRITICAL_PATTERN = /critical|high risk|suspicious|breach|fraud|scam|warning|danger|exposed|malicious|phishing|blocked/i;
+
+function isCriticalAlert(item: Notification): boolean {
+  return CRITICAL_PATTERN.test(`${item.title} ${item.body}`);
+}
 
 function NotifItem({ item, onPress, onClear }: { item: Notification; onPress: () => void; onClear: () => void }) {
   return (
@@ -49,6 +60,7 @@ export default function NotificationsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const qc = useQueryClient();
+  const [filter, setFilter] = useState<AlertFilter>("All");
 
   const { data: notifications, isLoading } = useQuery({
     queryKey: ["notifications"],
@@ -84,6 +96,9 @@ export default function NotificationsScreen() {
   }
 
   const unreadCount = notifications?.filter((n) => !n.is_read).length ?? 0;
+  const visible = (notifications ?? []).filter((n) =>
+    filter === "All" ? true : filter === "Critical" ? isCriticalAlert(n) : !isCriticalAlert(n)
+  );
 
   const header = (
     <View>
@@ -93,11 +108,20 @@ export default function NotificationsScreen() {
         <Ionicons name="person-circle-outline" size={23} color={colors.textDim} />
       </View>
       <View style={{ flexDirection: "row", height: 34, backgroundColor: colors.surface, borderRadius: 9, padding: 3, marginBottom: 14 }}>
-        {["All", "Critical", "Info"].map((label, index) => (
-          <View key={label} style={{ flex: 1, borderRadius: 7, backgroundColor: index === 0 ? colors.primaryBright : "transparent", alignItems: "center", justifyContent: "center" }}>
-            <Text style={{ color: index === 0 ? colors.bg : colors.textMuted, fontSize: 11, fontWeight: "800" }}>{label}</Text>
-          </View>
-        ))}
+        {(["All", "Critical", "Info"] as AlertFilter[]).map((label) => {
+          const active = filter === label;
+          return (
+            <Pressable
+              key={label}
+              onPress={() => setFilter(label)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
+              style={{ flex: 1, borderRadius: 7, backgroundColor: active ? colors.primaryBright : "transparent", alignItems: "center", justifyContent: "center" }}
+            >
+              <Text style={{ color: active ? colors.bg : colors.textMuted, fontSize: 11, fontWeight: "800" }}>{label}</Text>
+            </Pressable>
+          );
+        })}
       </View>
       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
         <Text style={{ color: colors.textDim, fontSize: 11, fontWeight: "800", letterSpacing: 1 }}>LATEST ALERTS</Text>
@@ -109,7 +133,7 @@ export default function NotificationsScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <FlatList
-        data={notifications ?? []}
+        data={visible}
         keyExtractor={(n) => n.id}
         ListHeaderComponent={header}
         contentContainerStyle={{ padding: spacing.md, paddingTop: insets.top + 8, paddingBottom: spacing.xxl }}
@@ -120,7 +144,7 @@ export default function NotificationsScreen() {
         )}
         ListEmptyComponent={
           <Text style={{ color: colors.textMuted, textAlign: "center", marginTop: spacing.lg }}>
-            No notifications yet.
+            {filter === "All" ? "No notifications yet." : `No ${filter.toLowerCase()} alerts.`}
           </Text>
         }
       />

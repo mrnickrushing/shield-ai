@@ -99,8 +99,8 @@ function RiskGauge({ score }: { score: number }) {
           transform={`rotate(137 ${size / 2} ${size / 2})`}
         />
       </Svg>
-      <View style={{ width: 118, alignItems: "center", marginTop: 8 }}>
-        <Text numberOfLines={1} maxFontSizeMultiplier={1.15} style={{ color: colors.textDim, fontSize: 12, fontWeight: "700" }}>Protection Score</Text>
+      <View style={{ width: 142, alignItems: "center", marginTop: 8 }}>
+        <Text numberOfLines={1} maxFontSizeMultiplier={1.05} style={{ color: colors.textDim, fontSize: 11, fontWeight: "700", letterSpacing: 0.2 }}>Protection Score</Text>
         <View style={{ flexDirection: "row", alignItems: "flex-end" }}>
           <Text maxFontSizeMultiplier={1.05} style={{ color: colors.text, fontSize: score >= 100 ? 32 : 36, lineHeight: 40, fontWeight: "900" }}>{score}</Text>
           <Text maxFontSizeMultiplier={1.1} style={{ color: colors.textDim, fontSize: 15, paddingBottom: 4 }}>/100</Text>
@@ -236,7 +236,7 @@ function ToolCard({ title, subtitle, icon, secondaryIcon, route }: (typeof tools
     <View
       style={{
         width: "48.5%",
-        minHeight: 88,
+        height: 92,
         borderRadius: radius.md,
         borderWidth: 1,
         borderColor: `${colors.primaryBright}55`,
@@ -252,8 +252,8 @@ function ToolCard({ title, subtitle, icon, secondaryIcon, route }: (typeof tools
         <Ionicons name={secondaryIcon} size={20} color={colors.accent} />
       </View>
       <View pointerEvents="none">
-        <Text numberOfLines={1} maxFontSizeMultiplier={1.2} style={{ color: colors.text, fontWeight: "800", fontSize: 14 }}>{title}</Text>
-        <Text numberOfLines={1} maxFontSizeMultiplier={1.2} style={{ color: colors.textDim, fontSize: 12, marginTop: 2 }}>{subtitle}</Text>
+        <Text numberOfLines={1} maxFontSizeMultiplier={1.15} style={{ color: colors.text, fontWeight: "800", fontSize: 14 }}>{title}</Text>
+        <Text numberOfLines={2} maxFontSizeMultiplier={1.1} style={{ color: colors.textDim, fontSize: 11, lineHeight: 14, marginTop: 2 }}>{subtitle}</Text>
       </View>
       <Pressable
         onPress={() => router.push(route as any)}
@@ -400,9 +400,22 @@ export default function Dashboard() {
       <GlowBackground accent={colors.bgBloom} centerY={0.15} />
       <View style={{ paddingTop: insets.top + 4, height: insets.top + 48, paddingHorizontal: spacing.lg, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
         <View style={{ width: 34 }} />
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 7 }}>
-          <BrandMark size={28} />
-          <Text style={{ color: colors.text, fontSize: 18, fontWeight: "900", letterSpacing: -0.35 }}>Shield AI</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 9 }}>
+          <BrandMark size={32} />
+          <Text
+            maxFontSizeMultiplier={1.1}
+            style={{
+              fontSize: 23,
+              fontWeight: "900",
+              letterSpacing: 0.4,
+              color: colors.text,
+              textShadowColor: colors.primaryBright,
+              textShadowOffset: { width: 0, height: 0 },
+              textShadowRadius: 13,
+            }}
+          >
+            <Text style={{ color: colors.primaryBright }}>Shield</Text> AI
+          </Text>
         </View>
         <Pressable
           onPress={() => router.push("/notifications")}

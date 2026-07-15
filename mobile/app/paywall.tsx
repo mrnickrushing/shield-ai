@@ -73,8 +73,8 @@ export default function Paywall() {
   const selectedPkg = monthlyPkg ?? fallbackPkg;
   const hasPurchasablePackage = Boolean(selectedPkg);
 
-  const individualMonthlyPrice = offering?.monthly?.product.priceString ?? "$9.99";
-  const familyMonthlyPrice = familyMonthly?.product.priceString ?? "$19.99";
+  const individualMonthlyPrice = offering?.monthly?.product.priceString ?? "$4.99";
+  const familyMonthlyPrice = familyMonthly?.product.priceString ?? "$9.99";
 
   const finishIfPremium = async (info: Awaited<ReturnType<typeof purchasePackage>>) => {
     if (!info || !hasPremium(info)) return false;
@@ -213,6 +213,11 @@ export default function Paywall() {
 
         {loadingOffering ? <ActivityIndicator color={colors.primaryBright} style={{ marginTop: 12 }} /> : null}
         {error ? <Text style={{ color: colors.suspicious, fontSize: 10, textAlign: "center", marginTop: 9 }}>{error}</Text> : null}
+        {!loadingOffering && !error && family && !hasPurchasablePackage ? (
+          <Text style={{ color: colors.suspicious, fontSize: 10, textAlign: "center", marginTop: 9 }}>
+            The Family plan isn&apos;t available yet — choose Premium to get protected now.
+          </Text>
+        ) : null}
         <Pressable onPress={() => buy(selectedPkg)} disabled={busy !== null || !hasPurchasablePackage} style={{ height: 50, borderRadius: 25, backgroundColor: "#2458FF", alignItems: "center", justifyContent: "center", marginTop: 14, opacity: hasPurchasablePackage ? 1 : 0.55 }}>
           <Text style={{ color: "#FFFFFF", fontSize: 15, fontWeight: "900" }}>{busy === "purchase" ? "Starting…" : "Secure My Account"}</Text>
         </Pressable>
