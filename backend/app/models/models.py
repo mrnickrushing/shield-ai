@@ -97,6 +97,7 @@ class Profile(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), unique=True)
     display_name: Mapped[str] = mapped_column(String, default="")
+    avatar_url: Mapped[str] = mapped_column(String, default="")
     locale: Mapped[str] = mapped_column(String, default="en")
     simple_language_mode: Mapped[bool] = mapped_column(Boolean, default=False)
     large_text_mode: Mapped[bool] = mapped_column(Boolean, default=False)

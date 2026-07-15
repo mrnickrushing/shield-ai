@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Switch, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, Switch, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { GradientButton } from "@/components/GradientButton";
@@ -50,12 +51,42 @@ function PreferenceRow({ label, description, value, onValueChange }: { label: st
 export default function Profile() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { user, rcPremium, updateProfile, logout } = useAuth();
+  const { user, rcPremium, updateProfile, uploadAvatar, logout } = useAuth();
   const [name, setName] = useState(user?.display_name ?? "");
   const [largeText, setLargeText] = useState(user?.large_text_mode ?? false);
   const [simpleLanguage, setSimpleLanguage] = useState(user?.simple_language_mode ?? false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [avatarBusy, setAvatarBusy] = useState(false);
+
+  const pickAvatar = async () => {
+    if (avatarBusy) return;
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert("Photo access needed", "Allow photo access in Settings to set a profile picture.");
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.9,
+    });
+    if (result.canceled || !result.assets?.[0]?.uri) return;
+    setAvatarBusy(true);
+    setError(null);
+    try {
+      await uploadAvatar(result.assets[0].uri);
+    } catch (e: any) {
+      setError(
+        e?.response?.status === 503
+          ? "Profile photos aren't available yet — check back soon."
+          : e?.response?.data?.detail ?? "Couldn't update your photo. Try again."
+      );
+    } finally {
+      setAvatarBusy(false);
+    }
+  };
 
   useEffect(() => {
     setName(user?.display_name ?? "");
@@ -106,11 +137,28 @@ export default function Profile() {
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.xl }}>
         <View style={{ alignItems: "center", paddingTop: 20, paddingBottom: 18 }}>
-          <View style={{ width: 112, height: 112, borderRadius: 56, borderWidth: 1.5, borderColor: colors.primaryBright, backgroundColor: colors.bg, padding: 7, alignItems: "center", justifyContent: "center", ...glow(colors.primaryBright, "lg") }}>
-            <View style={{ width: "100%", height: "100%", borderRadius: 50, backgroundColor: colors.surfaceAlt, alignItems: "center", justifyContent: "center" }}>
-              <Ionicons name="person" size={58} color={`${colors.primaryBright}a8`} style={{ marginTop: 10 }} />
+          <Pressable
+            onPress={pickAvatar}
+            accessibilityRole="button"
+            accessibilityLabel="Change profile photo"
+            style={{ width: 112, height: 112, borderRadius: 56, borderWidth: 1.5, borderColor: colors.primaryBright, backgroundColor: colors.bg, padding: 7, alignItems: "center", justifyContent: "center", ...glow(colors.primaryBright, "lg") }}
+          >
+            <View style={{ width: "100%", height: "100%", borderRadius: 50, backgroundColor: colors.surfaceAlt, alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+              {user?.avatar_url ? (
+                <Image source={{ uri: user.avatar_url }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+              ) : (
+                <Ionicons name="person" size={58} color={`${colors.primaryBright}a8`} style={{ marginTop: 10 }} />
+              )}
+              {avatarBusy ? (
+                <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(5,10,15,0.55)", alignItems: "center", justifyContent: "center" }}>
+                  <ActivityIndicator color={colors.primaryBright} />
+                </View>
+              ) : null}
             </View>
-          </View>
+            <View style={{ position: "absolute", right: 2, bottom: 2, width: 34, height: 34, borderRadius: 17, backgroundColor: colors.primaryBright, borderWidth: 2, borderColor: colors.bg, alignItems: "center", justifyContent: "center" }}>
+              <Ionicons name="camera" size={17} color={colors.bg} />
+            </View>
+          </Pressable>
           <Text numberOfLines={1} style={{ color: colors.text, fontSize: 25, lineHeight: 31, fontWeight: "900", marginTop: 15 }}>{displayName}</Text>
           <View style={{ marginTop: 12, flexDirection: "row", alignItems: "center", gap: 7, borderRadius: radius.pill, borderWidth: 1, borderColor: `${colors.primaryBright}99`, backgroundColor: `${colors.surfaceAlt}cc`, paddingHorizontal: 20, paddingVertical: 10, ...glow(colors.primaryBright, "md") }}>
             <Ionicons name="shield-checkmark" size={15} color={colors.primaryBright} />

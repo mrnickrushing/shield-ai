@@ -44,6 +44,7 @@ class UserOut(BaseModel):
     email: EmailStr
     is_premium: bool
     display_name: str = ""
+    avatar_url: str = ""
     simple_language_mode: bool = False
     large_text_mode: bool = False
 

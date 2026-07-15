@@ -174,6 +174,43 @@ def test_update_profile():
     r = client.patch("/api/v1/auth/me", json={"display_name": "New Name"}, headers=headers)
     assert r.status_code == 200
     assert r.json()["display_name"] == "New Name"
+    # Profiles expose an avatar_url, empty until one is uploaded.
+    assert r.json()["avatar_url"] == ""
+
+
+def _avatar_headers() -> dict:
+    reg = client.post(
+        "/api/v1/auth/register",
+        json={"email": f"avatar_{uuid.uuid4().hex}@example.com", "password": "supersecret1", "display_name": "Pic"},
+    )
+    return {"Authorization": f"Bearer {reg.json()['access_token']}"}
+
+
+def test_avatar_upload_unconfigured_returns_503():
+    # Without R2 credentials the endpoint must fail cleanly, not 500.
+    headers = _avatar_headers()
+    png = base64.b64decode(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
+    )
+    r = client.post(
+        "/api/v1/auth/me/avatar",
+        files={"file": ("a.png", png, "image/png")},
+        headers=headers,
+    )
+    assert r.status_code == 503, r.text
+
+
+def test_avatar_upload_rejects_non_image(monkeypatch):
+    from app.services import object_storage
+
+    monkeypatch.setattr(object_storage, "storage_configured", lambda: True)
+    headers = _avatar_headers()
+    r = client.post(
+        "/api/v1/auth/me/avatar",
+        files={"file": ("a.jpg", b"this is not an image", "image/jpeg")},
+        headers=headers,
+    )
+    assert r.status_code == 400, r.text
 
 
 def test_account_export_purge_and_delete_controls():

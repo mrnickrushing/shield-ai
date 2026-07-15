@@ -114,6 +114,7 @@ export type UserProfile = {
   email: string;
   is_premium: boolean;
   display_name: string;
+  avatar_url: string;
   simple_language_mode: boolean;
   large_text_mode: boolean;
 };
@@ -442,6 +443,18 @@ export const ShieldAPI = {
   googleAuthStartUrl: (return_url: string) =>
     `${API_URL}/api/v1/auth/google/start?return_url=${encodeURIComponent(return_url)}`,
   updateProfile: (patch: { display_name?: string; large_text_mode?: boolean; simple_language_mode?: boolean }) => api.patch<UserProfile>("/auth/me", patch).then((r) => r.data),
+  uploadAvatar: (uri: string) => {
+    const form = new FormData();
+    const name = uri.split("/").pop() || "avatar.jpg";
+    // React Native's FormData accepts this {uri,name,type} shape for file parts.
+    form.append("file", { uri, name, type: "image/jpeg" } as any);
+    return api
+      .post<UserProfile>("/auth/me/avatar", form, {
+        headers: { "Content-Type": "multipart/form-data" },
+        timeout: 60000,
+      })
+      .then((r) => r.data);
+  },
   exportAccountData: () => api.get<AccountExport>("/auth/me/export").then((r) => r.data),
   getPrivacyPreferences: () => api.get<PrivacyPreferences>("/auth/me/privacy").then((r) => r.data),
   updatePrivacyPreferences: (payload: PrivacyPreferences) => api.put<PrivacyPreferences>("/auth/me/privacy", payload).then((r) => r.data),
