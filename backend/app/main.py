@@ -5,9 +5,11 @@ from time import monotonic
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy import text
 
 from app.api.v1 import admin, auth, billing, coach, community, developer, education, family, identity, message_filter, monitoring, notifications, phone_reputation, recovery, scans, url_reputation, verticals
 from app.core.config import settings, validate_runtime_settings
+from app.db.session import get_engine
 
 _RATE_LIMIT_BUCKETS: dict[str, list[float]] = {}
 
@@ -124,8 +126,31 @@ def apple_app_site_association():
     }
 
 
+_HEALTH_CACHE_SECONDS = 5.0
+_health_db_ok: bool = True
+_health_checked_at: float = 0.0
+
+
 @app.get("/health", tags=["system"])
 def health():
+    global _health_db_ok, _health_checked_at
+    # /health is deliberately excluded from production_rate_limit above so
+    # load balancers/uptime monitors can hit it freely — but that also means
+    # an unauthenticated caller can hit it freely. Cache the DB probe for a
+    # few seconds so rapid/concurrent hits collapse into one real connection
+    # checkout instead of each one drawing from the pool.
+    now = monotonic()
+    if now - _health_checked_at >= _HEALTH_CACHE_SECONDS:
+        try:
+            with get_engine().connect() as conn:
+                conn.execute(text("SELECT 1"))
+            _health_db_ok = True
+        except Exception:
+            _health_db_ok = False
+        _health_checked_at = now
+
+    if not _health_db_ok:
+        return JSONResponse(status_code=503, content={"status": "unavailable", "app": settings.APP_NAME, "version": "0.6.0"})
     return {"status": "ok", "app": settings.APP_NAME, "version": "0.6.0"}
 
 
