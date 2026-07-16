@@ -7,6 +7,7 @@ import { StatusBar } from "expo-status-bar";
 import React, { useEffect } from "react";
 import { Platform } from "react-native";
 
+import { AppLockGate } from "@/components/AppLockGate";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { LiveAlertBridge } from "@/components/LiveAlertBridge";
 import { ShieldAPI } from "@/lib/api";
@@ -104,36 +105,38 @@ export default function RootLayout() {
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <StatusBar style="light" />
-        <Stack screenOptions={{ headerStyle: { backgroundColor: colors.bg }, headerTintColor: colors.text, contentStyle: { backgroundColor: colors.bg }, headerShadowVisible: false }}>
-          <Stack.Screen name="index" options={{ headerShown: false }} />
-          <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-          <Stack.Screen name="login" options={{ headerShown: false }} />
-          <Stack.Screen name="reveal" options={{ title: "Check Your Exposure", headerShown: false }} />
-          <Stack.Screen name="paywall" options={{ title: "Start Protection", headerShown: false }} />
-          <Stack.Screen name="coach" options={{ title: "Scam Coach", headerShown: false }} />
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="result" options={{ title: "Risk Report", headerShown: false }} />
-          <Stack.Screen name="profile" options={{ title: "Profile", headerShown: false }} />
-          <Stack.Screen name="privacy" options={{ title: "Privacy & Data" }} />
-          <Stack.Screen name="recovery" options={{ title: "Scam Recovery", headerShown: false }} />
-          <Stack.Screen name="incident" options={{ title: "Recovery Case" }} />
-          <Stack.Screen name="education" options={{ title: "Education Center" }} />
-          <Stack.Screen name="lesson" options={{ title: "Lesson" }} />
-          <Stack.Screen name="family" options={{ title: "Family Protection" }} />
-          <Stack.Screen name="community" options={{ title: "Community Intel" }} />
-          <Stack.Screen name="call-protection" options={{ title: "Call & Text Protection" }} />
-          <Stack.Screen name="notifications" options={{ title: "Notifications", headerShown: false }} />
-          <Stack.Screen name="identity" options={{ title: "Identity Protection", headerShown: false }} />
-          <Stack.Screen name="exposure" options={{ title: "Data Broker Exposure" }} />
-          <Stack.Screen name="browser" options={{ title: "Safe Browser", headerShown: false }} />
-          <Stack.Screen name="share" options={{ title: "Report a Scam" }} />
-          <Stack.Screen name="developer" options={{ title: "Developer" }} />
-          <Stack.Screen name="labs" options={{ title: "Shield Labs" }} />
-          <Stack.Screen name="report" options={{ title: "Protection Report" }} />
-          <Stack.Screen name="protection" options={{ title: "Protection Checklist" }} />
-          <Stack.Screen name="vertical/[key]" options={{ title: "Shield Labs" }} />
-        </Stack>
-        <LiveAlertBridge />
+        <AppLockGate>
+          <Stack screenOptions={{ headerStyle: { backgroundColor: colors.bg }, headerTintColor: colors.text, contentStyle: { backgroundColor: colors.bg }, headerShadowVisible: false }}>
+            <Stack.Screen name="index" options={{ headerShown: false }} />
+            <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+            <Stack.Screen name="login" options={{ headerShown: false }} />
+            <Stack.Screen name="reveal" options={{ title: "Check Your Exposure", headerShown: false }} />
+            <Stack.Screen name="paywall" options={{ title: "Start Protection", headerShown: false }} />
+            <Stack.Screen name="coach" options={{ title: "Scam Coach", headerShown: false }} />
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="result" options={{ title: "Risk Report", headerShown: false }} />
+            <Stack.Screen name="profile" options={{ title: "Profile", headerShown: false }} />
+            <Stack.Screen name="privacy" options={{ title: "Privacy & Data" }} />
+            <Stack.Screen name="recovery" options={{ title: "Scam Recovery", headerShown: false }} />
+            <Stack.Screen name="incident" options={{ title: "Recovery Case" }} />
+            <Stack.Screen name="education" options={{ title: "Education Center" }} />
+            <Stack.Screen name="lesson" options={{ title: "Lesson" }} />
+            <Stack.Screen name="family" options={{ title: "Family Protection" }} />
+            <Stack.Screen name="community" options={{ title: "Community Intel" }} />
+            <Stack.Screen name="call-protection" options={{ title: "Call & Text Protection" }} />
+            <Stack.Screen name="notifications" options={{ title: "Notifications", headerShown: false }} />
+            <Stack.Screen name="identity" options={{ title: "Identity Protection", headerShown: false }} />
+            <Stack.Screen name="exposure" options={{ title: "Data Broker Exposure" }} />
+            <Stack.Screen name="browser" options={{ title: "Safe Browser", headerShown: false }} />
+            <Stack.Screen name="share" options={{ title: "Report a Scam" }} />
+            <Stack.Screen name="developer" options={{ title: "Developer" }} />
+            <Stack.Screen name="labs" options={{ title: "Shield Labs" }} />
+            <Stack.Screen name="report" options={{ title: "Protection Report" }} />
+            <Stack.Screen name="protection" options={{ title: "Protection Checklist" }} />
+            <Stack.Screen name="vertical/[key]" options={{ title: "Shield Labs" }} />
+          </Stack>
+          <LiveAlertBridge />
+        </AppLockGate>
       </QueryClientProvider>
     </ErrorBoundary>
   );
