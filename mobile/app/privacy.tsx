@@ -227,7 +227,7 @@ export default function PrivacyScreen() {
           <Ionicons name="finger-print-outline" size={22} color={colors.primaryBright} />
           <View style={{ flex: 1 }}>
             <Text style={{ color: colors.text, fontWeight: "800" }}>Require device unlock</Text>
-            <Text style={{ color: colors.textMuted, fontSize: 13 }}>Store this preference for protecting sensitive screens.</Text>
+            <Text style={{ color: colors.textMuted, fontSize: 13 }}>Require Face ID, Touch ID, or your device passcode to open the app.</Text>
           </View>
           <Switch
             value={biometricLock}
