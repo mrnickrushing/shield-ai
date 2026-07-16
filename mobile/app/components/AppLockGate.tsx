@@ -44,8 +44,11 @@ export function AppLockGate({ children }: { children: React.ReactNode }) {
     if (privacy) SecureStore.setItemAsync(CACHE_KEY, String(privacy.require_device_unlock)).catch(() => {});
   }, [privacy]);
 
+  // Transparent while logged out; re-locks (subject to `required`) the
+  // moment a real user loads, so a cold launch straight into a logged-in
+  // session doesn't skip the gate until the next background/foreground.
   useEffect(() => {
-    if (!user?.id) setUnlocked(true);
+    setUnlocked(!user?.id);
   }, [user?.id]);
 
   const attemptUnlock = useCallback(async () => {
@@ -69,9 +72,21 @@ export function AppLockGate({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // Auto-prompt exactly once each time the gate newly becomes locked. Keyed
+  // off `required`/`unlocked` only (not `checking`) so a canceled or failed
+  // attempt falls back to the manual "Unlock" button instead of the effect
+  // immediately re-firing into a retry loop.
+  const promptedRef = useRef(false);
   useEffect(() => {
-    if (required && !unlocked && !checking) attemptUnlock();
-  }, [required, unlocked, checking, attemptUnlock]);
+    if (!required || unlocked) {
+      promptedRef.current = false;
+      return;
+    }
+    if (!promptedRef.current) {
+      promptedRef.current = true;
+      attemptUnlock();
+    }
+  }, [required, unlocked, attemptUnlock]);
 
   useEffect(() => {
     const sub = AppState.addEventListener("change", (next: AppStateStatus) => {
