@@ -26,7 +26,9 @@ export function AppLockGate({ children }: { children: React.ReactNode }) {
   const [checking, setChecking] = useState(false);
 
   useEffect(() => {
-    SecureStore.getItemAsync(CACHE_KEY).then((v) => setCachedRequired(v === "true"));
+    SecureStore.getItemAsync(CACHE_KEY)
+      .then((v) => setCachedRequired(v === "true"))
+      .catch(() => setCachedRequired(false));
   }, []);
 
   const { data: privacy } = useQuery({
@@ -98,24 +100,45 @@ export function AppLockGate({ children }: { children: React.ReactNode }) {
     return () => sub.remove();
   }, [required]);
 
-  if (required && !unlocked) {
-    return (
-      <View style={{ flex: 1, backgroundColor: colors.bg, alignItems: "center", justifyContent: "center", padding: spacing.xl, gap: spacing.md }}>
-        <Ionicons name="lock-closed-outline" size={48} color={colors.primaryBright} />
-        <Text style={{ color: colors.text, fontSize: 18, fontWeight: "800" }}>Shield AI is locked</Text>
-        <Text style={{ color: colors.textMuted, fontSize: 14, textAlign: "center" }}>
-          Unlock with your device passcode or biometrics to continue.
-        </Text>
-        <Pressable
-          onPress={attemptUnlock}
-          disabled={checking}
-          style={{ backgroundColor: colors.surfaceActive, borderRadius: radius.md, paddingVertical: spacing.sm, paddingHorizontal: spacing.lg, marginTop: spacing.sm }}
-        >
-          <Text style={{ color: colors.text, fontWeight: "700" }}>{checking ? "Checking..." : "Unlock"}</Text>
-        </Pressable>
-      </View>
-    );
+  // Nothing has mounted yet on this very first render, so a blank frame here
+  // costs nothing — but avoids briefly mounting protected screens underneath
+  // before we know whether the cached preference says to lock them.
+  if (Boolean(user?.id) && !privacy && cachedRequired === null) {
+    return null;
   }
 
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      {required && !unlocked && (
+        <View
+          style={{
+            position: "absolute",
+            top: 0,
+            bottom: 0,
+            left: 0,
+            right: 0,
+            backgroundColor: colors.bg,
+            alignItems: "center",
+            justifyContent: "center",
+            padding: spacing.xl,
+            gap: spacing.md,
+          }}
+        >
+          <Ionicons name="lock-closed-outline" size={48} color={colors.primaryBright} />
+          <Text style={{ color: colors.text, fontSize: 18, fontWeight: "800" }}>Shield AI is locked</Text>
+          <Text style={{ color: colors.textMuted, fontSize: 14, textAlign: "center" }}>
+            Unlock with your device passcode or biometrics to continue.
+          </Text>
+          <Pressable
+            onPress={attemptUnlock}
+            disabled={checking}
+            style={{ backgroundColor: colors.surfaceActive, borderRadius: radius.md, paddingVertical: spacing.sm, paddingHorizontal: spacing.lg, marginTop: spacing.sm }}
+          >
+            <Text style={{ color: colors.text, fontWeight: "700" }}>{checking ? "Checking..." : "Unlock"}</Text>
+          </Pressable>
+        </View>
+      )}
+    </>
+  );
 }
