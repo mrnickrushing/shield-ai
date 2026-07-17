@@ -268,9 +268,10 @@ def combine(
 ) -> dict:
     """Blend deterministic score with optional LLM assessment.
 
-    Weights are artifact-type-aware — see _BLEND_WEIGHTS. A safety floor
-    prevents the LLM's clear scam signal from being buried by a low
-    deterministic score when keyword matching failed.
+    Weights are artifact-type-aware — see _BLEND_WEIGHTS. The LLM may raise a
+    deterministic verdict, but it may never lower verified deterministic
+    evidence. This is both a safety property and a prompt-injection boundary:
+    hostile artifact text cannot talk the model into overriding known signals.
     """
     det = min(deterministic_score, 100)
     flags = list(dict.fromkeys(deterministic_flags))
@@ -283,27 +284,38 @@ def combine(
         confidence = min(confidence, 0.4)
 
     if llm:
-        llm_score = int(llm.get("risk_score", det))
+        try:
+            llm_score = max(0, min(int(llm.get("risk_score", det)), 100))
+        except (TypeError, ValueError, OverflowError):
+            llm_score = det
         det_w, llm_w = _BLEND_WEIGHTS.get(artifact_type, _DEFAULT_BLEND)
-        final = round(det_w * det + llm_w * llm_score)
+        blended = round(det_w * det + llm_w * llm_score)
+        final = max(det, blended)
 
         # Safety floor: if the LLM is highly confident about a scam but the
         # deterministic engine missed it (keyword matching is brittle), don't
         # let the blend bury a genuine threat below "suspicious".
-        llm_conf = float(llm.get("confidence", 0))
+        try:
+            llm_conf = max(0.0, min(float(llm.get("confidence", 0)), 1.0))
+        except (TypeError, ValueError, OverflowError):
+            llm_conf = 0.0
         if llm_score >= 70 and llm_conf >= 0.65 and final < 35:
             final = 35
         # Stronger floor: LLM says critical-level threat at high confidence
         if llm_score >= 85 and llm_conf >= 0.75 and final < 55:
             final = 55
 
-        category = llm.get("threat_category", category) or category
-        confidence = float(llm.get("confidence", confidence))
+        llm_category = llm.get("threat_category")
+        if isinstance(llm_category, str) and llm_category in THREAT_CATEGORIES:
+            category = llm_category
+        confidence = llm_conf
         if ocr_failed:
             confidence = min(confidence, 0.5)
-        explanation = llm.get("explanation", "")
-        for f in llm.get("red_flags", []):
-            if f not in flags:
+        llm_explanation = llm.get("explanation", "")
+        explanation = llm_explanation if isinstance(llm_explanation, str) else ""
+        llm_flags = llm.get("red_flags", [])
+        for f in llm_flags if isinstance(llm_flags, list) else []:
+            if isinstance(f, str) and f not in flags:
                 flags.append(f)
     else:
         # LLM unavailable — note degraded analysis so user knows score may be low

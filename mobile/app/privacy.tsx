@@ -1,11 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
+import * as LocalAuthentication from "expo-local-authentication";
 import React, { useState } from "react";
 import { Alert, Pressable, ScrollView, Share, Switch, Text, View } from "react-native";
 
 import { Button, Eyebrow, FadeIn, Surface } from "@/components/ui";
-import { ShieldAPI, clearTokens } from "@/lib/api";
+import { ShieldAPI } from "@/lib/api";
 import { useAuth } from "@/state/auth";
 import { colors, radius, spacing, withAlpha } from "@/theme/theme";
 
@@ -88,9 +89,20 @@ export default function PrivacyScreen() {
     });
   };
 
-  const setLockPreference = (value: boolean) => {
+  const setLockPreference = async (value: boolean) => {
+    if (value) {
+      const supported = await LocalAuthentication.hasHardwareAsync();
+      const enrolled = supported && await LocalAuthentication.isEnrolledAsync();
+      if (!enrolled) {
+        Alert.alert(
+          "Device unlock unavailable",
+          "Set up Face ID, Touch ID, or biometrics in your device settings before enabling this lock."
+        );
+        return;
+      }
+    }
     updatePrivacy.mutate({
-      retention_days: privacy?.retention_days ?? 90,
+      retention_days: privacy?.retention_days ?? null,
       require_device_unlock: value,
     });
   };
@@ -158,7 +170,6 @@ export default function PrivacyScreen() {
             setDeleting(true);
             try {
               await ShieldAPI.deleteAccount();
-              await clearTokens();
               await logout();
               router.replace("/login");
             } catch (e: any) {
@@ -236,7 +247,7 @@ export default function PrivacyScreen() {
             thumbColor={biometricLock ? colors.primaryBright : colors.textMuted}
           />
         </Surface>
-        <ActionRow icon="log-out-outline" title="Clear this device session" detail="Sign out and remove saved access tokens from this device." onPress={async () => { await clearTokens(); await logout(); router.replace("/login"); }} />
+        <ActionRow icon="log-out-outline" title="Clear this device session" detail="Sign out, revoke this session, and remove saved access tokens from this device." onPress={async () => { await logout(); router.replace("/login"); }} />
       </FadeIn>
 
       <FadeIn delay={160}>

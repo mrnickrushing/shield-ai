@@ -5,12 +5,16 @@ workflows:
     instance_type: linux_x2
 
     environment:
+      groups:
+        # Provides EXPO_TOKEN as an encrypted app-level Codemagic secret.
+        - expo_credentials
       vars:
         EXPO_PUBLIC_API_URL: https://api.shieldai.rushingtechnologies.com
         CI: "1"
-      node: "18"
+      node: "20"
 
     triggering:
+      cancel_previous_builds: true
       events:
         - push
       branch_patterns:
@@ -26,7 +30,7 @@ workflows:
     scripts:
       - name: Install JS dependencies
         working_directory: mobile
-        script: npm install --legacy-peer-deps
+        script: npm ci
 
       - name: Publish OTA update to production channel
         working_directory: mobile
@@ -45,8 +49,14 @@ workflows:
             exit 0
           fi
 
+          git fetch origin main
+          if [ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]; then
+            echo "A newer main commit exists — refusing to publish stale OTA code."
+            exit 0
+          fi
+
           APP_VERSION=$(node -e "console.log(require('./app.json').expo.version)")
-          npx eas-cli update \
+          npx eas-cli@21.0.1 update \
             --channel production \
             --platform ios \
             --message "OTA v${APP_VERSION} — $(date +%Y-%m-%d)" \
@@ -70,11 +80,12 @@ workflows:
         BUNDLE_ID: com.shieldai.app
         EXPO_PUBLIC_API_URL: https://api.shieldai.rushingtechnologies.com
         CI: "1"
-      node: "18"
+      node: "20"
       xcode: latest
       cocoapods: 1.15.2
 
     triggering:
+      cancel_previous_builds: true
       events:
         - push
       branch_patterns:
@@ -85,7 +96,7 @@ workflows:
     scripts:
       - name: Install JS dependencies
         working_directory: mobile
-        script: npm install --legacy-peer-deps
+        script: npm ci
 
       - name: Verify key modules
         working_directory: mobile
@@ -117,6 +128,13 @@ workflows:
           sed -i '' 's/return existing_file\.real_path/begin; return existing_file.real_path; rescue; end/' \
             ../node_modules/react-native/scripts/cocoapods/privacy_manifest_utils.rb
           pod install
+
+          # React Native 0.76 bundles fmt 11.0.2, whose consteval detection is
+          # incompatible with Apple Clang in Xcode 26.4+. Patch the downloaded
+          # pod after every clean prebuild and fail loudly if the expected fmt
+          # source layout ever changes.
+          python3 "$CM_BUILD_DIR/scripts/patch_fmt_consteval.py" \
+            "$CM_BUILD_DIR/mobile/ios/Pods/fmt/include/fmt/base.h"
 
       - name: Fetch fresh App Store signing files
         script: |
@@ -211,25 +229,6 @@ workflows:
             --workspace ShieldAI.xcworkspace \
             --scheme ShieldAI \
             --archive-xcargs "SWIFT_TREAT_WARNINGS_AS_ERRORS=NO"
-
-      - name: Publish OTA update to production channel
-        working_directory: mobile
-        script: |
-          # The IPA is already built and archived by the time we get here, so a
-          # missing/unusable EXPO_TOKEN must NOT fail the whole build and block
-          # the TestFlight upload. OTA is a nice-to-have on a native build (the
-          # binary already carries this JS); skip it cleanly when we can't auth.
-          if [ -z "${EXPO_TOKEN:-}" ]; then
-            echo "EXPO_TOKEN not set — skipping OTA publish (IPA already built for TestFlight)."
-            exit 0
-          fi
-          APP_VERSION=$(node -e "console.log(require('./app.json').expo.version)")
-          BUILD_NUM=$(cd ios && agvtool what-version -terse)
-          npx eas-cli update \
-            --channel production \
-            --platform ios \
-            --message "v${APP_VERSION} (${BUILD_NUM}) — $(date +%Y-%m-%d)" \
-            --non-interactive || echo "OTA publish failed — continuing so the TestFlight build still ships."
 
     artifacts:
       - mobile/ios/build/ios/ipa/*.ipa

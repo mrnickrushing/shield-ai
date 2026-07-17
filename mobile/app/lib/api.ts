@@ -1,6 +1,7 @@
 // API client with token storage + auto-attach + refresh.
 import axios from "axios";
 import Constants from "expo-constants";
+import * as Crypto from "expo-crypto";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 
@@ -9,10 +10,14 @@ export const API_URL =
   process.env.EXPO_PUBLIC_API_URL ??
   "https://api.shieldai.rushingtechnologies.com";
 
+// Axios intentionally exposes its instance factory on the default export.
+// eslint-disable-next-line import/no-named-as-default-member
 export const api = axios.create({ baseURL: `${API_URL}/api/v1`, timeout: 30000 });
 
 const ACCESS_KEY = "shield_access_token";
 const REFRESH_KEY = "shield_refresh_token";
+let credentialGeneration = 0;
+let refreshPromise: Promise<string | null> | null = null;
 
 async function storageSet(key: string, value: string) {
   if (Platform.OS === "web") {
@@ -40,10 +45,25 @@ export async function saveTokens(access: string, refresh: string) {
   await storageSet(REFRESH_KEY, refresh);
 }
 export async function clearTokens() {
+  credentialGeneration += 1;
   await storageDelete(ACCESS_KEY);
   await storageDelete(REFRESH_KEY);
 }
 export async function getAccessToken() { return storageGet(ACCESS_KEY); }
+
+async function revokeCurrentSession() {
+  const refresh = await storageGet(REFRESH_KEY);
+  // Invalidate refresh work before any network wait so a late response cannot
+  // resurrect credentials during logout/account switching.
+  await clearTokens();
+  if (!refresh) return;
+  try {
+    await axios.post(`${API_URL}/api/v1/auth/logout`, { refresh_token: refresh }, { timeout: 10000 });
+  } catch {
+    // Local logout must still complete while offline. The server session can
+    // also be revoked from another signed-in device's Privacy Center.
+  }
+}
 
 api.interceptors.request.use(async (config) => {
   const token = await getAccessToken();
@@ -60,11 +80,29 @@ api.interceptors.response.use(
       const refresh = await storageGet(REFRESH_KEY);
       if (refresh) {
         try {
-          const { data } = await axios.post(`${API_URL}/api/v1/auth/refresh`, { refresh_token: refresh });
-          await saveTokens(data.access_token, data.refresh_token);
-          original.headers.Authorization = `Bearer ${data.access_token}`;
+          if (!refreshPromise) {
+            const generation = credentialGeneration;
+            refreshPromise = (async () => {
+              try {
+                const { data } = await axios.post(`${API_URL}/api/v1/auth/refresh`, { refresh_token: refresh });
+                const currentRefresh = await storageGet(REFRESH_KEY);
+                if (generation !== credentialGeneration || currentRefresh !== refresh) return null;
+                await saveTokens(data.access_token, data.refresh_token);
+                return data.access_token as string;
+              } catch {
+                const currentRefresh = await storageGet(REFRESH_KEY);
+                if (generation === credentialGeneration && currentRefresh === refresh) await clearTokens();
+                return null;
+              } finally {
+                refreshPromise = null;
+              }
+            })();
+          }
+          const accessToken = await refreshPromise;
+          if (!accessToken) return Promise.reject(error);
+          original.headers.Authorization = `Bearer ${accessToken}`;
           return api(original);
-        } catch { await clearTokens(); }
+        } catch { return Promise.reject(error); }
       }
     }
     return Promise.reject(error);
@@ -155,7 +193,7 @@ export type Incident = {
   incident_type: string;
   status: string;
   title: string;
-  amount_lost: number | null;
+  amount_lost: string | null;
   currency: string;
   notes: string;
   linked_scan_id: string | null;
@@ -178,6 +216,9 @@ export type Notification = {
   title: string;
   body: string;
   scan_id: string | null;
+  severity: "safe" | "low" | "suspicious" | "high" | "critical";
+  topic: string;
+  route: string;
   is_read: boolean;
   created_at: string;
 };
@@ -437,11 +478,15 @@ export type Verdict = {
 export const ShieldAPI = {
   register: (email: string, password: string, display_name: string) => api.post("/auth/register", { email, password, display_name }).then((r) => r.data),
   login: (email: string, password: string) => api.post("/auth/login", { email, password }).then((r) => r.data),
+  logout: revokeCurrentSession,
   me: () => api.get<UserProfile>("/auth/me").then((r) => r.data),
   socialAuth: (provider: "apple" | "google", token: string, email?: string, display_name?: string, nonce?: string) =>
     api.post<{ access_token: string; refresh_token: string }>("/auth/social", { provider, token, email, display_name, nonce }).then((r) => r.data),
-  googleAuthStartUrl: (return_url: string) =>
-    `${API_URL}/api/v1/auth/google/start?return_url=${encodeURIComponent(return_url)}`,
+  googleAuthReturnUrl: `${API_URL}/google-auth`,
+  googleAuthStartUrl: (return_url: string, code_challenge: string) =>
+    `${API_URL}/api/v1/auth/google/start?return_url=${encodeURIComponent(return_url)}&code_challenge=${encodeURIComponent(code_challenge)}`,
+  googleAuthExchange: (code: string, code_verifier: string) =>
+    api.post<{ access_token: string; refresh_token: string }>("/auth/google/exchange", { code, code_verifier }).then((r) => r.data),
   updateProfile: (patch: { display_name?: string; large_text_mode?: boolean; simple_language_mode?: boolean }) => api.patch<UserProfile>("/auth/me", patch).then((r) => r.data),
   uploadAvatar: (uri: string) => {
     const form = new FormData();
@@ -504,6 +549,8 @@ export const ShieldAPI = {
   // Notifications
   registerDevice: (push_token: string, platform: "ios" | "android") =>
     api.post("/notifications/devices", { push_token, platform, label: `${platform.toUpperCase()} Device` }),
+  unregisterDevice: (push_token: string) =>
+    api.delete("/notifications/devices/current", { params: { push_token } }),
   getNotificationPreferences: () =>
     api.get<NotificationPreferences>("/notifications/preferences").then((r) => r.data),
   updateNotificationPreferences: (payload: NotificationPreferences) =>
@@ -561,11 +608,23 @@ export const ShieldAPI = {
   // Onboarding reveal — works before the subscription starts.
   breachPreview: (email: string) =>
     api.post<BreachPreview>("/identity/breach-preview", { email }).then((r) => r.data),
-  passwordCheck: (password: string) =>
-    api.post<{ pwned_count: number; is_compromised: boolean; recommendation: string }>(
+  passwordCheck: async (password: string) => {
+    const sha1 = (await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA1, password)).toUpperCase();
+    const prefix = sha1.slice(0, 5);
+    const suffix = sha1.slice(5);
+    const { data } = await api.post<{ suffixes: Record<string, number> }>(
       "/identity/password-check",
-      { password }
-    ).then((r) => r.data),
+      { sha1_prefix: prefix }
+    );
+    const count = data.suffixes[suffix] ?? 0;
+    return {
+      pwned_count: count,
+      is_compromised: count > 0,
+      recommendation: count > 0
+        ? `This password appeared ${count.toLocaleString()} time(s) in known data breaches. Stop using it immediately and replace it with a unique, randomly generated password.`
+        : "This password was not found in known breach databases. Still use a unique password for every account.",
+    };
+  },
   listIdentityAlerts: () =>
     api.get<IdentityAlert[]>("/identity/alerts").then((r) => r.data),
   markAlertRead: (id: string) =>

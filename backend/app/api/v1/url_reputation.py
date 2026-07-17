@@ -7,18 +7,16 @@ qualify when link scans across the community repeatedly verdict them
 high/critical — the extension never phones home per page view.
 """
 from fastapi import APIRouter, Depends
-from sqlalchemy import func
+from sqlalchemy import case, func, or_
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.db.session import get_db
+from app.core.config import settings
 from app.models.models import LinkScan, RiskLevel, RiskReport, ScanHistory, SeededScamDomain, User
 
 router = APIRouter(prefix="/url-reputation", tags=["url-reputation"])
 
-# One corroborating scan is enough for a domain: unlike phone numbers, a
-# high/critical URL verdict already folds in Google Web Risk + heuristics.
-MIN_DETECTIONS = 1
 MAX_ENTRIES = 5000
 
 
@@ -30,7 +28,7 @@ def sync_url_reputation(
     rows = (
         db.query(
             LinkScan.domain,
-            func.count(RiskReport.id).label("detections"),
+            func.count(func.distinct(ScanHistory.user_id)).label("reporters"),
             func.max(RiskReport.created_at).label("last_seen"),
         )
         .join(ScanHistory, LinkScan.scan_id == ScanHistory.id)
@@ -40,7 +38,12 @@ def sync_url_reputation(
             RiskReport.risk_level.in_([RiskLevel.high, RiskLevel.critical]),
         )
         .group_by(LinkScan.domain)
-        .having(func.count(RiskReport.id) >= MIN_DETECTIONS)
+        .having(
+            or_(
+                func.count(func.distinct(ScanHistory.user_id)) >= settings.URL_BLOCKLIST_MIN_REPORTERS,
+                func.max(case((LinkScan.safe_browsing_hit.is_(True), 1), else_=0)) == 1,
+            )
+        )
         .order_by(func.max(RiskReport.created_at).desc())
         .limit(MAX_ENTRIES)
         .all()
@@ -56,7 +59,7 @@ def sync_url_reputation(
     domains = [seed.domain for seed in seeds]
     latest = max((seed.created_at for seed in seeds), default=None)
 
-    for domain, _detections, last_seen in rows:
+    for domain, _reporters, last_seen in rows:
         domains.append(domain.lower())
         if latest is None or (last_seen and last_seen > latest):
             latest = last_seen

@@ -18,8 +18,8 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     bind = op.get_bind()
     if bind.dialect.name == "postgresql":
-        for val in ("marketplace", "social"):
-            op.execute(f"ALTER TYPE scantype ADD VALUE IF NOT EXISTS '{val}'")
+        op.execute("ALTER TYPE scantype ADD VALUE IF NOT EXISTS 'marketplace'")
+        op.execute("ALTER TYPE scantype ADD VALUE IF NOT EXISTS 'social'")
 
     op.create_table(
         "marketplace_scans",

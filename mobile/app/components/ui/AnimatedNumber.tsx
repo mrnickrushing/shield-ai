@@ -30,7 +30,6 @@ export function AnimatedNumber({
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value, duration]);
 
   return <Text style={style}>{display}</Text>;

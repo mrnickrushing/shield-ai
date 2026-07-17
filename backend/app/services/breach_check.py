@@ -49,31 +49,22 @@ def check_breaches(email: str) -> dict:
     }
 
 
-def check_password_pwned(password: str) -> int:
-    """
-    k-Anonymity password check via HIBP Pwned Passwords.
-    Returns how many times this password appeared in known breach databases.
-    Never sends the full password — only a 5-character SHA-1 prefix.
-    Raises on network or HTTP errors so callers can surface an unavailable state
-    rather than silently reporting a compromised password as safe.
-    """
-    import hashlib
-
+def fetch_password_range(prefix: str) -> dict[str, int]:
+    """Fetch one HIBP k-anonymity range without receiving a password/hash."""
     import httpx
 
-    sha1 = hashlib.sha1(password.encode("utf-8")).hexdigest().upper()
-    prefix, suffix = sha1[:5], sha1[5:]
     resp = httpx.get(
         f"https://api.pwnedpasswords.com/range/{prefix}",
         headers={"user-agent": "Shield-AI/3.0"},
         timeout=5.0,
     )
     resp.raise_for_status()
+    matches: dict[str, int] = {}
     for line in resp.text.splitlines():
         parts = line.split(":")
-        if len(parts) == 2 and parts[0] == suffix:
-            return int(parts[1])
-    return 0
+        if len(parts) == 2 and len(parts[0]) == 35:
+            matches[parts[0]] = int(parts[1])
+    return matches
 
 
 def _severity(breaches: list[dict]) -> str:

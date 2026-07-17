@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "";
-const ADMIN_TOKEN_KEY = "shield_admin_token";
+let adminToken: string | null = null;
 
 export const api = axios.create({
   baseURL: `${API_URL}/api/v1`,
@@ -9,26 +9,22 @@ export const api = axios.create({
 });
 
 export function setToken(t: string) {
+  adminToken = t;
   api.defaults.headers.common["Authorization"] = `Bearer ${t}`;
-  if (typeof window !== "undefined") {
-    window.localStorage.setItem(ADMIN_TOKEN_KEY, t);
-  }
 }
 
 export function clearToken() {
+  adminToken = null;
   delete api.defaults.headers.common["Authorization"];
-  if (typeof window !== "undefined") {
-    window.localStorage.removeItem(ADMIN_TOKEN_KEY);
-  }
+  if (typeof window !== "undefined") window.localStorage.removeItem("shield_admin_token");
 }
 
 export function hydrateToken() {
-  if (typeof window === "undefined") return null;
-  const token = window.localStorage.getItem(ADMIN_TOKEN_KEY);
-  if (token) {
-    api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-  }
-  return token;
+  // Admin credentials intentionally live only in process memory. A refresh
+  // requires re-authentication instead of leaving a bearer token available to
+  // injected JavaScript in localStorage.
+  if (typeof window !== "undefined") window.localStorage.removeItem("shield_admin_token");
+  return adminToken;
 }
 
 export type AdminStats = {

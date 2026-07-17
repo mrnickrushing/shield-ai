@@ -47,6 +47,7 @@ export default function RecoveryScreen() {
   const createIncident = useMutation({
     mutationFn: (type: string) => ShieldAPI.createIncident({ incident_type: type, linked_scan_id: params.scanId }),
     onSuccess: (data: any) => { setIncidentId(data.id); setPhase("steps"); },
+    onError: () => Alert.alert("Couldn't start recovery", "No case was created. Check your connection and try again."),
   });
 
   const updateIncident = useMutation({
@@ -60,14 +61,20 @@ export default function RecoveryScreen() {
       qc.invalidateQueries({ queryKey: ["incidents"] });
       Alert.alert("Saved", "Evidence added to your incident record.");
     },
+    onError: () => Alert.alert("Evidence not saved", "Your evidence is still on this screen. Check your connection and try again."),
   });
 
-  const toggleStep = (stepId: string) => {
+  const toggleStep = async (stepId: string) => {
     const updated = checkedSteps.includes(stepId)
       ? checkedSteps.filter((s) => s !== stepId)
       : [...checkedSteps, stepId];
-    setCheckedSteps(updated);
-    if (incidentId) updateIncident.mutate(updated);
+    if (!incidentId) return;
+    try {
+      await updateIncident.mutateAsync(updated);
+      setCheckedSteps(updated);
+    } catch {
+      Alert.alert("Step not saved", "The recovery checklist was not changed. Check your connection and try again.");
+    }
   };
 
   if (phase === "select") {
@@ -158,7 +165,7 @@ export default function RecoveryScreen() {
               return (
                 <Surface
                   key={step.id}
-                  onPress={() => toggleStep(step.id)}
+                  onPress={() => { void toggleStep(step.id); }}
                   accent={done ? colors.safe : undefined}
                   style={done ? { backgroundColor: withAlpha(colors.safe, "14") } : undefined}
                 >

@@ -1,16 +1,34 @@
-const { defineConfig } = require("eslint/config");
-const expoConfig = require("eslint-config-expo/flat");
+const { FlatCompat } = require("@eslint/eslintrc");
+const path = require("node:path");
 
-module.exports = defineConfig([
-  expoConfig,
+const compat = new FlatCompat({
+  baseDirectory: __dirname,
+  resolvePluginsRelativeTo: path.dirname(require.resolve("eslint-config-expo/package.json")),
+});
+
+module.exports = [
+  ...compat.extends("expo"),
   {
-    ignores: ["dist/*", ".expo/*", "node_modules/*", "scripts/*", "patches/*"],
+    ignores: ["dist/*", ".expo/*", "node_modules/*", "scripts/*", "patches/*", "android/*", "ios/*"],
   },
   {
-    files: ["plugins/**/*.js"],
+    files: ["eslint.config.js", "plugins/**/*.js"],
     languageOptions: {
       globals: {
         __dirname: "readonly",
+        module: "readonly",
+        require: "readonly",
+      },
+    },
+  },
+  {
+    files: ["plugins/safariExtension/resources/**/*.js"],
+    languageOptions: {
+      globals: {
+        document: "readonly",
+        history: "readonly",
+        location: "readonly",
+        sessionStorage: "readonly",
       },
     },
   },
@@ -19,11 +37,6 @@ module.exports = defineConfig([
       // TypeScript already validates module resolution; the import resolver
       // can't follow package "exports" maps (e.g. expo-file-system).
       "import/no-unresolved": "off",
-      // Reanimated's documented API mutates sharedValue.value in handlers
-      // and effects, which this rule can't distinguish from render mutation.
-      "react-hooks/immutability": "off",
-      // Prop->state sync effects predate this rule; treat as advisory.
-      "react-hooks/set-state-in-effect": "warn",
     },
   },
-]);
+];

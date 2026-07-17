@@ -90,9 +90,12 @@ export default function Profile() {
   };
 
   useEffect(() => {
-    setName(user?.display_name ?? "");
-    setLargeText(user?.large_text_mode ?? false);
-    setSimpleLanguage(user?.simple_language_mode ?? false);
+    const task = requestAnimationFrame(() => {
+      setName(user?.display_name ?? "");
+      setLargeText(user?.large_text_mode ?? false);
+      setSimpleLanguage(user?.simple_language_mode ?? false);
+    });
+    return () => cancelAnimationFrame(task);
   }, [user?.display_name, user?.large_text_mode, user?.simple_language_mode]);
 
   const isDirty = name.trim() !== (user?.display_name ?? "") || largeText !== (user?.large_text_mode ?? false) || simpleLanguage !== (user?.simple_language_mode ?? false);
@@ -159,7 +162,7 @@ export default function Profile() {
         <MenuRow icon="shield-checkmark-outline" label="Account Security" onPress={() => router.push("/privacy")} />
         <MenuRow icon="lock-closed-outline" label="Privacy Preferences" onPress={() => router.push("/privacy")} />
         <MenuRow icon="notifications-outline" label="Notification Settings" onPress={() => router.push("/notification-settings" as never)} />
-        <MenuRow icon="phone-portrait-outline" label="Linked Devices" onPress={() => router.push("/developer")} />
+        <MenuRow icon="phone-portrait-outline" label="Linked Devices" onPress={() => router.push("/privacy")} />
 
         <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 16 }} />
         <Text style={{ color: colors.textDim, fontSize: 11, fontWeight: "800", letterSpacing: 1.3, marginBottom: 8 }}>PROFILE PREFERENCES</Text>

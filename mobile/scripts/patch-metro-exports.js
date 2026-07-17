@@ -58,3 +58,21 @@ if (fs.existsSync(expoNested)) {
     console.log(`[patch-metro] promoted ${name}@${ver} to top level`);
   }
 }
+
+// Expo SDK 52's transpiled CLI assumes the CommonJS tar package exposes a
+// `.default`. Patched tar 7 releases correctly expose named exports and mark
+// themselves as ESM-compatible, so that generated access becomes undefined.
+// Keep the secure tar 7 override and make the old CLI accept either shape.
+for (const relative of [
+  ['@expo', 'cli', 'build', 'src', 'utils', 'npm.js'],
+  ['@expo', 'cli', 'build', 'src', 'utils', 'tar.js'],
+]) {
+  const target = path.join(nm, ...relative);
+  if (!fs.existsSync(target)) continue;
+  const before = fs.readFileSync(target, 'utf8');
+  const after = before.replaceAll('_tar().default.extract', '(_tar().default || _tar()).extract');
+  if (after !== before) {
+    fs.writeFileSync(target, after);
+    console.log(`[patch-metro] patched Expo CLI tar 7 interop in ${relative.join('/')}`);
+  }
+}

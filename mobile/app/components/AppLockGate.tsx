@@ -10,7 +10,7 @@ import { appLockLifecycleTransition } from "@/lib/appLockLifecycle";
 import { useAuth } from "@/state/auth";
 import { colors, radius, spacing } from "@/theme/theme";
 
-const CACHE_KEY = "requireDeviceUnlockCache";
+const cacheKey = (userId: string) => `requireDeviceUnlockCache:${userId}`;
 
 /**
  * Enforces the "Require device unlock" privacy preference. Without this, the
@@ -24,15 +24,26 @@ export function AppLockGate({ children }: { children: React.ReactNode }) {
   const appState = useRef(AppState.currentState);
   const authenticationInFlight = useRef(false);
   const suppressForegroundRelock = useRef(false);
-  const [cachedRequired, setCachedRequired] = useState<boolean | null>(null);
-  const [unlocked, setUnlocked] = useState(false);
+  const [cachedPreference, setCachedPreference] = useState<{ userId: string; required: boolean } | null>(null);
+  const [unlockedUserId, setUnlockedUserId] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
+  const [authUnavailable, setAuthUnavailable] = useState(false);
+  const [obscured, setObscured] = useState(AppState.currentState !== "active");
+  const logout = useAuth((s) => s.logout);
 
   useEffect(() => {
-    SecureStore.getItemAsync(CACHE_KEY)
-      .then((v) => setCachedRequired(v === "true"))
-      .catch(() => setCachedRequired(false));
-  }, []);
+    if (!user?.id) return;
+    const userId = user.id;
+    let active = true;
+    SecureStore.getItemAsync(cacheKey(user.id))
+      .then((v) => {
+        if (active) setCachedPreference({ userId, required: v === null ? true : v === "true" });
+      })
+      .catch(() => {
+        if (active) setCachedPreference({ userId, required: true });
+      });
+    return () => { active = false; };
+  }, [user?.id]);
 
   const { data: privacy } = useQuery({
     queryKey: ["privacy-preferences"],
@@ -43,42 +54,40 @@ export function AppLockGate({ children }: { children: React.ReactNode }) {
   // required starts from the last-known cached value (so a cold launch locks
   // immediately, before the network round-trip resolves) and is replaced by
   // the live server value once it loads.
-  const required = Boolean(user?.id) && (privacy ? privacy.require_device_unlock : cachedRequired ?? false);
+  const cachedRequired = cachedPreference && cachedPreference.userId === user?.id ? cachedPreference.required : true;
+  const required = Boolean(user?.id) && (privacy ? privacy.require_device_unlock : cachedRequired);
+  const unlocked = !user?.id || unlockedUserId === user.id;
 
   useEffect(() => {
-    if (privacy) SecureStore.setItemAsync(CACHE_KEY, String(privacy.require_device_unlock)).catch(() => {});
-  }, [privacy]);
-
-  // Transparent while logged out; re-locks (subject to `required`) the
-  // moment a real user loads, so a cold launch straight into a logged-in
-  // session doesn't skip the gate until the next background/foreground.
-  useEffect(() => {
-    setUnlocked(!user?.id);
-  }, [user?.id]);
+    if (privacy && user?.id) SecureStore.setItemAsync(cacheKey(user.id), String(privacy.require_device_unlock)).catch(() => {});
+  }, [privacy, user?.id]);
 
   const attemptUnlock = useCallback(async () => {
-    if (authenticationInFlight.current) return;
+    const userId = user?.id;
+    if (!userId || authenticationInFlight.current) return;
     authenticationInFlight.current = true;
     setChecking(true);
     try {
       const hasHardware = await LocalAuthentication.hasHardwareAsync();
       const enrolled = hasHardware && (await LocalAuthentication.isEnrolledAsync());
       if (!enrolled) {
-        // Nothing to authenticate against on this device — fail open rather
-        // than permanently locking the user out of their own app.
-        setUnlocked(true);
+        // A protection preference must never silently degrade. Keep protected
+        // content locked and offer a safe sign-out escape instead.
+        setAuthUnavailable(true);
+        setUnlockedUserId(null);
         return;
       }
+      setAuthUnavailable(false);
       const result = await LocalAuthentication.authenticateAsync({
         promptMessage: "Unlock Shield AI",
         disableDeviceFallback: false,
       });
-      setUnlocked(result.success);
+      setUnlockedUserId(result.success ? userId : null);
     } finally {
       authenticationInFlight.current = false;
       setChecking(false);
     }
-  }, []);
+  }, [user?.id]);
 
   // Auto-prompt exactly once each time the gate newly becomes locked. Keyed
   // off `required`/`unlocked` only (not `checking`) so a canceled or failed
@@ -98,6 +107,7 @@ export function AppLockGate({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const sub = AppState.addEventListener("change", (next: AppStateStatus) => {
+      setObscured(next !== "active");
       const transition = appLockLifecycleTransition({
         previous: appState.current,
         next,
@@ -107,7 +117,7 @@ export function AppLockGate({ children }: { children: React.ReactNode }) {
       });
       suppressForegroundRelock.current = transition.suppressForegroundRelock;
       if (transition.shouldRelock) {
-        setUnlocked(false);
+        setUnlockedUserId(null);
       }
       appState.current = next;
     });
@@ -117,14 +127,22 @@ export function AppLockGate({ children }: { children: React.ReactNode }) {
   // Nothing has mounted yet on this very first render, so a blank frame here
   // costs nothing — but avoids briefly mounting protected screens underneath
   // before we know whether the cached preference says to lock them.
-  if (Boolean(user?.id) && !privacy && cachedRequired === null) {
+  if (Boolean(user?.id) && !privacy && cachedPreference?.userId !== user?.id) {
     return null;
   }
 
+  const locked = required && !unlocked;
+
   return (
-    <>
-      {children}
-      {required && !unlocked && (
+    <View style={{ flex: 1 }}>
+      <View
+        style={{ flex: 1 }}
+        accessibilityElementsHidden={locked || obscured}
+        importantForAccessibility={locked || obscured ? "no-hide-descendants" : "auto"}
+      >
+        {children}
+      </View>
+      {(locked || obscured) && (
         <View
           style={{
             position: "absolute",
@@ -139,20 +157,35 @@ export function AppLockGate({ children }: { children: React.ReactNode }) {
             gap: spacing.md,
           }}
         >
-          <Ionicons name="lock-closed-outline" size={48} color={colors.primaryBright} />
-          <Text style={{ color: colors.text, fontSize: 18, fontWeight: "800" }}>Shield AI is locked</Text>
-          <Text style={{ color: colors.textMuted, fontSize: 14, textAlign: "center" }}>
-            Unlock with your device passcode or biometrics to continue.
-          </Text>
-          <Pressable
-            onPress={attemptUnlock}
-            disabled={checking}
-            style={{ backgroundColor: colors.surfaceActive, borderRadius: radius.md, paddingVertical: spacing.sm, paddingHorizontal: spacing.lg, marginTop: spacing.sm }}
-          >
-            <Text style={{ color: colors.text, fontWeight: "700" }}>{checking ? "Checking..." : "Unlock"}</Text>
-          </Pressable>
+          {!obscured && (
+            <>
+              <Ionicons name="lock-closed-outline" size={48} color={colors.primaryBright} />
+              <Text style={{ color: colors.text, fontSize: 18, fontWeight: "800" }}>Shield AI is locked</Text>
+              <Text style={{ color: colors.textMuted, fontSize: 14, textAlign: "center" }}>
+                {authUnavailable
+                  ? "Device authentication is not available. Your protected data will stay locked."
+                  : "Unlock with your device passcode or biometrics to continue."}
+              </Text>
+              {!authUnavailable && (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Unlock Shield AI"
+                  onPress={attemptUnlock}
+                  disabled={checking}
+                  style={{ minHeight: 44, justifyContent: "center", backgroundColor: colors.surfaceActive, borderRadius: radius.md, paddingVertical: spacing.sm, paddingHorizontal: spacing.lg, marginTop: spacing.sm }}
+                >
+                  <Text style={{ color: colors.text, fontWeight: "700" }}>{checking ? "Checking..." : "Unlock"}</Text>
+                </Pressable>
+              )}
+              {authUnavailable && (
+                <Pressable accessibilityRole="button" onPress={logout} style={{ minHeight: 44, justifyContent: "center", paddingHorizontal: spacing.lg }}>
+                  <Text style={{ color: colors.suspicious, fontWeight: "800" }}>Sign out safely</Text>
+                </Pressable>
+              )}
+            </>
+          )}
         </View>
       )}
-    </>
+    </View>
   );
 }

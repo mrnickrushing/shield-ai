@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.db.session import get_db
-from app.models.models import CommunityReport, ScamPattern, User  # User used in POST routes
+from app.models.models import CommunityReport, ScamPattern, ScanHistory, User
 from app.schemas.schemas import CommunityReportCreate, CommunityReportOut, ScamPatternOut
 
 router = APIRouter(prefix="/community", tags=["community"])
@@ -23,6 +23,10 @@ def submit_report(
     user: User = Depends(get_current_user),
 ):
     """Report a false positive, a missed scam, or a new pattern for analyst review."""
+    if payload.scan_id:
+        scan = db.get(ScanHistory, payload.scan_id)
+        if not scan or scan.user_id != user.id:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Scan not found")
     report = CommunityReport(
         user_id=user.id,
         scan_id=payload.scan_id,

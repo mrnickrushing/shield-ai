@@ -20,7 +20,6 @@ export function BrandWordmark({
 }) {
   return (
     <Text
-      maxFontSizeMultiplier={1.1}
       numberOfLines={1}
       style={{
         fontSize: size,

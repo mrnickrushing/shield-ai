@@ -8,14 +8,14 @@ from __future__ import annotations
 
 import logging
 import smtplib
-from datetime import datetime, time, timezone
+from datetime import datetime, time, timedelta, timezone
 from email.message import EmailMessage
 from typing import Any
 
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.models.models import Device, NotificationPreference, User
+from app.models.models import Device, NotificationPreference, PushReceipt, User
 
 log = logging.getLogger(__name__)
 
@@ -108,7 +108,7 @@ def send_push_to_devices(
     data: dict[str, Any] | None = None,
     respect_quiet_hours: bool = True,
 ) -> int:
-    """Best-effort Expo push delivery. Returns the number of target tokens.
+    """Best-effort Expo push delivery. Returns the accepted ticket count.
 
     Exceptions are swallowed and logged so alert creation never fails because
     Apple/Expo/network delivery is temporarily unavailable.
@@ -123,12 +123,12 @@ def send_push_to_devices(
     ):
         return 0
 
-    tokens = [
-        d.push_token
-        for d in db.query(Device).filter(Device.user_id == user_id, Device.revoked_at.is_(None)).all()
-        if d.push_token
+    devices = [
+        device
+        for device in db.query(Device).filter(Device.user_id == user_id, Device.revoked_at.is_(None)).all()
+        if device.push_token
     ]
-    if not tokens:
+    if not devices:
         return 0
 
     try:
@@ -142,21 +142,117 @@ def send_push_to_devices(
                 "data": data or {},
                 "sound": "default" if severity in ("high", "critical") else None,
             }
-            for token in tokens
+            for token in (device.push_token for device in devices)
         ]
         headers = {"Content-Type": "application/json"}
         if settings.EXPO_ACCESS_TOKEN:
             headers["Authorization"] = f"Bearer {settings.EXPO_ACCESS_TOKEN}"
 
-        httpx.post(
+        response = httpx.post(
             "https://exp.host/--/api/v2/push/send",
             json=messages,
             headers=headers,
             timeout=settings.ALERT_DELIVERY_TIMEOUT_SECONDS,
         )
+        response.raise_for_status()
+        payload = response.json()
+        tickets = payload.get("data", []) if isinstance(payload, dict) else []
+        if isinstance(tickets, dict):
+            tickets = [tickets]
+        delivered = 0
+        changed = False
+        for device, ticket in zip(devices, tickets):
+            if isinstance(ticket, dict) and ticket.get("status") == "ok":
+                delivered += 1
+                ticket_id = ticket.get("id")
+                if ticket_id:
+                    db.add(PushReceipt(user_id=user_id, device_id=device.id, ticket_id=str(ticket_id)))
+                    changed = True
+                continue
+            error_code = ((ticket or {}).get("details") or {}).get("error") if isinstance(ticket, dict) else None
+            if error_code == "DeviceNotRegistered":
+                device.revoked_at = datetime.now(timezone.utc)
+                changed = True
+            log.warning(
+                "Expo rejected push for user %s (%s): %s",
+                user_id,
+                error_code or "unknown",
+                (ticket or {}).get("message", "missing ticket") if isinstance(ticket, dict) else "missing ticket",
+            )
+        if changed:
+            db.commit()
+        return delivered
     except Exception as exc:
         log.warning("push delivery failed for user %s: %s", user_id, exc)
-    return len(tokens)
+    return 0
+
+
+def check_pending_push_receipts(db: Session, *, limit: int = 1000) -> dict[str, int]:
+    """Resolve accepted Expo tickets and retire invalid device tokens."""
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=1)
+    pending = (
+        db.query(PushReceipt)
+        .filter(PushReceipt.status == "pending", PushReceipt.created_at <= cutoff)
+        .order_by(PushReceipt.created_at.asc())
+        .limit(limit)
+        .all()
+    )
+    if not pending:
+        return {"checked": 0, "delivered": 0, "failed": 0, "pending": 0}
+
+    try:
+        import httpx
+
+        headers = {"Content-Type": "application/json"}
+        if settings.EXPO_ACCESS_TOKEN:
+            headers["Authorization"] = f"Bearer {settings.EXPO_ACCESS_TOKEN}"
+        response = httpx.post(
+            "https://exp.host/--/api/v2/push/getReceipts",
+            json={"ids": [row.ticket_id for row in pending]},
+            headers=headers,
+            timeout=settings.ALERT_DELIVERY_TIMEOUT_SECONDS,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        receipts = payload.get("data", {}) if isinstance(payload, dict) else {}
+        if not isinstance(receipts, dict):
+            raise ValueError("Expo receipt response was not an object")
+    except Exception as exc:
+        log.warning("push receipt lookup failed: %s", exc)
+        return {"checked": 0, "delivered": 0, "failed": 0, "pending": len(pending)}
+
+    now = datetime.now(timezone.utc)
+    counts = {"checked": 0, "delivered": 0, "failed": 0, "pending": 0}
+    for row in pending:
+        receipt = receipts.get(row.ticket_id)
+        row.attempts += 1
+        row.checked_at = now
+        if not isinstance(receipt, dict):
+            if row.attempts >= 8:
+                row.status = "expired"
+                row.last_error = "Receipt was not available after eight checks"
+                counts["failed"] += 1
+            else:
+                counts["pending"] += 1
+            continue
+
+        counts["checked"] += 1
+        if receipt.get("status") == "ok":
+            row.status = "delivered"
+            counts["delivered"] += 1
+            continue
+
+        error_code = str((receipt.get("details") or {}).get("error") or "unknown")
+        row.status = "failed"
+        row.last_error = f"{error_code}: {receipt.get('message', '')}"[:1000]
+        counts["failed"] += 1
+        if error_code == "DeviceNotRegistered":
+            device = db.get(Device, row.device_id)
+            if device and device.user_id == row.user_id:
+                device.revoked_at = now
+
+    db.commit()
+    return counts
 
 
 def send_email_alert(
