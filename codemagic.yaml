@@ -5,6 +5,9 @@ workflows:
     instance_type: linux_x2
 
     environment:
+      groups:
+        # Provides EXPO_TOKEN as an encrypted app-level Codemagic secret.
+        - expo_credentials
       vars:
         EXPO_PUBLIC_API_URL: https://api.shieldai.rushingtechnologies.com
         CI: "1"
