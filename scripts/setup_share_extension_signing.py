@@ -82,7 +82,8 @@ def api(method, path, body=None):
         method=method,
     )
     try:
-        with urlopen(req) as r:
+        # BASE is a fixed HTTPS App Store Connect origin; callers supply only a path.
+        with urlopen(req) as r:  # nosemgrep -- fixed HTTPS Apple origin above
             raw = r.read()
             return json.loads(raw) if raw else {}
     except HTTPError as e:

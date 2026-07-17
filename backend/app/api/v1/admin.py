@@ -61,6 +61,7 @@ from app.schemas.schemas import (
     ScamPatternOut,
 )
 from app.services.account_deletion import delete_user_account
+from app.services.subscription import is_premium_active
 
 
 class _UserFlagsPatch(BaseModel):
@@ -504,7 +505,7 @@ def subscription_diagnostics(
                 "is_premium": user.is_premium,
                 "premium_expires_at": user.premium_expires_at,
                 "rc_product_id": user.rc_product_id,
-                "status": "expired" if user.premium_expires_at and user.premium_expires_at < now else "premium" if user.is_premium else "free",
+                "status": "premium" if is_premium_active(user, now) else "expired" if user.is_premium else "free",
             }
             for user in users
         ],
