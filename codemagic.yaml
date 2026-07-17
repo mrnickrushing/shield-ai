@@ -126,6 +126,13 @@ workflows:
             ../node_modules/react-native/scripts/cocoapods/privacy_manifest_utils.rb
           pod install
 
+          # React Native 0.76 bundles fmt 11.0.2, whose consteval detection is
+          # incompatible with Apple Clang in Xcode 26.4+. Patch the downloaded
+          # pod after every clean prebuild and fail loudly if the expected fmt
+          # source layout ever changes.
+          python3 "$CM_BUILD_DIR/scripts/patch_fmt_consteval.py" \
+            "$CM_BUILD_DIR/mobile/ios/Pods/fmt/include/fmt/base.h"
+
       - name: Fetch fresh App Store signing files
         script: |
           if [ -z "${CERTIFICATE_PRIVATE_KEY:-}" ]; then
