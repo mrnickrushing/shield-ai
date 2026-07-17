@@ -32,7 +32,6 @@ def patch_fmt_header(path: Path) -> bool:
     patched, replacements = CONSTEVAL_ENABLED.subn(
         lambda match: f"{match.group(1)} 0{WORKAROUND_COMMENT}",
         original,
-        count=1,
     )
     if replacements != 1:
         raise RuntimeError(
