@@ -1,7 +1,7 @@
 {
   "headers": [
     {
-      "source": "**",
+      "source": "**/*",
       "headers": [
         { "key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://api.shieldai.rushingtechnologies.com; font-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'" },
         { "key": "X-Frame-Options", "value": "DENY" },
