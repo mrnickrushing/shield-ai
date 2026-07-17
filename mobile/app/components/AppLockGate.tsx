@@ -6,6 +6,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, AppStateStatus, Pressable, Text, View } from "react-native";
 
 import { ShieldAPI } from "@/lib/api";
+import { appLockLifecycleTransition } from "@/lib/appLockLifecycle";
 import { useAuth } from "@/state/auth";
 import { colors, radius, spacing } from "@/theme/theme";
 
@@ -21,6 +22,8 @@ export function AppLockGate({ children }: { children: React.ReactNode }) {
   const user = useAuth((s) => s.user);
   const hydrated = useAuth((s) => s.hydrated);
   const appState = useRef(AppState.currentState);
+  const authenticationInFlight = useRef(false);
+  const suppressForegroundRelock = useRef(false);
   const [cachedRequired, setCachedRequired] = useState<boolean | null>(null);
   const [unlocked, setUnlocked] = useState(false);
   const [checking, setChecking] = useState(false);
@@ -54,6 +57,8 @@ export function AppLockGate({ children }: { children: React.ReactNode }) {
   }, [user?.id]);
 
   const attemptUnlock = useCallback(async () => {
+    if (authenticationInFlight.current) return;
+    authenticationInFlight.current = true;
     setChecking(true);
     try {
       const hasHardware = await LocalAuthentication.hasHardwareAsync();
@@ -70,6 +75,7 @@ export function AppLockGate({ children }: { children: React.ReactNode }) {
       });
       setUnlocked(result.success);
     } finally {
+      authenticationInFlight.current = false;
       setChecking(false);
     }
   }, []);
@@ -92,7 +98,15 @@ export function AppLockGate({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const sub = AppState.addEventListener("change", (next: AppStateStatus) => {
-      if (appState.current.match(/inactive|background/) && next === "active" && required) {
+      const transition = appLockLifecycleTransition({
+        previous: appState.current,
+        next,
+        required,
+        authenticationInFlight: authenticationInFlight.current,
+        suppressForegroundRelock: suppressForegroundRelock.current,
+      });
+      suppressForegroundRelock.current = transition.suppressForegroundRelock;
+      if (transition.shouldRelock) {
         setUnlocked(false);
       }
       appState.current = next;
