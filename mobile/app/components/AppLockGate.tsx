@@ -6,6 +6,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, AppStateStatus, Pressable, Text, View } from "react-native";
 
 import { ShieldAPI } from "@/lib/api";
+import { appLockLifecycleTransition } from "@/lib/appLockLifecycle";
 import { useAuth } from "@/state/auth";
 import { colors, radius, spacing } from "@/theme/theme";
 
@@ -21,6 +22,8 @@ export function AppLockGate({ children }: { children: React.ReactNode }) {
   const user = useAuth((s) => s.user);
   const hydrated = useAuth((s) => s.hydrated);
   const appState = useRef(AppState.currentState);
+  const authenticationInFlight = useRef(false);
+  const suppressForegroundRelock = useRef(false);
   const [cachedPreference, setCachedPreference] = useState<{ userId: string; required: boolean } | null>(null);
   const [unlockedUserId, setUnlockedUserId] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
@@ -61,7 +64,8 @@ export function AppLockGate({ children }: { children: React.ReactNode }) {
 
   const attemptUnlock = useCallback(async () => {
     const userId = user?.id;
-    if (!userId) return;
+    if (!userId || authenticationInFlight.current) return;
+    authenticationInFlight.current = true;
     setChecking(true);
     try {
       const hasHardware = await LocalAuthentication.hasHardwareAsync();
@@ -80,6 +84,7 @@ export function AppLockGate({ children }: { children: React.ReactNode }) {
       });
       setUnlockedUserId(result.success ? userId : null);
     } finally {
+      authenticationInFlight.current = false;
       setChecking(false);
     }
   }, [user?.id]);
@@ -103,7 +108,15 @@ export function AppLockGate({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const sub = AppState.addEventListener("change", (next: AppStateStatus) => {
       setObscured(next !== "active");
-      if (appState.current.match(/inactive|background/) && next === "active" && required) {
+      const transition = appLockLifecycleTransition({
+        previous: appState.current,
+        next,
+        required,
+        authenticationInFlight: authenticationInFlight.current,
+        suppressForegroundRelock: suppressForegroundRelock.current,
+      });
+      suppressForegroundRelock.current = transition.suppressForegroundRelock;
+      if (transition.shouldRelock) {
         setUnlockedUserId(null);
       }
       appState.current = next;
