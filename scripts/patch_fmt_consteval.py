@@ -7,6 +7,7 @@ patch must run after CocoaPods has populated ``Pods/fmt``.
 
 from pathlib import Path
 import re
+import stat
 import sys
 
 
@@ -39,6 +40,9 @@ def patch_fmt_header(path: Path) -> bool:
             "the bundled fmt layout may have changed"
         )
 
+    # CocoaPods checks out fmt's source as read-only on Codemagic machines.
+    # Preserve its existing mode while granting the build user write access.
+    path.chmod(path.stat().st_mode | stat.S_IWUSR)
     path.write_text(patched, encoding="utf-8")
     if not CONSTEVAL_DISABLED.search(path.read_text(encoding="utf-8")):
         raise RuntimeError("fmt consteval patch verification failed")
