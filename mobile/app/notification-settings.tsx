@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   AppState,
@@ -161,6 +161,7 @@ export default function NotificationSettingsScreen() {
   const [draftOverride, setDraftOverride] = useState<NotificationPreferences | null>(null);
   const [dirty, setDirty] = useState(false);
   const [permission, setPermission] = useState<NotificationPermissionState>("undetermined");
+  const permissionRef = useRef<NotificationPermissionState | null>(null);
   const [permissionBusy, setPermissionBusy] = useState(false);
   const [message, setMessage] = useState<{ tone: "success" | "error"; text: string } | null>(null);
 
@@ -173,14 +174,38 @@ export default function NotificationSettingsScreen() {
 
   const refreshPermission = async () => {
     try {
-      setPermission(await getNotificationPermissionState());
+      const previous = permissionRef.current;
+      const next = await getNotificationPermissionState();
+      permissionRef.current = next;
+      setPermission(next);
+
+      if (previous !== null && previous !== "granted" && next === "granted") {
+        try {
+          await registerDeviceForPush({ requestPermission: false });
+        } catch {
+          setMessage({
+            tone: "error",
+            text: "Notifications are allowed, but this device could not be registered. Please try again.",
+          });
+        }
+      }
     } catch {
+      permissionRef.current = "unsupported";
       setPermission("unsupported");
     }
   };
 
   useEffect(() => {
-    getNotificationPermissionState().then(setPermission, () => setPermission("unsupported"));
+    getNotificationPermissionState().then(
+      (state) => {
+        permissionRef.current = state;
+        setPermission(state);
+      },
+      () => {
+        permissionRef.current = "unsupported";
+        setPermission("unsupported");
+      }
+    );
     const subscription = AppState.addEventListener("change", (state) => {
       if (state === "active") void refreshPermission();
     });
@@ -212,6 +237,7 @@ export default function NotificationSettingsScreen() {
     setMessage(null);
     try {
       const state = await registerDeviceForPush({ requestPermission: true });
+      permissionRef.current = state;
       setPermission(state);
       if (state === "granted") {
         updateDraft({ push_enabled: true });
