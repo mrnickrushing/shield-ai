@@ -3,8 +3,9 @@ import hashlib
 import hmac
 import io
 import secrets
+import base64
 from datetime import datetime, timedelta, timezone
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 
 import httpx
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
@@ -23,25 +24,50 @@ from app.core.security import (
 )
 from app.db.session import get_db
 from app.models.models import (
+    ApiKey,
+    ApiUsage,
     AuthSession,
     AuditLog,
     AvatarImage,
+    BillingWebhookEvent,
+    BreachRecord,
+    BrokerOptOut,
+    BrowserTelemetryEvent,
+    CasePackShare,
     CommunityReport,
     Device,
+    EducationProgress,
+    EmailScan,
+    ExtensionTelemetryEvent,
     IdentityAlert,
+    ImageScan,
     Incident,
+    IncidentEvidence,
+    LinkScan,
+    MarketplaceScan,
+    MessageScan,
+    MonitoredIdentity,
     Notification,
     NotificationPreference,
+    OAuthAuthorizationCode,
+    PersonalBlockedNumber,
+    PhoneScan,
     PrivacyPreference,
     Profile,
+    PushReceipt,
+    QRScan,
+    RiskReport,
     ScanHistory,
     ScanFeedbackDetail,
+    SocialScan,
     SocialIdentity,
+    TrustedContact,
     User,
 )
 from app.schemas.schemas import (
     AuthSessionOut,
     DeviceOut,
+    OAuthCodeExchange,
     PrivacyPreferenceIn,
     PrivacyPreferenceOut,
     ProfileUpdate,
@@ -54,6 +80,7 @@ from app.schemas.schemas import (
 )
 from app.services.privacy import apply_retention_policy, purge_user_scans
 from app.services.account_deletion import delete_user_account
+from app.services.subscription import is_premium_active
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 GOOGLE_DISCOVERY_AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth"
@@ -126,6 +153,19 @@ def _hash_apple_nonce(nonce: str) -> str:
     return hashlib.sha256(nonce.encode()).hexdigest()
 
 
+def _verified_apple_email(claims: dict) -> str | None:
+    """Return only an email Apple explicitly attested as verified.
+
+    The client credential's ``email`` field is profile metadata delivered only
+    on first authorization; it is not an authenticated token claim and must
+    never be used to locate or link an account.
+    """
+    verified = claims.get("email_verified")
+    if verified is not True and str(verified).lower() != "true":
+        return None
+    return _normalize_email(claims.get("email"))
+
+
 def _verify_apple_identity_token(token: str, nonce: str) -> dict:
     signing_key = _apple_jwks_client.get_signing_key_from_jwt(token)
     claims = jwt.decode(
@@ -143,7 +183,7 @@ def _verify_apple_identity_token(token: str, nonce: str) -> dict:
     return claims
 
 
-def _create_google_state(return_url: str) -> str:
+def _create_google_state(return_url: str, code_challenge: str) -> str:
     now = datetime.now(timezone.utc)
     payload = {
         "sub": secrets.token_urlsafe(12),
@@ -151,6 +191,7 @@ def _create_google_state(return_url: str) -> str:
         "exp": now + timedelta(minutes=10),
         "type": "google_oauth_state",
         "return_url": return_url,
+        "code_challenge": code_challenge,
     }
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
@@ -164,9 +205,22 @@ def _decode_google_state(state: str) -> dict:
 
 def _normalize_google_return_url(return_url: str | None) -> str:
     candidate = (return_url or settings.MOBILE_GOOGLE_AUTH_RETURN_URI).strip()
-    if not candidate.startswith("shieldai://"):
+    allowed = urlparse(settings.MOBILE_GOOGLE_AUTH_RETURN_URI)
+    parsed = urlparse(candidate)
+    if (
+        parsed.scheme != "https"
+        or parsed.netloc != allowed.netloc
+        or parsed.path != allowed.path
+        or parsed.params
+        or parsed.fragment
+    ):
         return settings.MOBILE_GOOGLE_AUTH_RETURN_URI
-    return candidate
+    return f"https://{parsed.netloc}{parsed.path}"
+
+
+def _pkce_challenge(verifier: str) -> str:
+    digest = hashlib.sha256(verifier.encode()).digest()
+    return base64.urlsafe_b64encode(digest).decode().rstrip("=")
 
 
 def _require_google_oauth_config() -> tuple[str, str, str]:
@@ -191,7 +245,7 @@ def _user_out(user: User) -> UserOut:
     return UserOut(
         id=user.id,
         email=user.email,
-        is_premium=user.is_premium,
+        is_premium=is_premium_active(user),
         display_name=profile.display_name if profile else "",
         avatar_url=profile.avatar_url if profile else "",
         simple_language_mode=profile.simple_language_mode if profile else False,
@@ -223,7 +277,7 @@ def register(payload: UserRegister, request: Request, db: Session = Depends(get_
 @router.post("/login", response_model=TokenPair)
 def login(payload: UserLogin, request: Request, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == _normalize_email(payload.email)).first()
-    if not user or not verify_password(payload.password, user.hashed_password):
+    if not user or not user.is_active or not verify_password(payload.password, user.hashed_password):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid email or password")
     db.add(AuditLog(user_id=user.id, action="login"))
     tokens = _issue_token_pair(db, user, request)
@@ -247,6 +301,8 @@ def social_auth(payload: SocialAuthRequest, request: Request, db: Session = Depe
             expected_audience = settings.GOOGLE_OAUTH_CLIENT_ID.strip()
             if expected_audience and info.get("aud") != expected_audience:
                 raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid Google token")
+            if str(info.get("email_verified", "")).lower() != "true":
+                raise HTTPException(status.HTTP_400_BAD_REQUEST, "Google account email is not verified")
             email = _normalize_email(info.get("email"))
             subject = info.get("sub")
             if not display_name:
@@ -259,7 +315,7 @@ def social_auth(payload: SocialAuthRequest, request: Request, db: Session = Depe
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "Apple nonce is required")
         try:
             claims = _verify_apple_identity_token(payload.token, payload.nonce)
-            email = _normalize_email(claims.get("email") or payload.email)
+            email = _verified_apple_email(claims)
             subject = claims.get("sub")
         except Exception:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid Apple token")
@@ -282,11 +338,14 @@ def social_auth(payload: SocialAuthRequest, request: Request, db: Session = Depe
     if user is None and email:
         user = db.query(User).filter(User.email == email).first()
 
+    if user is not None and not user.is_active:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Account is unavailable")
+
     if not user:
         if not email:
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,
-                "We could not match this account. Sign in with email once, then try Apple again.",
+                "Apple did not provide a verified email. Sign in with another method.",
             )
         user = User(email=email, hashed_password=hash_password(secrets.token_urlsafe(32)))
         db.add(user)
@@ -320,10 +379,12 @@ def social_auth(payload: SocialAuthRequest, request: Request, db: Session = Depe
 
 
 @router.get("/google/start")
-def google_auth_start(return_url: str | None = None):
+def google_auth_start(code_challenge: str, return_url: str | None = None):
+    if len(code_challenge) != 43 or any(c not in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_" for c in code_challenge):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "A valid PKCE challenge is required")
     client_id, _, redirect_uri = _require_google_oauth_config()
     normalized_return_url = _normalize_google_return_url(return_url)
-    state = _create_google_state(normalized_return_url)
+    state = _create_google_state(normalized_return_url, code_challenge)
     auth_url = (
         f"{GOOGLE_DISCOVERY_AUTH_ENDPOINT}"
         f"?client_id={quote(client_id)}"
@@ -348,11 +409,15 @@ async def google_auth_callback(
     client_id, client_secret, redirect_uri = _require_google_oauth_config()
     normalized_return_url = settings.MOBILE_GOOGLE_AUTH_RETURN_URI
 
-    if state:
-        try:
-            normalized_return_url = _normalize_google_return_url(_decode_google_state(state).get("return_url"))
-        except Exception:
-            return _redirect_with_error(settings.MOBILE_GOOGLE_AUTH_RETURN_URI, "Invalid Google sign-in state.")
+    if not state:
+        return _redirect_with_error(settings.MOBILE_GOOGLE_AUTH_RETURN_URI, "Invalid Google sign-in state.")
+    try:
+        state_payload = _decode_google_state(state)
+        normalized_return_url = _normalize_google_return_url(state_payload.get("return_url"))
+        if not state_payload.get("code_challenge"):
+            raise ValueError("Missing PKCE challenge")
+    except Exception:
+        return _redirect_with_error(settings.MOBILE_GOOGLE_AUTH_RETURN_URI, "Invalid Google sign-in state.")
 
     if error:
         return _redirect_with_error(normalized_return_url, f"Google sign-in failed: {error}")
@@ -387,6 +452,8 @@ async def google_auth_callback(
     except httpx.HTTPError:
         return _redirect_with_error(normalized_return_url, "Google verification is unavailable right now.")
 
+    if info.get("aud") != client_id or str(info.get("email_verified", "")).lower() != "true":
+        return _redirect_with_error(normalized_return_url, "Google did not return a verified account.")
     email = _normalize_email(info.get("email"))
     subject = info.get("sub")
     if not email or not subject:
@@ -405,6 +472,9 @@ async def google_auth_callback(
     user = db.get(User, identity.user_id) if identity else None
     if user is None:
         user = db.query(User).filter(User.email == email).first()
+
+    if user is not None and not user.is_active:
+        return _redirect_with_error(normalized_return_url, "Account is unavailable.")
 
     if not user:
         user = User(email=email, hashed_password=hash_password(secrets.token_urlsafe(32)))
@@ -433,16 +503,50 @@ async def google_auth_callback(
     elif identity.email != email:
         identity.email = email
 
-    tokens = _issue_token_pair(db, user, request)
+    authorization_code = secrets.token_urlsafe(48)
+    db.add(
+        OAuthAuthorizationCode(
+            user_id=user.id,
+            code_hash=_hash_token(authorization_code),
+            code_challenge=state_payload["code_challenge"],
+            redirect_uri=normalized_return_url,
+            expires_at=datetime.now(timezone.utc) + timedelta(minutes=5),
+        )
+    )
     db.commit()
 
     separator = "&" if "?" in normalized_return_url else "?"
-    callback_url = (
-        f"{normalized_return_url}{separator}"
-        f"access_token={quote(tokens.access_token)}"
-        f"&refresh_token={quote(tokens.refresh_token)}"
-    )
+    callback_url = f"{normalized_return_url}{separator}code={quote(authorization_code)}"
     return RedirectResponse(callback_url, status_code=status.HTTP_302_FOUND)
+
+
+@router.post("/google/exchange", response_model=TokenPair)
+def google_auth_exchange(
+    payload: OAuthCodeExchange,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    now = datetime.now(timezone.utc)
+    auth_code = (
+        db.query(OAuthAuthorizationCode)
+        .filter(OAuthAuthorizationCode.code_hash == _hash_token(payload.code))
+        .with_for_update()
+        .first()
+    )
+    if (
+        not auth_code
+        or auth_code.used_at is not None
+        or _as_utc(auth_code.expires_at) < now
+        or not hmac.compare_digest(auth_code.code_challenge, _pkce_challenge(payload.code_verifier))
+    ):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid or expired authorization code")
+    user = db.get(User, auth_code.user_id)
+    if not user or not user.is_active:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Account is unavailable")
+    auth_code.used_at = now
+    tokens = _issue_token_pair(db, user, request)
+    db.commit()
+    return tokens
 
 
 @router.post("/refresh", response_model=TokenPair)
@@ -455,8 +559,8 @@ def refresh(payload: RefreshRequest, request: Request, db: Session = Depends(get
     except Exception:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid refresh token")
     user = db.get(User, user_id)
-    if not user:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "User not found")
+    if not user or not user.is_active:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Account is unavailable")
     session: AuthSession | None = None
     if data.get("sid"):
         session = db.get(AuthSession, data["sid"])
@@ -472,6 +576,33 @@ def refresh(payload: RefreshRequest, request: Request, db: Session = Depends(get
     tokens = _issue_token_pair(db, user, request, session=session)
     db.commit()
     return tokens
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+def logout(payload: RefreshRequest, db: Session = Depends(get_db)):
+    """Revoke the server-side session represented by a refresh token.
+
+    This endpoint intentionally does not require an access token: a client may
+    still revoke its long-lived session after the short-lived access token has
+    expired. Possession of the exact current refresh token is required.
+    """
+    try:
+        data = decode_token(payload.refresh_token)
+        if data.get("type") != "refresh" or not data.get("sid"):
+            raise ValueError
+    except Exception:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid refresh token")
+
+    session = db.get(AuthSession, data["sid"])
+    if (
+        not session
+        or session.user_id != data.get("sub")
+        or not hmac.compare_digest(session.refresh_token_hash, _hash_token(payload.refresh_token))
+    ):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid refresh token")
+    session.is_active = False
+    session.revoked_at = datetime.now(timezone.utc)
+    db.commit()
 
 
 @router.get("/me", response_model=UserOut)
@@ -511,14 +642,17 @@ async def upload_avatar(
     app database, and point the profile at the API's serve endpoint."""
     from PIL import Image, ImageOps, UnidentifiedImageError
 
-    raw = await file.read()
+    max_bytes = settings.AVATAR_MAX_MB * 1024 * 1024
+    raw = await file.read(max_bytes + 1)
     if not raw:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Empty file.")
-    if len(raw) > settings.AVATAR_MAX_MB * 1024 * 1024:
+    if len(raw) > max_bytes:
         raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, f"Image must be under {settings.AVATAR_MAX_MB} MB.")
 
     try:
         image = Image.open(io.BytesIO(raw))
+        if image.width * image.height > 25_000_000:
+            raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "Image dimensions are too large.")
         image.verify()  # detect truncated/forged files before decoding
         image = Image.open(io.BytesIO(raw))
         # Honor EXIF orientation, then drop all metadata by re-encoding.
@@ -645,14 +779,14 @@ def revoke_device(device_id: str, db: Session = Depends(get_db), user: User = De
 
 @router.get("/me/export")
 def export_me(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    """Return a user-owned account export for in-app sharing/download."""
+    """Return a complete, portable export of the caller's user-owned data."""
     scans = (
         db.query(ScanHistory)
         .filter(ScanHistory.user_id == user.id)
         .order_by(ScanHistory.created_at.desc())
-        .limit(500)
         .all()
     )
+    scan_ids = [scan.id for scan in scans]
     incidents = (
         db.query(Incident)
         .filter(Incident.user_id == user.id)
@@ -663,7 +797,6 @@ def export_me(db: Session = Depends(get_db), user: User = Depends(get_current_us
         db.query(Notification)
         .filter(Notification.user_id == user.id)
         .order_by(Notification.created_at.desc())
-        .limit(500)
         .all()
     )
     community_reports = (
@@ -697,18 +830,98 @@ def export_me(db: Session = Depends(get_db), user: User = Depends(get_current_us
         .all()
     )
 
+    def owned(model):
+        return db.query(model).filter(model.user_id == user.id).all()
+
+    def for_scans(model):
+        return db.query(model).filter(model.scan_id.in_(scan_ids)).all() if scan_ids else []
+
+    incident_ids = [incident.id for incident in incidents]
+    avatar = db.get(AvatarImage, user.id)
+    avatar_export = None
+    if avatar:
+        avatar_export = {
+            "content_type": avatar.content_type,
+            "updated_at": avatar.updated_at,
+            "sha256": hashlib.sha256(avatar.data).hexdigest(),
+            "data_base64": base64.b64encode(avatar.data).decode("ascii"),
+        }
+
+    # Credential verifiers and one-time-code hashes are deliberately omitted:
+    # they are authentication material, not portable account content.
+    session_metadata = [
+        {
+            "id": row.id,
+            "user_agent": row.user_agent,
+            "ip_address": row.ip_address,
+            "is_active": row.is_active,
+            "created_at": row.created_at,
+            "last_used_at": row.last_used_at,
+            "expires_at": row.expires_at,
+            "revoked_at": row.revoked_at,
+        }
+        for row in sessions
+    ]
+    api_keys = [
+        {
+            "id": row.id,
+            "name": row.name,
+            "key_prefix": row.key_prefix,
+            "scopes": row.scopes,
+            "is_active": row.is_active,
+            "created_at": row.created_at,
+            "last_used_at": row.last_used_at,
+        }
+        for row in owned(ApiKey)
+    ]
+
     return {
         "exported_at": datetime.now(timezone.utc).isoformat(),
         "user": _user_out(user),
         "privacy_preferences": _get_privacy_pref(db, user.id),
         "notification_preferences": db.query(NotificationPreference).filter(NotificationPreference.user_id == user.id).first(),
+        "avatar": avatar_export,
         "devices": devices,
-        "sessions": sessions,
+        "push_receipts": owned(PushReceipt),
+        "sessions": session_metadata,
+        "social_identities": owned(SocialIdentity),
         "scans": scans,
+        "risk_reports": for_scans(RiskReport),
+        "link_scans": for_scans(LinkScan),
+        "image_scans": for_scans(ImageScan),
+        "qr_scans": for_scans(QRScan),
+        "message_scans": for_scans(MessageScan),
+        "email_scans": for_scans(EmailScan),
+        "phone_scans": for_scans(PhoneScan),
+        "marketplace_scans": for_scans(MarketplaceScan),
+        "social_scans": for_scans(SocialScan),
         "incidents": incidents,
+        "incident_evidence": db.query(IncidentEvidence).filter(IncidentEvidence.incident_id.in_(incident_ids)).all() if incident_ids else [],
+        "case_pack_shares": [
+            {
+                "id": row.id,
+                "incident_id": row.incident_id,
+                "expires_at": row.expires_at,
+                "created_at": row.created_at,
+                "revoked_at": row.revoked_at,
+            }
+            for row in owned(CasePackShare)
+        ],
         "notifications": notifications,
         "community_reports": community_reports,
+        "trusted_contacts": owned(TrustedContact),
+        "monitored_identities": owned(MonitoredIdentity),
+        "breach_records": owned(BreachRecord),
         "identity_alerts": identity_alerts,
+        "broker_opt_outs": owned(BrokerOptOut),
+        "browser_telemetry": owned(BrowserTelemetryEvent),
+        "extension_telemetry": owned(ExtensionTelemetryEvent),
+        "education_progress": owned(EducationProgress),
+        "api_usage": owned(ApiUsage),
+        "api_keys": api_keys,
+        "personal_blocked_numbers": owned(PersonalBlockedNumber),
+        "audit_log": owned(AuditLog),
+        "billing_events": owned(BillingWebhookEvent),
         "scan_feedback_details": feedback_details,
     }
 

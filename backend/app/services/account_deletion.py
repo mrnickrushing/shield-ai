@@ -8,6 +8,8 @@ from app.models.models import (
     ApiUsage,
     AuditLog,
     AuthSession,
+    AvatarImage,
+    BillingWebhookEvent,
     BreachRecord,
     BrokerOptOut,
     BrowserTelemetryEvent,
@@ -22,8 +24,11 @@ from app.models.models import (
     MonitoredIdentity,
     Notification,
     NotificationPreference,
+    OAuthAuthorizationCode,
     PrivacyPreference,
     Profile,
+    PersonalBlockedNumber,
+    PushReceipt,
     ScanFeedbackDetail,
     SocialIdentity,
     TrustedContact,
@@ -44,8 +49,11 @@ def delete_user_account(db: Session, user: User, *, audit_detail: dict | None = 
 
     for model in (
         Notification,
+        PushReceipt,
         Device,
         AuthSession,
+        OAuthAuthorizationCode,
+        BillingWebhookEvent,
         NotificationPreference,
         PrivacyPreference,
         TrustedContact,
@@ -60,6 +68,7 @@ def delete_user_account(db: Session, user: User, *, audit_detail: dict | None = 
         ApiUsage,
         ApiKey,
         SocialIdentity,
+        PersonalBlockedNumber,
     ):
         db.query(model).filter(model.user_id == user.id).delete(synchronize_session=False)
 
@@ -72,4 +81,5 @@ def delete_user_account(db: Session, user: User, *, audit_detail: dict | None = 
         synchronize_session=False,
     )
     db.query(Profile).filter(Profile.user_id == user.id).delete(synchronize_session=False)
+    db.query(AvatarImage).filter(AvatarImage.user_id == user.id).delete(synchronize_session=False)
     db.delete(user)

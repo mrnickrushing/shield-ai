@@ -54,23 +54,31 @@ export const useAuth = create<AuthState>((set) => ({
   },
 
   acceptTokens: async (accessToken, refreshToken) => {
+    set({ user: null, rcPremium: false });
+    await clearTokens();
     await saveTokens(accessToken, refreshToken);
     set({ user: await ShieldAPI.me() });
   },
 
   login: async (email, password) => {
+    set({ user: null, rcPremium: false });
+    await clearTokens();
     const tokens = await ShieldAPI.login(email, password);
     await saveTokens(tokens.access_token, tokens.refresh_token);
     set({ user: await ShieldAPI.me() });
   },
 
   register: async (email, password, name) => {
+    set({ user: null, rcPremium: false });
+    await clearTokens();
     const tokens = await ShieldAPI.register(email, password, name);
     await saveTokens(tokens.access_token, tokens.refresh_token);
     set({ user: await ShieldAPI.me() });
   },
 
   loginWithSocial: async (provider, token, email, displayName, nonce) => {
+    set({ user: null, rcPremium: false });
+    await clearTokens();
     const tokens = await ShieldAPI.socialAuth(provider, token, email, displayName, nonce);
     await saveTokens(tokens.access_token, tokens.refresh_token);
     set({ user: await ShieldAPI.me() });
@@ -87,8 +95,10 @@ export const useAuth = create<AuthState>((set) => ({
   },
 
   logout: async () => {
-    await clearTokens();
-    await logOutRevenueCat();
     set({ user: null, rcPremium: false });
+    const { unregisterDeviceForPush } = await import("@/lib/notifications");
+    await unregisterDeviceForPush();
+    await ShieldAPI.logout();
+    await logOutRevenueCat();
   },
 }));

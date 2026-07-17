@@ -21,8 +21,13 @@ def upgrade() -> None:
     # (Railway uses PG 16). SQLite stores enums as TEXT so no action needed.
     bind = op.get_bind()
     if bind.dialect.name == "postgresql":
-        for val in ("qr", "message", "email", "phone"):
-            op.execute(f"ALTER TYPE scantype ADD VALUE IF NOT EXISTS '{val}'")
+        # Enum values are fixed migration source, never runtime input. Keeping
+        # each DDL statement literal also makes that trust boundary explicit to
+        # static analysis.
+        op.execute("ALTER TYPE scantype ADD VALUE IF NOT EXISTS 'qr'")
+        op.execute("ALTER TYPE scantype ADD VALUE IF NOT EXISTS 'message'")
+        op.execute("ALTER TYPE scantype ADD VALUE IF NOT EXISTS 'email'")
+        op.execute("ALTER TYPE scantype ADD VALUE IF NOT EXISTS 'phone'")
 
     op.create_table(
         "qr_scans",

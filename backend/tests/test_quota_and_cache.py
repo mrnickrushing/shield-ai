@@ -5,6 +5,7 @@ os.environ.setdefault("DATABASE_URL", "sqlite+pysqlite:///:memory:")
 os.environ.setdefault("ENVIRONMENT", "development")
 
 import uuid
+from datetime import datetime, timedelta, timezone
 
 from app.core.config import settings
 from app.models.models import ScanHistory, ScanStatus, ScanType, User
@@ -63,34 +64,27 @@ def test_scan_allowed_under_limit(monkeypatch):
     assert r.status_code == 201, r.text
 
 
-def test_daily_cap_uses_atomic_redis_counter_when_available(monkeypatch):
-    # With Redis present, the cap is enforced by an atomic counter so a
-    # concurrent burst can't slip past the read-then-act DB count.
-    monkeypatch.setattr(settings, "PREMIUM_DAILY_SCAN_LIMIT", 2)
-
-    counter = {"n": 0}
-
-    class _FakeRedis:
-        def incr(self, key):
-            counter["n"] += 1
-            return counter["n"]
-
-        def expire(self, key, ttl):
-            pass
-
+def test_daily_cap_uses_durable_rolling_history_even_with_redis(monkeypatch):
+    # Quota truth comes from durable scan history, not a resettable Redis UTC
+    # counter. Only records inside the rolling 24-hour window count.
     from app.services import quota
 
-    monkeypatch.setattr(quota, "ScanHistory", ScanHistory)
     import app.services.llm_cache as llm_cache
 
-    monkeypatch.setattr(llm_cache, "get_redis", lambda: _FakeRedis())
+    monkeypatch.setattr(llm_cache, "get_redis", lambda: (_ for _ in ()).throw(AssertionError("Redis must not be used")))
 
     db = TestingSession()
     try:
-        # counter returns prior totals 0, 1 (allowed), then 2 (>= limit).
-        assert quota._daily_scan_count(db, "u1") == 0
-        assert quota._daily_scan_count(db, "u1") == 1
-        assert quota._daily_scan_count(db, "u1") == 2
+        user_id = f"quota-window-{uuid.uuid4()}"
+        db.add(ScanHistory(user_id=user_id, scan_type=ScanType.message, status=ScanStatus.completed))
+        db.add(ScanHistory(
+            user_id=user_id,
+            scan_type=ScanType.message,
+            status=ScanStatus.completed,
+            created_at=datetime.now(timezone.utc) - timedelta(hours=25),
+        ))
+        db.commit()
+        assert quota._daily_scan_count(db, user_id) == 1
     finally:
         db.close()
 

@@ -67,7 +67,7 @@ function Row({ c, onPress }: { c: ProtectionScoreComponent; onPress: () => void 
 
 export default function ProtectionChecklistScreen() {
   const router = useRouter();
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ["protection-score"],
     queryFn: ShieldAPI.protectionScore,
     staleTime: 30_000,
@@ -97,13 +97,26 @@ export default function ProtectionChecklistScreen() {
         <View style={{ paddingVertical: spacing.xxl, alignItems: "center" }}>
           <ActivityIndicator color={colors.primaryBright} />
         </View>
+      ) : isError || !data ? (
+        <FadeIn delay={40}>
+          <Surface accent={colors.suspicious} style={{ alignItems: "center", marginTop: spacing.lg }}>
+            <Ionicons name="cloud-offline-outline" size={34} color={colors.suspicious} />
+            <Text style={{ color: colors.text, fontWeight: "800", fontSize: 17, marginTop: spacing.sm }}>Protection status unavailable</Text>
+            <Text style={{ color: colors.textMuted, textAlign: "center", marginTop: spacing.xs, marginBottom: spacing.md }}>
+              Shield AI could not load your current protections. No score or “fully protected” status has been assumed.
+            </Text>
+            <Pressable accessibilityRole="button" onPress={() => refetch()} style={{ minHeight: 44, paddingHorizontal: spacing.lg, justifyContent: "center", borderRadius: radius.pill, backgroundColor: withAlpha(colors.primaryBright, "22") }}>
+              <Text style={{ color: colors.primaryBright, fontWeight: "800" }}>{isFetching ? "Retrying…" : "Try Again"}</Text>
+            </Pressable>
+          </Surface>
+        </FadeIn>
       ) : (
         <>
           <FadeIn delay={40}>
             <Surface accent={colors.primaryBright} glow={withAlpha(colors.primary, "30")} style={{ marginBottom: spacing.lg }}>
               <View style={{ flexDirection: "row", alignItems: "baseline", gap: spacing.sm }}>
                 <Text style={{ color: colors.text, fontSize: 40, fontWeight: "900", letterSpacing: -1.5 }}>
-                  {data?.score ?? 0}
+                  {data.score}
                 </Text>
                 <Text style={{ color: colors.textMuted, fontSize: 16, fontWeight: "700" }}>/ 100</Text>
               </View>

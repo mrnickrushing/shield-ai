@@ -1,16 +1,20 @@
-version: "3.9"
-
 services:
   db:
     image: postgres:16-alpine
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
     environment:
       POSTGRES_USER: shield
-      POSTGRES_PASSWORD: shield
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in infra/.env}
       POSTGRES_DB: shield_ai
     ports:
-      - "5432:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    tmpfs:
+      - /run/postgresql
+      - /tmp
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U shield"]
       interval: 5s
@@ -19,15 +23,29 @@ services:
 
   redis:
     image: redis:7-alpine
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:?Set REDIS_PASSWORD in infra/.env}"]
     ports:
-      - "6379:6379"
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redisdata:/data
+    tmpfs:
+      - /tmp
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   api:
     build:
       context: ../backend
       dockerfile: Dockerfile
     env_file:
-      - ../backend/.env
+      - path: ../backend/.env
+        required: false
     ports:
       - "8000:8000"
     depends_on:
@@ -42,7 +60,8 @@ services:
       dockerfile: Dockerfile
     command: celery -A app.workers.celery_app.celery_app worker --loglevel=info
     env_file:
-      - ../backend/.env
+      - path: ../backend/.env
+        required: false
     depends_on:
       - redis
       - db
@@ -53,10 +72,12 @@ services:
       dockerfile: Dockerfile
     command: celery -A app.workers.celery_app.celery_app beat --loglevel=info
     env_file:
-      - ../backend/.env
+      - path: ../backend/.env
+        required: false
     depends_on:
       - redis
       - db
 
 volumes:
   pgdata:
+  redisdata:

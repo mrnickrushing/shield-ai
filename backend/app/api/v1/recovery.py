@@ -3,7 +3,6 @@ import hashlib
 import secrets
 import textwrap
 from datetime import datetime, timedelta, timezone
-
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from sqlalchemy.orm import Session
 
@@ -198,7 +197,8 @@ def create_incident(payload: IncidentCreate, db: Session = Depends(get_db), user
     now = datetime.now(timezone.utc)
     incident = Incident(
         user_id=user.id, incident_type=payload.incident_type, title=payload.title or "",
-        amount_lost=payload.amount_lost, currency=payload.currency, notes=payload.notes or "",
+        amount_lost=payload.amount_lost,
+        currency=payload.currency, notes=payload.notes or "",
         linked_scan_id=payload.linked_scan_id, created_at=now, updated_at=now,
     )
     db.add(incident)

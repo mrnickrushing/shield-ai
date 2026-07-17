@@ -5,9 +5,11 @@ explainable, and high-signal.
 """
 from __future__ import annotations
 
+import ipaddress
 import re
+import socket
 from datetime import datetime, timezone
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 import httpx
 
@@ -74,12 +76,87 @@ def _has_homograph(host: str) -> bool:
     return any(ord(c) > 127 for c in host) or host.startswith("xn--")
 
 
-def expand_url(url: str, timeout: float = 5.0) -> tuple[str, int]:
-    """Follow redirects, returning (final_url, redirect_count)."""
+_ALLOWED_URL_PORTS = {80, 443}
+_MAX_REDIRECTS = 5
+
+
+def _public_ip(address: str) -> bool:
     try:
-        with httpx.Client(follow_redirects=True, timeout=timeout) as client:
-            resp = client.head(url)
-            return str(resp.url), len(resp.history)
+        ip = ipaddress.ip_address(address)
+    except ValueError:
+        return False
+    return not (
+        ip.is_private
+        or ip.is_loopback
+        or ip.is_link_local
+        or ip.is_multicast
+        or ip.is_reserved
+        or ip.is_unspecified
+    )
+
+
+def is_safe_public_url(url: str) -> bool:
+    """Reject URL targets that could reach internal services.
+
+    Validation is repeated for every redirect hop. Both literal addresses and
+    every address returned by DNS must be public; mixed public/private answers
+    are rejected to avoid a resolver choosing an internal target.
+    """
+    try:
+        parsed = urlparse(url)
+        if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+            return False
+        if parsed.username or parsed.password:
+            return False
+        try:
+            port = parsed.port or (443 if parsed.scheme == "https" else 80)
+        except ValueError:
+            return False
+        if port not in _ALLOWED_URL_PORTS:
+            return False
+
+        host = parsed.hostname.rstrip(".").lower()
+        if host == "localhost" or host.endswith(".localhost"):
+            return False
+        try:
+            ipaddress.ip_address(host)
+        except ValueError:
+            pass
+        else:
+            return _public_ip(host)
+
+        addresses = {
+            item[4][0]
+            for item in socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+        }
+        return bool(addresses) and all(_public_ip(address) for address in addresses)
+    except (OSError, UnicodeError):
+        return False
+
+
+def expand_url(url: str, timeout: float = 5.0) -> tuple[str, int]:
+    """Follow public HTTP redirects, returning (final_url, redirect_count)."""
+    if not is_safe_public_url(url):
+        return url, 0
+    try:
+        current = url
+        redirects = 0
+        with httpx.Client(follow_redirects=False, timeout=timeout) as client:
+            while redirects <= _MAX_REDIRECTS:
+                if not is_safe_public_url(current):
+                    return url, 0
+                resp = client.head(current)
+                if not resp.is_redirect:
+                    return str(resp.url), redirects
+                location = resp.headers.get("location")
+                if not location or redirects == _MAX_REDIRECTS:
+                    return current, redirects
+                destination = urljoin(str(resp.url), location)
+                if not is_safe_public_url(destination):
+                    return url, 0
+                current = destination
+                redirects += 1
+        return current, redirects
     except Exception:
         return url, 0
 

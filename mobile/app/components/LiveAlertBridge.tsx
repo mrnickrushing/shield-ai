@@ -5,10 +5,11 @@ import React, { useEffect, useRef, useState } from "react";
 import { Animated, Pressable, Text, View } from "react-native";
 
 import { API_URL, Notification, ShieldAPI } from "@/lib/api";
+import { safeNotificationRoute } from "@/lib/notificationPolicy";
 import { useAuth } from "@/state/auth";
 import { colors, radius, spacing, withAlpha } from "@/theme/theme";
 
-type LiveAlert = Pick<Notification, "id" | "title" | "body" | "scan_id" | "created_at">;
+type LiveAlert = Pick<Notification, "id" | "title" | "body" | "scan_id" | "route" | "created_at">;
 
 function newestUnread(items: Notification[], seen: Set<string>) {
   return items.find((item) => !item.is_read && !seen.has(item.id));
@@ -106,8 +107,7 @@ export function LiveAlertBridge() {
       <Pressable
         onPress={() => {
           dismissAlert();
-          if (alert.scan_id) router.push(`/result?id=${alert.scan_id}`);
-          else router.push("/notifications");
+          router.push(safeNotificationRoute(alert.route, alert.scan_id) as any);
         }}
         style={{
           backgroundColor: colors.surfaceHigh,

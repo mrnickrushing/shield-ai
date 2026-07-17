@@ -1,7 +1,8 @@
 """Scan routes — Phase 1-3: link, image, QR, message, email, phone, marketplace, social."""
+import io
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import (
@@ -9,6 +10,7 @@ from app.api.deps import (
     get_user_from_api_key_or_jwt_write as get_user_write,
 )
 from app.db.session import get_db
+from app.core.config import settings
 from app.models.models import (
     ApiUsage,
     RiskReport,
@@ -34,6 +36,7 @@ from app.schemas.schemas import (
     VoiceScanCreate,
 )
 from app.services import ocr, scan_service
+from app.services.subscription import is_premium_active
 
 router = APIRouter(prefix="/scans", tags=["scans"])
 
@@ -45,6 +48,37 @@ def _require_subscription(db: Session, user: User) -> None:
     require_active_subscription(db, user)
 
 
+def _run_or_enqueue(
+    db: Session,
+    scan: ScanHistory,
+    scan_kind: str,
+    task_payload: dict,
+    inline_processor,
+    *,
+    usage_provider: str | None = None,
+) -> None:
+    """Keep network/OCR/LLM work off production request workers."""
+    if settings.ENVIRONMENT.lower() in {"production", "prod"}:
+        try:
+            from app.workers.celery_app import celery_app
+
+            celery_app.send_task("scans.process", args=[scan.id, scan_kind, task_payload])
+        except Exception as exc:
+            scan.status = ScanStatus.failed
+            db.commit()
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                "Analysis queue is temporarily unavailable. Please try again.",
+            ) from exc
+        return
+
+    inline_processor()
+    if usage_provider:
+        db.add(ApiUsage(user_id=scan.user_id, provider=usage_provider))
+    db.commit()
+    db.refresh(scan)
+
+
 @router.get("/url-check")
 def url_check(url: str, user: User = Depends(get_user)):
     """Fast reputation verdict for the live Safe Browser.
@@ -53,7 +87,7 @@ def url_check(url: str, user: User = Depends(get_user)):
     still requires Premium — Live Safe Browser is a subscription feature.
     Registered before /{scan_id} so this path wins.
     """
-    if not user.is_premium:
+    if not is_premium_active(user):
         raise HTTPException(
             status.HTTP_402_PAYMENT_REQUIRED,
             "Live Safe Browser requires Shield AI Premium.",
@@ -78,10 +112,11 @@ def create_link_scan(
     db.commit()
     db.refresh(scan)
 
-    scan_service.process_link_scan(db, scan, payload.url)
-    db.add(ApiUsage(user_id=user.id, provider="safe_browsing"))
-    db.commit()
-    db.refresh(scan)
+    _run_or_enqueue(
+        db, scan, "link", {"url": payload.url},
+        lambda: scan_service.process_link_scan(db, scan, payload.url),
+        usage_provider="safe_browsing",
+    )
     return scan
 
 
@@ -96,6 +131,26 @@ def create_image_scan(
         image_bytes = ocr.decode_base64_image(payload.image_base64)
     except Exception:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid image data")
+    if len(image_bytes) > settings.MAX_UPLOAD_MB * 1024 * 1024:
+        raise HTTPException(
+            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            f"Image must be under {settings.MAX_UPLOAD_MB} MB.",
+        )
+    try:
+        from PIL import Image, UnidentifiedImageError
+
+        with Image.open(io.BytesIO(image_bytes)) as image:
+            width, height = image.size
+            if width <= 0 or height <= 0 or width * height > 25_000_000:
+                raise HTTPException(
+                    status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                    "Image dimensions are too large.",
+                )
+            image.verify()
+    except HTTPException:
+        raise
+    except (UnidentifiedImageError, OSError, ValueError):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid image data")
 
     scan = ScanHistory(
         user_id=user.id, scan_type=ScanType.image, status=ScanStatus.pending,
@@ -104,16 +159,17 @@ def create_image_scan(
     db.commit()
     db.refresh(scan)
 
-    scan_service.process_image_scan(db, scan, image_bytes, storage_key=payload.filename)
-    db.add(ApiUsage(user_id=user.id, provider="anthropic"))
-    db.commit()
-    db.refresh(scan)
+    _run_or_enqueue(
+        db, scan, "image", {"image_base64": payload.image_base64, "storage_key": payload.filename},
+        lambda: scan_service.process_image_scan(db, scan, image_bytes, storage_key=payload.filename),
+        usage_provider="anthropic",
+    )
     return scan
 
 
 @router.get("", response_model=list[ScanOut])
 def list_scans(
-    limit: int = 50,
+    limit: int = Query(default=50, ge=1, le=200),
     db: Session = Depends(get_db),
     user: User = Depends(get_user),
 ):
@@ -121,7 +177,7 @@ def list_scans(
         db.query(ScanHistory)
         .filter(ScanHistory.user_id == user.id)
         .order_by(ScanHistory.created_at.desc())
-        .limit(min(limit, 200))
+        .limit(limit)
         .all()
     )
 
@@ -201,10 +257,11 @@ def create_qr_scan(
     db.commit()
     db.refresh(scan)
 
-    scan_service.process_qr_scan(db, scan, payload.qr_content)
-    db.add(ApiUsage(user_id=user.id, provider="safe_browsing"))
-    db.commit()
-    db.refresh(scan)
+    _run_or_enqueue(
+        db, scan, "qr", {"qr_content": payload.qr_content},
+        lambda: scan_service.process_qr_scan(db, scan, payload.qr_content),
+        usage_provider="safe_browsing",
+    )
     return scan
 
 
@@ -223,10 +280,11 @@ def create_message_scan(
     db.commit()
     db.refresh(scan)
 
-    scan_service.process_message_scan(db, scan, payload.message_text, payload.platform_hint)
-    db.add(ApiUsage(user_id=user.id, provider="anthropic"))
-    db.commit()
-    db.refresh(scan)
+    _run_or_enqueue(
+        db, scan, "message", {"message_text": payload.message_text, "platform_hint": payload.platform_hint},
+        lambda: scan_service.process_message_scan(db, scan, payload.message_text, payload.platform_hint),
+        usage_provider="anthropic",
+    )
     return scan
 
 
@@ -252,10 +310,11 @@ def create_voice_scan(
     db.commit()
     db.refresh(scan)
 
-    scan_service.process_voice_scan(db, scan, transcript, payload.caller_number)
-    db.add(ApiUsage(user_id=user.id, provider="anthropic"))
-    db.commit()
-    db.refresh(scan)
+    _run_or_enqueue(
+        db, scan, "voice", {"transcript": transcript, "caller_number": payload.caller_number},
+        lambda: scan_service.process_voice_scan(db, scan, transcript, payload.caller_number),
+        usage_provider="anthropic",
+    )
     return scan
 
 
@@ -282,18 +341,19 @@ def create_email_scan(
     db.commit()
     db.refresh(scan)
 
-    scan_service.process_email_scan(
-        db, scan,
-        raw_email=payload.raw_email,
-        sender_email=payload.sender_email,
-        sender_display_name=payload.sender_display_name,
-        reply_to_email=payload.reply_to_email,
-        subject=payload.subject,
-        body_text=payload.body_text,
+    email_payload = {
+        "raw_email": payload.raw_email,
+        "sender_email": payload.sender_email,
+        "sender_display_name": payload.sender_display_name,
+        "reply_to_email": payload.reply_to_email,
+        "subject": payload.subject,
+        "body_text": payload.body_text,
+    }
+    _run_or_enqueue(
+        db, scan, "email", email_payload,
+        lambda: scan_service.process_email_scan(db, scan, **email_payload),
+        usage_provider="anthropic",
     )
-    db.add(ApiUsage(user_id=user.id, provider="anthropic"))
-    db.commit()
-    db.refresh(scan)
     return scan
 
 
@@ -312,9 +372,10 @@ def create_phone_scan(
     db.commit()
     db.refresh(scan)
 
-    scan_service.process_phone_scan(db, scan, payload.phone_number)
-    db.commit()
-    db.refresh(scan)
+    _run_or_enqueue(
+        db, scan, "phone", {"phone_number": payload.phone_number},
+        lambda: scan_service.process_phone_scan(db, scan, payload.phone_number),
+    )
     return scan
 
 
@@ -337,10 +398,11 @@ def create_marketplace_scan(
     db.commit()
     db.refresh(scan)
 
-    scan_service.process_marketplace_scan(db, scan, payload.content_text, payload.platform_hint)
-    db.add(ApiUsage(user_id=user.id, provider="anthropic"))
-    db.commit()
-    db.refresh(scan)
+    _run_or_enqueue(
+        db, scan, "marketplace", {"content_text": payload.content_text, "platform_hint": payload.platform_hint},
+        lambda: scan_service.process_marketplace_scan(db, scan, payload.content_text, payload.platform_hint),
+        usage_provider="anthropic",
+    )
     return scan
 
 
@@ -359,8 +421,9 @@ def create_social_scan(
     db.commit()
     db.refresh(scan)
 
-    scan_service.process_social_scan(db, scan, payload.content_text, payload.platform)
-    db.add(ApiUsage(user_id=user.id, provider="anthropic"))
-    db.commit()
-    db.refresh(scan)
+    _run_or_enqueue(
+        db, scan, "social", {"content_text": payload.content_text, "platform": payload.platform},
+        lambda: scan_service.process_social_scan(db, scan, payload.content_text, payload.platform),
+        usage_provider="anthropic",
+    )
     return scan

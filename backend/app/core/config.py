@@ -5,6 +5,8 @@ from typing import List
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+DEFAULT_SECRET_KEY = "CHANGE_ME_IN_PRODUCTION_USE_AT_LEAST_32_BYTES"
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
@@ -16,7 +18,7 @@ class Settings(BaseSettings):
     DEBUG: bool = True
 
     # --- Security / JWT ---
-    SECRET_KEY: str = Field(default="CHANGE_ME_IN_PRODUCTION")
+    SECRET_KEY: str = Field(default=DEFAULT_SECRET_KEY)
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
@@ -44,8 +46,9 @@ class Settings(BaseSettings):
     GOOGLE_OAUTH_CLIENT_ID: str = ""
     GOOGLE_OAUTH_CLIENT_SECRET: str = ""
     GOOGLE_OAUTH_REDIRECT_URI: str = "https://api.shieldai.rushingtechnologies.com/api/v1/auth/google/callback"
-    MOBILE_GOOGLE_AUTH_RETURN_URI: str = "shieldai://google-auth"
+    MOBILE_GOOGLE_AUTH_RETURN_URI: str = "https://api.shieldai.rushingtechnologies.com/google-auth"
     APPLE_CLIENT_ID: str = "com.shieldai.app"
+    ANDROID_APP_SHA256_CERT_FINGERPRINTS: List[str] = []
     REVENUECAT_WEBHOOK_SECRET: str = ""  # Authorization header value RevenueCat sends to /billing/revenuecat-webhook
 
     # --- Phase 2 optional APIs ---
@@ -75,6 +78,7 @@ class Settings(BaseSettings):
     # high/critical risk before it's surfaced in the shared call-blocking feed.
     # Guards against one user's report getting a legitimate number blocked app-wide.
     PHONE_BLOCKLIST_MIN_REPORTERS: int = 3
+    URL_BLOCKLIST_MIN_REPORTERS: int = 3
 
     # --- Limits ---
     MAX_UPLOAD_MB: int = 10
@@ -100,10 +104,12 @@ def validate_runtime_settings() -> None:
         return
     if not settings.STRICT_PRODUCTION_CONFIG:
         return
-    if settings.SECRET_KEY == "CHANGE_ME_IN_PRODUCTION" or len(settings.SECRET_KEY) < 32:
+    if settings.SECRET_KEY == DEFAULT_SECRET_KEY or len(settings.SECRET_KEY) < 32:
         raise RuntimeError("SECRET_KEY must be set to a strong production value.")
     if "*" in settings.CORS_ORIGINS:
         raise RuntimeError("CORS_ORIGINS must not include '*' in production.")
+    if not settings.ANDROID_APP_SHA256_CERT_FINGERPRINTS:
+        raise RuntimeError("ANDROID_APP_SHA256_CERT_FINGERPRINTS must be set for verified OAuth app links.")
 
 
 @lru_cache

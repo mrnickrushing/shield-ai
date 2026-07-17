@@ -7,6 +7,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  AppState,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -145,6 +146,10 @@ const MODE_ORDER: ScanMode[] = [
   "marketplace",
   "social",
 ];
+
+function isScanMode(value: unknown): value is ScanMode {
+  return typeof value === "string" && MODE_ORDER.includes(value as ScanMode);
+}
 
 const MODE_META: Record<ScanMode, ModeMeta> = {
   link: {
@@ -328,13 +333,13 @@ export default function ScanScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ type?: string; text?: string }>();
-  const [mode, setMode] = useState<ScanMode>((params.type as ScanMode) ?? "link");
+  const [mode, setMode] = useState<ScanMode>(isScanMode(params.type) ? params.type : "link");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Siri/Shortcuts entry point: shieldai://scan?text=... pre-fills the
   // universal box (e.g. a "Check with Shield AI" shortcut passing the clipboard).
   const [universalText, setUniversalText] = useState(params.text ? decodeURIComponent(params.text) : "");
-  const [advancedOpen, setAdvancedOpen] = useState(!!params.type);
+  const [advancedOpen, setAdvancedOpen] = useState(isScanMode(params.type));
   const qrScanned = useRef(false);
 
   const [url, setUrl] = useState("");
@@ -361,11 +366,23 @@ export default function ScanScreen() {
   });
 
   useEffect(() => {
-    if (params.type) {
+    if (!isScanMode(params.type)) return;
+    const task = requestAnimationFrame(() => {
       setMode(params.type as ScanMode);
       setAdvancedOpen(true);
-    }
+    });
+    return () => cancelAnimationFrame(task);
   }, [params.type]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state !== "active") ExpoSpeechRecognitionModule.abort();
+    });
+    return () => {
+      subscription.remove();
+      ExpoSpeechRecognitionModule.abort();
+    };
+  }, []);
 
   const active = MODE_META[mode];
 

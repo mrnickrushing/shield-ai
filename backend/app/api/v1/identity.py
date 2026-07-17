@@ -7,9 +7,10 @@ GET  /api/v1/identity/alerts           — list identity alerts
 POST /api/v1/identity/alerts/{id}/read — mark alert as read
 """
 import time as _time
+import re
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
@@ -26,6 +27,7 @@ from app.schemas.schemas import (
     IdentityAlertOut,
 )
 from app.services import breach_check, broker_catalog
+from app.services.subscription import is_premium_active
 
 router = APIRouter(prefix="/identity", tags=["identity"])
 
@@ -33,7 +35,7 @@ _CACHE_TTL_HOURS = 24
 
 
 def _require_premium(user: User) -> None:
-    if not user.is_premium:
+    if not is_premium_active(user):
         raise HTTPException(
             status.HTTP_402_PAYMENT_REQUIRED,
             "Identity protection requires Shield AI Premium.",
@@ -186,36 +188,27 @@ def check_password(
     user: User = Depends(get_current_user),
 ):
     """
-    k-Anonymity password check. Returns the number of times this password
-    appeared in known data breaches. Never logs or stores the password.
+    Proxy one HIBP k-anonymity range. The client computes SHA-1 locally and
+    sends only its five-character prefix; the password and full hash never
+    leave the device.
     """
     _require_premium(user)
-    password = payload.get("password", "")
-    if not password:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "password is required")
+    prefix = str(payload.get("sha1_prefix", "")).upper()
+    if not re.fullmatch(r"[0-9A-F]{5}", prefix):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "A valid SHA-1 prefix is required")
     try:
-        count = breach_check.check_password_pwned(password)
+        suffixes = breach_check.fetch_password_range(prefix)
     except Exception:
         raise HTTPException(
             status.HTTP_503_SERVICE_UNAVAILABLE,
             "Password check service temporarily unavailable. Please try again.",
         )
-    if count > 0:
-        recommendation = (
-            f"This password appeared {count:,} time(s) in known data breaches. "
-            "Stop using it immediately and replace it with a unique, randomly generated password."
-        )
-    else:
-        recommendation = (
-            "This password was not found in known breach databases. "
-            "Still use a unique password for every account."
-        )
-    return {"pwned_count": count, "is_compromised": count > 0, "recommendation": recommendation}
+    return {"suffixes": suffixes}
 
 
 @router.get("/alerts", response_model=list[IdentityAlertOut])
 def list_alerts(
-    limit: int = 50,
+    limit: int = Query(default=50, ge=1, le=200),
     unread_only: bool = False,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
@@ -223,7 +216,7 @@ def list_alerts(
     q = db.query(IdentityAlert).filter(IdentityAlert.user_id == user.id)
     if unread_only:
         q = q.filter(IdentityAlert.is_read.is_(False))
-    return q.order_by(IdentityAlert.created_at.desc()).limit(min(limit, 200)).all()
+    return q.order_by(IdentityAlert.created_at.desc()).limit(limit).all()
 
 
 @router.post("/alerts/{alert_id}/read", status_code=status.HTTP_204_NO_CONTENT)

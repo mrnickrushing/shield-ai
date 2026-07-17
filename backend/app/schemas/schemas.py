@@ -1,7 +1,13 @@
 """Pydantic request/response schemas for Phase 1 + Phase 2 + Phase 4."""
 from datetime import datetime
+from decimal import Decimal
 
-from pydantic import BaseModel, EmailStr, Field, model_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
+
+from app.core.config import settings
+
+MAX_TEXT_CHARS = 100_000
+MAX_IMAGE_BASE64_CHARS = ((settings.MAX_UPLOAD_MB * 1024 * 1024 + 2) // 3) * 4 + 128
 
 
 class UserRegister(BaseModel):
@@ -12,7 +18,7 @@ class UserRegister(BaseModel):
 
 class UserLogin(BaseModel):
     email: EmailStr
-    password: str
+    password: str = Field(min_length=1, max_length=128)
 
 
 class TokenPair(BaseModel):
@@ -22,15 +28,20 @@ class TokenPair(BaseModel):
 
 
 class RefreshRequest(BaseModel):
-    refresh_token: str
+    refresh_token: str = Field(min_length=20, max_length=4096)
 
 
 class SocialAuthRequest(BaseModel):
     provider: str = Field(pattern="^(apple|google)$")
-    token: str
+    token: str = Field(min_length=20, max_length=20_000)
     nonce: str | None = Field(default=None, min_length=16, max_length=256)
-    email: str | None = None
-    display_name: str | None = None
+    email: str | None = Field(default=None, max_length=320)
+    display_name: str | None = Field(default=None, max_length=200)
+
+
+class OAuthCodeExchange(BaseModel):
+    code: str = Field(min_length=32, max_length=512)
+    code_verifier: str = Field(min_length=43, max_length=128, pattern=r"^[A-Za-z0-9._~-]+$")
 
 
 class ProfileUpdate(BaseModel):
@@ -48,17 +59,16 @@ class UserOut(BaseModel):
     simple_language_mode: bool = False
     large_text_mode: bool = False
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class LinkScanCreate(BaseModel):
-    url: str
+    url: str = Field(min_length=1, max_length=4096)
 
 
 class ImageScanCreate(BaseModel):
-    image_base64: str
-    filename: str = "screenshot.png"
+    image_base64: str = Field(min_length=4, max_length=MAX_IMAGE_BASE64_CHARS)
+    filename: str = Field(default="screenshot.png", max_length=255)
 
 
 class RiskReportOut(BaseModel):
@@ -71,8 +81,7 @@ class RiskReportOut(BaseModel):
     recommended_actions: list[str]
     evidence: dict
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ScanOut(BaseModel):
@@ -85,8 +94,7 @@ class ScanOut(BaseModel):
     completed_at: datetime | None = None
     report: RiskReportOut | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ScanFeedback(BaseModel):
@@ -110,51 +118,50 @@ class ScanFeedbackDetailOut(BaseModel):
     review_status: str
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class QRScanCreate(BaseModel):
-    qr_content: str
+    qr_content: str = Field(min_length=1, max_length=8192)
 
 
 class MessageScanCreate(BaseModel):
-    message_text: str
-    platform_hint: str = ""
+    message_text: str = Field(min_length=1, max_length=MAX_TEXT_CHARS)
+    platform_hint: str = Field(default="", max_length=100)
 
 
 class VoiceScanCreate(BaseModel):
-    transcript: str
-    caller_number: str = ""
+    transcript: str = Field(min_length=1, max_length=MAX_TEXT_CHARS)
+    caller_number: str = Field(default="", max_length=64)
 
 
 class EmailScanCreate(BaseModel):
-    raw_email: str | None = None
-    sender_email: str | None = None
-    sender_display_name: str | None = None
-    reply_to_email: str | None = None
-    subject: str | None = None
-    body_text: str | None = None
+    raw_email: str | None = Field(default=None, max_length=250_000)
+    sender_email: str | None = Field(default=None, max_length=320)
+    sender_display_name: str | None = Field(default=None, max_length=500)
+    reply_to_email: str | None = Field(default=None, max_length=320)
+    subject: str | None = Field(default=None, max_length=2000)
+    body_text: str | None = Field(default=None, max_length=MAX_TEXT_CHARS)
 
 
 class PhoneScanCreate(BaseModel):
-    phone_number: str
+    phone_number: str = Field(min_length=1, max_length=64)
 
 
 class MarketplaceScanCreate(BaseModel):
-    content_text: str
-    platform_hint: str = ""
+    content_text: str = Field(min_length=1, max_length=MAX_TEXT_CHARS)
+    platform_hint: str = Field(default="", max_length=100)
 
 
 class SocialScanCreate(BaseModel):
-    content_text: str
-    platform: str = ""
+    content_text: str = Field(min_length=1, max_length=MAX_TEXT_CHARS)
+    platform: str = Field(default="", max_length=100)
 
 
 class DeviceRegister(BaseModel):
-    push_token: str
+    push_token: str = Field(min_length=16, max_length=4096)
     platform: str = Field(pattern="^(ios|android)$")
-    label: str = ""
+    label: str = Field(default="", max_length=200)
 
 
 class DeviceOut(BaseModel):
@@ -166,8 +173,7 @@ class DeviceOut(BaseModel):
     last_seen_at: datetime | None = None
     revoked_at: datetime | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AuthSessionOut(BaseModel):
@@ -180,8 +186,7 @@ class AuthSessionOut(BaseModel):
     expires_at: datetime
     revoked_at: datetime | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class NotificationPreferenceIn(BaseModel):
@@ -194,12 +199,20 @@ class NotificationPreferenceIn(BaseModel):
     minimum_severity: str = Field(default="suspicious", pattern="^(all|low|suspicious|high|critical)$")
     topics: dict = {}
 
+    @field_validator("quiet_hours_start", "quiet_hours_end")
+    @classmethod
+    def validate_quiet_hours(cls, value: str) -> str:
+        import re
+
+        if not re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", value):
+            raise ValueError("Quiet hours must use 24-hour HH:MM format")
+        return value
+
 
 class NotificationPreferenceOut(NotificationPreferenceIn):
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class PrivacyPreferenceIn(BaseModel):
@@ -210,8 +223,7 @@ class PrivacyPreferenceIn(BaseModel):
 class PrivacyPreferenceOut(PrivacyPreferenceIn):
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ---------------------------------------------------------------------------
@@ -220,7 +232,7 @@ class PrivacyPreferenceOut(PrivacyPreferenceIn):
 
 class VerticalScanRequest(BaseModel):
     input: str = Field(default="", max_length=20000)
-    file_base64: str | None = None  # photo or PDF of a document (verticals that accept files)
+    file_base64: str | None = Field(default=None, max_length=MAX_IMAGE_BASE64_CHARS)  # photo or PDF
     context: dict = {}
 
     @model_validator(mode="after")
@@ -262,18 +274,26 @@ class NotificationOut(BaseModel):
     title: str
     body: str
     scan_id: str | None = None
+    severity: str = "low"
+    topic: str = "account"
+    route: str = "/notifications"
     is_read: bool
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Phase 4
 class IncidentCreate(BaseModel):
     incident_type: str
     title: str = ""
-    amount_lost: float | None = None
+    amount_lost: Decimal | None = Field(
+        default=None,
+        ge=Decimal("0"),
+        le=Decimal("999999999999.99"),
+        max_digits=14,
+        decimal_places=2,
+    )
     currency: str = "USD"
     notes: str = ""
     linked_scan_id: str | None = None
@@ -282,7 +302,13 @@ class IncidentCreate(BaseModel):
 class IncidentUpdate(BaseModel):
     status: str | None = None
     title: str | None = None
-    amount_lost: float | None = None
+    amount_lost: Decimal | None = Field(
+        default=None,
+        ge=Decimal("0"),
+        le=Decimal("999999999999.99"),
+        max_digits=14,
+        decimal_places=2,
+    )
     notes: str | None = None
     steps_completed: list[str] | None = None
 
@@ -292,7 +318,7 @@ class IncidentOut(BaseModel):
     incident_type: str
     status: str
     title: str
-    amount_lost: float | None = None
+    amount_lost: Decimal | None = None
     currency: str
     notes: str
     linked_scan_id: str | None = None
@@ -300,8 +326,7 @@ class IncidentOut(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class IncidentEvidenceCreate(BaseModel):
@@ -325,8 +350,7 @@ class TrustedContactOut(BaseModel):
     relationship_label: str
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class LessonOut(BaseModel):
@@ -341,8 +365,7 @@ class LessonOut(BaseModel):
     quiz_questions: list
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class QuizSubmit(BaseModel):
@@ -399,8 +422,7 @@ class IdentityAlertOut(BaseModel):
     is_read: bool
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class BrokerStatusUpdate(BaseModel):
@@ -462,8 +484,7 @@ class MonitoredIdentityOut(BaseModel):
     last_status: str
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class BrowserTelemetryCreate(BaseModel):
@@ -499,8 +520,7 @@ class ApiKeyOut(BaseModel):
     created_at: datetime
     last_used_at: datetime | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ApiKeyCreated(ApiKeyOut):
@@ -524,8 +544,7 @@ class CommunityReportOut(BaseModel):
     status: str
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CommunityReportAdminOut(CommunityReportOut):
@@ -558,8 +577,7 @@ class ScamPatternOut(BaseModel):
     source: str
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AdminStatsOut(BaseModel):
@@ -593,8 +611,7 @@ class AdminUserOut(BaseModel):
     total_api_keys: int = 0
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class PhoneReputationEntry(BaseModel):

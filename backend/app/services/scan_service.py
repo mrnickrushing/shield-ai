@@ -65,6 +65,9 @@ def _finalize(db: Session, scan: ScanHistory, report_data: dict, evidence: dict)
         title=f"Scan complete — {report_data['risk_level'].title()} risk",
         body=report_data["explanation"][:160],
         scan_id=scan.id,
+        severity=str(report_data["risk_level"]),
+        topic="account",
+        route=f"/result?id={scan.id}",
     )
     db.add(notif)
     db.commit()
@@ -78,7 +81,7 @@ def _finalize(db: Session, scan: ScanHistory, report_data: dict, evidence: dict)
         notif.body,
         severity=str(report_data["risk_level"]),
         topic="account",
-        data={"scan_id": scan.id, "type": "scan_complete"},
+        data={"scan_id": scan.id, "route": f"/result?id={scan.id}", "type": "scan_complete"},
     )
 
     return report

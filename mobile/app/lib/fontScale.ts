@@ -45,9 +45,10 @@ export function installGlobalFontScaling(): void {
     }
     return React.cloneElement(element, {
       style: [element.props.style, override],
-      // Our scale already enlarges text; cap OS Dynamic Type so the two don't
-      // compound into unusably huge type.
-      maxFontSizeMultiplier: element.props.maxFontSizeMultiplier ?? 1.3,
+      // Do not cap OS Dynamic Type. Users who select an accessibility text
+      // size must be allowed to receive it even when the app's own Large Text
+      // preference is enabled; scrollable layouts absorb the extra height.
+      maxFontSizeMultiplier: undefined,
     });
   };
   AnyText.__shieldFontScalePatched = true;

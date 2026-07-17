@@ -24,7 +24,7 @@ DELETE /api/v1/admin/patterns/{pattern_id}       — deactivate
 """
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
@@ -61,6 +61,7 @@ from app.schemas.schemas import (
     ScamPatternOut,
 )
 from app.services.account_deletion import delete_user_account
+from app.services.subscription import is_premium_active
 
 
 class _UserFlagsPatch(BaseModel):
@@ -184,7 +185,7 @@ def get_stats(
 
 @router.get("/users", response_model=list[AdminUserOut])
 def list_users(
-    limit: int = 100,
+    limit: int = Query(default=100, ge=1, le=500),
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ):
@@ -360,7 +361,7 @@ def disable_user_api_keys(
 @router.get("/api-keys")
 def list_api_keys(
     status_filter: str | None = None,
-    limit: int = 200,
+    limit: int = Query(default=200, ge=1, le=500),
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ):
@@ -393,7 +394,7 @@ def update_api_key(
 
 @router.get("/audit-logs")
 def list_audit_logs(
-    limit: int = 200,
+    limit: int = Query(default=200, ge=1, le=500),
     user_id: str | None = None,
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
@@ -419,7 +420,7 @@ def list_audit_logs(
 
 @router.get("/notifications/diagnostics")
 def notification_diagnostics(
-    limit: int = 200,
+    limit: int = Query(default=200, ge=1, le=500),
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ):
@@ -487,7 +488,7 @@ def create_test_notification(
 
 @router.get("/subscriptions/diagnostics")
 def subscription_diagnostics(
-    limit: int = 200,
+    limit: int = Query(default=200, ge=1, le=500),
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ):
@@ -504,7 +505,7 @@ def subscription_diagnostics(
                 "is_premium": user.is_premium,
                 "premium_expires_at": user.premium_expires_at,
                 "rc_product_id": user.rc_product_id,
-                "status": "expired" if user.premium_expires_at and user.premium_expires_at < now else "premium" if user.is_premium else "free",
+                "status": "premium" if is_premium_active(user, now) else "expired" if user.is_premium else "free",
             }
             for user in users
         ],
@@ -557,7 +558,7 @@ def operations_overview(
 @router.get("/reports", response_model=list[CommunityReportAdminOut])
 def list_community_reports(
     status_filter: str | None = None,
-    limit: int = 100,
+    limit: int = Query(default=100, ge=1, le=500),
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ):
@@ -572,7 +573,7 @@ def list_community_reports(
 @router.get("/feedback")
 def list_feedback_reviews(
     status_filter: str | None = "pending",
-    limit: int = 100,
+    limit: int = Query(default=100, ge=1, le=500),
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ):

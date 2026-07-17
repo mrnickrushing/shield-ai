@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+import logging
 from urllib.parse import urlparse
 
 from sqlalchemy import func
@@ -26,6 +27,8 @@ from app.services import breach_check, phone_lookup
 from app.services.notification_delivery import SEVERITY_RANK, preferences_for, send_email_alert, send_push_to_devices, should_deliver
 from app.services.url_check import check_url
 
+log = logging.getLogger(__name__)
+
 
 def normalize_domain(url: str, fallback: str = "") -> str:
     if fallback:
@@ -46,6 +49,7 @@ def create_alert(
     scan_id: str | None = None,
     force_inbox: bool = True,
     dedupe_for: timedelta | None = timedelta(hours=24),
+    route: str = "/notifications",
 ) -> Notification | None:
     if dedupe_for is not None:
         cutoff = datetime.now(timezone.utc) - dedupe_for
@@ -65,18 +69,50 @@ def create_alert(
 
     if not force_inbox and not should_deliver(db, user_id, severity, topic, "push"):
         return None
-    notif = Notification(user_id=user_id, title=title, body=body[:1000], scan_id=scan_id)
-    db.add(notif)
-    send_push_to_devices(
-        db,
-        user_id,
-        title,
-        body,
+    if scan_id:
+        route = f"/result?id={scan_id}"
+    notif = Notification(
+        user_id=user_id,
+        title=title,
+        body=body[:1000],
+        scan_id=scan_id,
         severity=severity,
         topic=topic,
-        data={"scan_id": scan_id, "topic": topic, "type": "monitoring_alert"},
+        route=route,
     )
-    send_email_alert(db, user_id, title, body, severity=severity, topic=topic)
+    db.add(notif)
+    # Persist the inbox record (and any monitor progress already staged in this
+    # transaction) before external delivery. If a worker is killed after a push
+    # succeeds, the durable dedupe record remains and the retry cannot resend it.
+    db.flush()
+    db.commit()
+    delivery_data = {"scan_id": scan_id, "topic": topic, "route": route, "type": "monitoring_alert"}
+    from app.core.config import settings
+
+    if settings.ENVIRONMENT.lower() in {"production", "prod"}:
+        try:
+            from app.workers.celery_app import celery_app
+
+            celery_app.send_task(
+                "notifications.deliver_alert",
+                args=[user_id, title, body],
+                kwargs={"severity": severity, "topic": topic, "data": delivery_data},
+            )
+        except Exception as exc:
+            # The durable inbox alert remains visible and a broker outage is
+            # observable in worker/API logs; never roll it back after commit.
+            log.error("could not enqueue alert delivery for user %s: %s", user_id, exc)
+    else:
+        send_push_to_devices(
+            db,
+            user_id,
+            title,
+            body,
+            severity=severity,
+            topic=topic,
+            data=delivery_data,
+        )
+        send_email_alert(db, user_id, title, body, severity=severity, topic=topic)
     return notif
 
 
@@ -200,7 +236,15 @@ def _record_identity_alert(
             detail={**detail, "monitor_id": target.id, "target_type": target.target_type},
         )
     )
-    create_alert(db, target.user_id, title, body, severity=severity, topic=topic)
+    create_alert(
+        db,
+        target.user_id,
+        title,
+        body,
+        severity=severity,
+        topic=topic,
+        route="/identity",
+    )
     return True
 
 
@@ -358,7 +402,7 @@ def _monitor_username(db: Session, target: MonitoredIdentity) -> bool:
     )
 
 
-def run_identity_monitors(db: Session, max_age_hours: int = 24) -> int:
+def run_identity_monitors(db: Session, max_age_hours: int = 24, batch_size: int = 50) -> int:
     cutoff = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
     targets = (
         db.query(MonitoredIdentity)
@@ -366,14 +410,30 @@ def run_identity_monitors(db: Session, max_age_hours: int = 24) -> int:
             MonitoredIdentity.is_active.is_(True),
             (MonitoredIdentity.last_checked_at.is_(None)) | (MonitoredIdentity.last_checked_at < cutoff),
         )
-        .limit(500)
+        .limit(batch_size)
         .all()
     )
     alerts = 0
     for target in targets:
         if check_identity_target(db, target):
             alerts += 1
+        # Persist progress after every network-backed target. A worker timeout
+        # resumes at the next due target rather than repeating the whole batch.
+        db.commit()
     return alerts
+
+
+def due_identity_monitor_count(db: Session, max_age_hours: int = 24) -> int:
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
+    return (
+        db.query(func.count(MonitoredIdentity.id))
+        .filter(
+            MonitoredIdentity.is_active.is_(True),
+            (MonitoredIdentity.last_checked_at.is_(None)) | (MonitoredIdentity.last_checked_at < cutoff),
+        )
+        .scalar()
+        or 0
+    )
 
 
 def run_recovery_reminders(db: Session) -> int:
@@ -394,6 +454,7 @@ def run_recovery_reminders(db: Session) -> int:
             severity="suspicious",
             topic="account",
             dedupe_for=timedelta(days=7),
+            route=f"/incident?id={incident.id}",
         )
         incident.updated_at = datetime.now(timezone.utc)
         if notif:
@@ -488,6 +549,7 @@ def run_broker_rechecks(db: Session) -> int:
             db, row.user_id, title, body,
             severity="suspicious", topic="breach",
             force_inbox=True, dedupe_for=timedelta(days=7),
+            route="/exposure",
         )
         row.last_recheck_at = now
         if notif:
@@ -503,6 +565,7 @@ def run_blocklist_growth_push(db: Session) -> int:
     shield got bigger. Skips quiet weeks entirely.
     """
     from app.models.models import SeededScamNumber, User
+    from app.services.subscription import is_premium_active
 
     week_ago = datetime.now(timezone.utc) - timedelta(days=7)
     added = (
@@ -517,13 +580,16 @@ def run_blocklist_growth_push(db: Session) -> int:
     title = "Your call shield grew this week"
     body = f"{added:,} new scam numbers were added to your blocklist this week. Open Call Protection to sync them to your phone."
     sent = 0
-    for (user_id,) in (
-        db.query(User.id).filter(User.is_active.is_(True), User.is_premium.is_(True)).all()
+    for user in (
+        db.query(User).filter(User.is_active.is_(True), User.is_premium.is_(True)).all()
     ):
+        if not is_premium_active(user):
+            continue
         notif = create_alert(
-            db, user_id, title, body,
+            db, user.id, title, body,
             severity="low", topic="account",
             force_inbox=False, dedupe_for=timedelta(days=6),
+            route="/call-protection",
         )
         if notif:
             sent += 1

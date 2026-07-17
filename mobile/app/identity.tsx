@@ -15,6 +15,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { PressableFX } from "@/components/PressableFX";
+import { QueryErrorState } from "@/components/QueryErrorState";
 import { Button, Eyebrow, FadeIn, Surface } from "@/components/ui";
 import { ShieldAPI, BreachResult, IdentityAlert, MonitoredIdentity } from "@/lib/api";
 import { colors, radius, spacing, withAlpha } from "@/theme/theme";
@@ -54,12 +55,12 @@ export default function IdentityScreen() {
     recommendation: string;
   } | null>(null);
 
-  const { data: alerts } = useQuery({
+  const { data: alerts, isError: alertsError, refetch: refetchAlerts } = useQuery({
     queryKey: ["identity-alerts"],
     queryFn: () => ShieldAPI.listIdentityAlerts(),
     staleTime: 60_000,
   });
-  const { data: monitoredTargets } = useQuery({
+  const { data: monitoredTargets, isError: targetsError, refetch: refetchTargets } = useQuery({
     queryKey: ["monitoring-targets"],
     queryFn: () => ShieldAPI.listMonitoringTargets(),
     staleTime: 60_000,
@@ -139,6 +140,9 @@ export default function IdentityScreen() {
   } as const;
 
   const unreadCount = alerts?.filter((a) => !a.is_read).length ?? 0;
+  const emailMonitorCount = (monitoredTargets ?? []).filter(
+    (target) => target.target_type === "email" && target.is_active
+  ).length;
 
   return (
     <KeyboardAvoidingView
@@ -153,18 +157,29 @@ export default function IdentityScreen() {
         </View>
 
         <FadeIn>
+          {(alertsError || targetsError) && (
+            <View style={{ marginBottom: spacing.lg }}>
+              <QueryErrorState
+                message="Identity alerts or monitoring status could not be loaded. No protection status has been assumed."
+                onRetry={() => {
+                  refetchAlerts();
+                  refetchTargets();
+                }}
+              />
+            </View>
+          )}
           <View style={{ borderRadius: radius.md, borderWidth: 1, borderColor: `${colors.primaryBright}99`, backgroundColor: colors.glassDeep, padding: 10, marginBottom: spacing.lg, ...({ shadowColor: colors.primaryBright, shadowOpacity: 0.28, shadowRadius: 13, shadowOffset: { width: 0, height: 0 } }) }}>
             <Text style={{ color: colors.text, fontSize: 15, fontWeight: "900", marginBottom: 8 }}>Monitoring Status</Text>
             <View style={{ flexDirection: "row", gap: 7 }}>
               {[
-                { icon: "shield-checkmark-outline" as const, color: colors.safe, title: "Email Breach\nMonitoring", value: `${(monitoredTargets ?? []).filter((target) => target.target_type === "email" && target.is_active).length} Breaches\nFound` },
-                { icon: "lock-closed-outline" as const, color: colors.primaryBright, title: "Credit Freeze\nGuidance", value: "Freeze Active\n(3 Bureaus)" },
+                { icon: "shield-checkmark-outline" as const, color: colors.safe, title: "Email Breach\nMonitoring", value: targetsError ? "Status\nUnavailable" : `${emailMonitorCount} email${emailMonitorCount === 1 ? "" : "s"}\nWatched` },
+                { icon: "lock-closed-outline" as const, color: colors.primaryBright, title: "Credit Freeze\nGuidance", value: "Setup steps\nNot verified" },
                 { icon: "eye-off-outline" as const, color: colors.purple, title: "Data Broker\nExposure", value: "Review\nSources" },
               ].map((status) => (
-                <View key={status.title} style={{ flex: 1, minHeight: 130, borderRadius: 10, borderWidth: 1, borderColor: status.color, backgroundColor: `${status.color}15`, alignItems: "center", paddingHorizontal: 5, paddingVertical: 10 }}>
+                <View key={status.title} style={{ flex: 1, minHeight: 150, borderRadius: 10, borderWidth: 1, borderColor: status.color, backgroundColor: `${status.color}15`, alignItems: "center", paddingHorizontal: 6, paddingVertical: 10 }}>
                   <Ionicons name={status.icon} size={27} color={status.color} />
-                  <Text style={{ color: colors.text, fontSize: 10, lineHeight: 12, textAlign: "center", fontWeight: "800", marginTop: 8 }}>{status.title}</Text>
-                  <Text style={{ color: colors.textDim, fontSize: 9, lineHeight: 11, textAlign: "center", marginTop: 4 }}>{status.value}</Text>
+                  <Text style={{ color: colors.text, fontSize: 12, lineHeight: 16, textAlign: "center", fontWeight: "800", marginTop: 8 }}>{status.title}</Text>
+                  <Text style={{ color: colors.textDim, fontSize: 12, lineHeight: 16, textAlign: "center", marginTop: 4 }}>{status.value}</Text>
                 </View>
               ))}
             </View>

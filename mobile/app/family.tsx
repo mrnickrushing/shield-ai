@@ -5,6 +5,7 @@ import React, { useState } from "react";
 import { Alert, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 
 import { Button, Chip, Eyebrow, FadeIn, GlowOrb, Surface } from "@/components/ui";
+import { QueryErrorState } from "@/components/QueryErrorState";
 import { ShieldAPI } from "@/lib/api";
 import { colors, radius, spacing, withAlpha } from "@/theme/theme";
 
@@ -19,7 +20,7 @@ export default function FamilyScreen() {
   const [email, setEmail] = useState("");
   const [rel, setRel] = useState("Friend");
 
-  const { data: contacts = [] } = useQuery({ queryKey: ["trusted-contacts"], queryFn: ShieldAPI.listContacts });
+  const { data: contacts = [], isError, refetch } = useQuery({ queryKey: ["trusted-contacts"], queryFn: ShieldAPI.listContacts });
   const addContact = useMutation({
     mutationFn: () => ShieldAPI.addContact({ name, phone, email, relationship_label: rel }),
     onSuccess: () => {
@@ -76,7 +77,13 @@ export default function FamilyScreen() {
         </Surface>
       </FadeIn>
 
-      {(contacts as any[]).length === 0 && !showAdd && (
+      {isError && !showAdd && (
+        <View style={{ marginBottom: spacing.lg }}>
+          <QueryErrorState message="Trusted contacts could not be loaded." onRetry={() => refetch()} />
+        </View>
+      )}
+
+      {!isError && (contacts as any[]).length === 0 && !showAdd && (
         <FadeIn delay={60}>
           <Surface style={{ alignItems: "center", paddingVertical: spacing.xl, marginBottom: spacing.lg }}>
             <Ionicons name="people-outline" size={36} color={colors.textMuted} style={{ marginBottom: spacing.sm }} />
@@ -88,7 +95,7 @@ export default function FamilyScreen() {
         </FadeIn>
       )}
 
-      {(contacts as any[]).length > 0 && (
+      {!isError && (contacts as any[]).length > 0 && (
         <FadeIn delay={60}>
           {(contacts as any[]).map((c: any) => (
             <Surface key={c.id} style={{ marginBottom: spacing.md, flexDirection: "row", alignItems: "center" }}>

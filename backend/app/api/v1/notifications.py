@@ -6,7 +6,7 @@ POST /api/v1/notifications/{id}/read — mark a notification as read
 """
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
@@ -45,12 +45,12 @@ def register_device(
     user: User = Depends(get_current_user),
 ):
     """Register or update the push token for this device."""
-    existing = (
-        db.query(Device)
-        .filter(Device.user_id == user.id, Device.push_token == payload.push_token)
-        .first()
-    )
+    # An Expo token identifies one app installation, not one account. Transfer
+    # it atomically on account switch so the previous account can never keep
+    # sending sensitive alerts to the same physical device.
+    existing = db.query(Device).filter(Device.push_token == payload.push_token).first()
     if existing:
+        existing.user_id = user.id
         existing.platform = payload.platform
         existing.label = payload.label
         existing.last_seen_at = datetime.now(timezone.utc)
@@ -58,6 +58,25 @@ def register_device(
     else:
         db.add(Device(user_id=user.id, push_token=payload.push_token, platform=payload.platform, label=payload.label, last_seen_at=datetime.now(timezone.utc)))
     db.commit()
+
+
+@router.delete("/devices/current", status_code=status.HTTP_204_NO_CONTENT)
+def unregister_device(
+    push_token: str = Query(min_length=16, max_length=4096),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    device = (
+        db.query(Device)
+        .filter(Device.user_id == user.id, Device.push_token == push_token)
+        .first()
+    )
+    if device:
+        # Keep the row so delivery receipts retain referential integrity, but
+        # make it immediately ineligible for future notifications.
+        device.revoked_at = datetime.now(timezone.utc)
+        device.last_seen_at = datetime.now(timezone.utc)
+        db.commit()
 
 
 @router.get("/preferences", response_model=NotificationPreferenceOut)
@@ -88,7 +107,7 @@ def update_preferences(
 
 @router.get("", response_model=list[NotificationOut])
 def list_notifications(
-    limit: int = 50,
+    limit: int = Query(default=50, ge=1, le=200),
     unread_only: bool = False,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
@@ -96,7 +115,7 @@ def list_notifications(
     q = db.query(Notification).filter(Notification.user_id == user.id)
     if unread_only:
         q = q.filter(Notification.is_read.is_(False))
-    return q.order_by(Notification.created_at.desc()).limit(min(limit, 200)).all()
+    return q.order_by(Notification.created_at.desc()).limit(limit).all()
 
 
 @router.post("/{notif_id}/read", status_code=status.HTTP_204_NO_CONTENT)

@@ -21,12 +21,14 @@ from app.models.models import (
     ScanHistory,
     User,
 )
+from app.services.subscription import is_premium_active
 
 # (key, points, title, fix_hint, screen)
 COMPONENTS = [
     ("scanned_recently", 15, "Ran a scan in the last 7 days", "Scan anything suspicious to stay sharp.", "scan"),
     ("call_protection", 20, "Call protection synced", "Turn on scam-call labeling in Settings → Phone.", "call-protection"),
-    ("text_protection", 15, "Text filtering active", "Enable SMS filtering in Settings → Messages → Unknown & Spam.", "call-protection"),
+    # iOS does not expose whether the user selected our Message Filter. Do not
+    # award points from blocklist provisioning or a self-reported toggle.
     ("safe_browser_used", 10, "Used the live Safe Browser", "Open links through the Safe Browser for real-time protection.", "browser"),
     ("identity_monitored", 20, "Identity monitoring set up", "Add your email so we watch for new breaches.", "identity"),
     ("education_started", 10, "Completed a scam-spotting lesson", "Take a 2-minute lesson — trained users spot scams faster.", "education"),
@@ -61,7 +63,6 @@ def compute_protection_score(db: Session, user: User) -> dict:
             is not None
         ),
         "call_protection": _ext_active("call_directory"),
-        "text_protection": _ext_active("message_filter"),
         "safe_browser_used": (
             db.query(BrowserTelemetryEvent.id)
             .filter(BrowserTelemetryEvent.user_id == user.id, BrowserTelemetryEvent.created_at >= month_ago)
@@ -80,7 +81,7 @@ def compute_protection_score(db: Session, user: User) -> dict:
             .first()
             is not None
         ),
-        "premium_active": bool(user.is_premium),
+        "premium_active": is_premium_active(user),
     }
 
     score = 0

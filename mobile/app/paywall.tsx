@@ -55,7 +55,8 @@ export default function Paywall() {
   }, [userId]);
 
   useEffect(() => {
-    loadOffering();
+    const task = requestAnimationFrame(() => { void loadOffering(); });
+    return () => cancelAnimationFrame(task);
   }, [loadOffering]);
 
   // Entitlement can arrive from a purchase, a restore, or the backend webhook.
@@ -174,62 +175,62 @@ export default function Paywall() {
           <Ionicons name="person-circle-outline" size={24} color={colors.text} />
         </View>
         <Text style={{ color: colors.text, fontSize: 21, fontWeight: "900", textAlign: "center" }}>Choose Your Protection Level</Text>
-        <Text style={{ color: colors.textDim, fontSize: 11, textAlign: "center", marginTop: 4, marginBottom: 16 }}>AI-powered scam, fraud, and identity protection assistant</Text>
+        <Text style={{ color: colors.textDim, fontSize: 13, lineHeight: 19, textAlign: "center", marginTop: 4, marginBottom: 16 }}>AI-powered scam, fraud, and identity protection assistant</Text>
 
-        <View style={{ flexDirection: "row", gap: 6 }}>
+        <View style={{ gap: 10 }}>
           {[
             { title: "Premium", price: individualMonthlyPrice, family: false, lines: ["Live Safe Browser", "Breach Monitoring", "Identity Breach Report", "Data Broker Exposure Checklist"] },
             { title: "Family", price: familyMonthlyPrice, family: true, lines: ["Everything in Premium", "Shared across multiple members", "Trusted Contact Escalation"] },
           ].map((tier) => {
             const selected = family === tier.family;
             return (
-              <Pressable key={tier.title} onPress={() => setFamily(tier.family)} style={{ flex: 1, minHeight: 196, borderRadius: 9, borderWidth: selected ? 2 : 1, borderColor: selected ? colors.primaryBright : "#73839A", backgroundColor: selected ? "#142E59" : "#102445", padding: 9 }}>
-                <Text style={{ color: colors.text, textAlign: "center", fontSize: 12, fontWeight: "800" }}>{tier.title}</Text>
-                <Text style={{ color: colors.text, textAlign: "center", fontSize: 18, fontWeight: "900", marginTop: 9 }}>{tier.price}<Text style={{ fontSize: 9, fontWeight: "400" }}>/month</Text></Text>
-                <View style={{ marginTop: 10, flex: 1 }}>{tier.lines.map((line) => <Text key={line} style={{ color: colors.textDim, fontSize: 8.5, lineHeight: 13 }}>• {line}</Text>)}</View>
-                <View style={{ height: 28, borderRadius: 14, backgroundColor: selected ? "#FFFFFF" : "transparent", borderWidth: 1, borderColor: "#FFFFFF", alignItems: "center", justifyContent: "center" }}><Text style={{ color: selected ? "#0B1730" : "#FFFFFF", fontSize: 9, fontWeight: "700" }}>Select {tier.title}</Text></View>
+              <Pressable accessibilityRole="radio" accessibilityState={{ checked: selected }} key={tier.title} onPress={() => setFamily(tier.family)} style={{ minHeight: 180, borderRadius: 12, borderWidth: selected ? 2 : 1, borderColor: selected ? colors.primaryBright : "#73839A", backgroundColor: selected ? "#142E59" : "#102445", padding: 16 }}>
+                <Text style={{ color: colors.text, textAlign: "center", fontSize: 16, fontWeight: "800" }}>{tier.title}</Text>
+                <Text style={{ color: colors.text, textAlign: "center", fontSize: 22, fontWeight: "900", marginTop: 9 }}>{tier.price}<Text style={{ fontSize: 13, fontWeight: "400" }}>/month</Text></Text>
+                <View style={{ marginTop: 10, flex: 1, gap: 3 }}>{tier.lines.map((line) => <Text key={line} style={{ color: colors.textDim, fontSize: 13, lineHeight: 19 }}>• {line}</Text>)}</View>
+                <View style={{ minHeight: 44, borderRadius: 22, backgroundColor: selected ? "#FFFFFF" : "transparent", borderWidth: 1, borderColor: "#FFFFFF", alignItems: "center", justifyContent: "center", marginTop: 10 }}><Text style={{ color: selected ? "#0B1730" : "#FFFFFF", fontSize: 14, fontWeight: "700" }}>Select {tier.title}</Text></View>
               </Pressable>
             );
           })}
-          <Pressable onPress={() => Linking.openURL("mailto:sales@rushingtechnologies.com?subject=Shield%20AI%20B2B")} style={{ flex: 1, minHeight: 196, borderRadius: 9, borderWidth: 1, borderColor: "#73839A", backgroundColor: "#102445", padding: 9 }}>
-            <Text style={{ color: colors.text, textAlign: "center", fontSize: 12, fontWeight: "800" }}>B2B</Text>
-            <Text style={{ color: colors.textDim, textAlign: "center", fontSize: 7 }}>(Contact Sales)</Text>
-            <Text style={{ color: colors.text, textAlign: "center", fontSize: 14, fontWeight: "900", marginTop: 9 }}>Contact Sales</Text>
-            <View style={{ marginTop: 12 }}><Text style={{ color: colors.textDim, fontSize: 8.5, lineHeight: 13 }}>• API, white-label workflows</Text><Text style={{ color: colors.textDim, fontSize: 8.5, lineHeight: 13 }}>• Employee anti-phishing benefits</Text></View>
+          <Pressable accessibilityRole="button" accessibilityLabel="Contact sales about Shield AI for business" onPress={() => Linking.openURL("mailto:sales@rushingtechnologies.com?subject=Shield%20AI%20B2B")} style={{ minHeight: 170, borderRadius: 12, borderWidth: 1, borderColor: "#73839A", backgroundColor: "#102445", padding: 16 }}>
+            <Text style={{ color: colors.text, textAlign: "center", fontSize: 16, fontWeight: "800" }}>B2B</Text>
+            <Text style={{ color: colors.textDim, textAlign: "center", fontSize: 12 }}>(Contact Sales)</Text>
+            <Text style={{ color: colors.text, textAlign: "center", fontSize: 18, fontWeight: "900", marginTop: 9 }}>Contact Sales</Text>
+            <View style={{ marginTop: 12, gap: 3 }}><Text style={{ color: colors.textDim, fontSize: 13, lineHeight: 19 }}>• API, white-label workflows</Text><Text style={{ color: colors.textDim, fontSize: 13, lineHeight: 19 }}>• Employee anti-phishing benefits</Text></View>
           </Pressable>
         </View>
 
         <View style={{ borderRadius: 10, borderWidth: 1, borderColor: "#5D6F87", backgroundColor: "#102445", marginTop: 14, overflow: "hidden" }}>
           <View style={{ flexDirection: "row", paddingHorizontal: 10, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: "#52647D" }}>
-            <Text style={{ color: colors.text, fontSize: 10, fontWeight: "800", flex: 1 }}>Plan Features</Text>
-            {['Premium', 'Family', 'B2B'].map((label) => <Text key={label} style={{ color: colors.text, fontSize: 8, fontWeight: "700", width: 46, textAlign: "center" }}>{label}</Text>)}
+            <Text style={{ color: colors.text, fontSize: 13, fontWeight: "800", flex: 1 }}>Plan Features</Text>
+            {['Premium', 'Family', 'B2B'].map((label) => <Text key={label} style={{ color: colors.text, fontSize: 11, fontWeight: "700", width: 58, textAlign: "center" }}>{label}</Text>)}
           </View>
           {featureRows.map(([label, premium, familyPlan, b2b]) => (
-            <View key={label} style={{ minHeight: 27, flexDirection: "row", alignItems: "center", paddingHorizontal: 10, borderBottomWidth: 1, borderBottomColor: "#263A59" }}>
-              <Text style={{ color: colors.textDim, fontSize: 8.5, flex: 1 }}>{label}</Text>
-              {[premium, familyPlan, b2b].map((enabled, index) => <View key={index} style={{ width: 46, alignItems: "center" }}><Ionicons name={enabled ? "checkmark-circle" : "ellipse"} size={13} color={enabled ? colors.safe : "#6D7786"} /></View>)}
+            <View key={label} style={{ minHeight: 44, flexDirection: "row", alignItems: "center", paddingHorizontal: 10, borderBottomWidth: 1, borderBottomColor: "#263A59" }}>
+              <Text style={{ color: colors.textDim, fontSize: 12, flex: 1 }}>{label}</Text>
+              {[premium, familyPlan, b2b].map((enabled, index) => <View key={index} style={{ width: 58, alignItems: "center" }}><Ionicons name={enabled ? "checkmark-circle" : "ellipse"} size={18} color={enabled ? colors.safe : "#6D7786"} /></View>)}
             </View>
           ))}
         </View>
 
         {loadingOffering ? <ActivityIndicator color={colors.primaryBright} style={{ marginTop: 12 }} /> : null}
-        {error ? <Text style={{ color: colors.suspicious, fontSize: 10, textAlign: "center", marginTop: 9 }}>{error}</Text> : null}
+        {error ? <Text accessibilityRole="alert" style={{ color: colors.suspicious, fontSize: 13, textAlign: "center", marginTop: 9 }}>{error}</Text> : null}
         {!loadingOffering && !error && family && !hasPurchasablePackage ? (
-          <Text style={{ color: colors.suspicious, fontSize: 10, textAlign: "center", marginTop: 9 }}>
+          <Text style={{ color: colors.suspicious, fontSize: 13, textAlign: "center", marginTop: 9 }}>
             The Family plan isn&apos;t available yet — choose Premium to get protected now.
           </Text>
         ) : null}
         <Pressable onPress={() => buy(selectedPkg)} disabled={busy !== null || !hasPurchasablePackage} style={{ height: 50, borderRadius: 25, backgroundColor: "#2458FF", alignItems: "center", justifyContent: "center", marginTop: 14, opacity: hasPurchasablePackage ? 1 : 0.55 }}>
           <Text style={{ color: "#FFFFFF", fontSize: 15, fontWeight: "900" }}>{busy === "purchase" ? "Starting…" : "Secure My Account"}</Text>
         </Pressable>
-        <View style={{ flexDirection: "row", justifyContent: "center", gap: 14, marginTop: 12 }}>
-          <Pressable onPress={restore}><Text style={{ color: colors.textMuted, fontSize: 9 }}>Restore Purchases</Text></Pressable>
-          <Pressable onPress={() => Linking.openURL(TERMS_URL)}><Text style={{ color: colors.textMuted, fontSize: 9 }}>Terms & Conditions</Text></Pressable>
-          <Pressable onPress={() => Linking.openURL(PRIVACY_URL)}><Text style={{ color: colors.textMuted, fontSize: 9 }}>Privacy Policy</Text></Pressable>
+        <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 8, marginTop: 12 }}>
+          <Pressable accessibilityRole="button" onPress={restore} style={{ minHeight: 44, justifyContent: "center", paddingHorizontal: 8 }}><Text style={{ color: colors.textMuted, fontSize: 12 }}>Restore Purchases</Text></Pressable>
+          <Pressable accessibilityRole="link" onPress={() => Linking.openURL(TERMS_URL)} style={{ minHeight: 44, justifyContent: "center", paddingHorizontal: 8 }}><Text style={{ color: colors.textMuted, fontSize: 12 }}>Terms & Conditions</Text></Pressable>
+          <Pressable accessibilityRole="link" onPress={() => Linking.openURL(PRIVACY_URL)} style={{ minHeight: 44, justifyContent: "center", paddingHorizontal: 8 }}><Text style={{ color: colors.textMuted, fontSize: 12 }}>Privacy Policy</Text></Pressable>
         </View>
         <View style={{ flexDirection: "row", justifyContent: "center", gap: 16, marginTop: 10 }}>
-          <Pressable onPress={signOut}><Text style={{ color: colors.textMuted, fontSize: 9 }}>Sign out</Text></Pressable>
-          <Pressable onPress={confirmDeleteAccount}><Text style={{ color: colors.textMuted, fontSize: 9 }}>Delete account</Text></Pressable>
+          <Pressable accessibilityRole="button" onPress={signOut} style={{ minHeight: 44, justifyContent: "center", paddingHorizontal: 8 }}><Text style={{ color: colors.textMuted, fontSize: 12 }}>Sign out</Text></Pressable>
+          <Pressable accessibilityRole="button" onPress={confirmDeleteAccount} style={{ minHeight: 44, justifyContent: "center", paddingHorizontal: 8 }}><Text style={{ color: colors.textMuted, fontSize: 12 }}>Delete account</Text></Pressable>
         </View>
       </View>
     </ScrollView>

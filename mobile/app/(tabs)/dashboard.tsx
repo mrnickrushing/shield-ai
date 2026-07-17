@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import React, { useEffect } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
 import Svg, { Circle, Defs, LinearGradient, Path, Polyline, RadialGradient, Stop } from "react-native-svg";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -78,7 +78,7 @@ function RiskGauge({ score }: { score: number }) {
   const status = score >= 70 ? "Protected" : score >= 45 ? "Needs attention" : "At risk";
   return (
     <View style={{ alignItems: "center", width: "100%" }}>
-      <Text numberOfLines={1} maxFontSizeMultiplier={1.1} style={{ color: colors.textDim, fontSize: 12, fontWeight: "800", letterSpacing: 0.4, marginBottom: 6 }}>
+      <Text numberOfLines={1} style={{ color: colors.textDim, fontSize: 12, fontWeight: "800", letterSpacing: 0.4, marginBottom: 6 }}>
         Protection Score
       </Text>
       <View style={{ width: size, height: size }}>
@@ -108,12 +108,12 @@ function RiskGauge({ score }: { score: number }) {
         </Svg>
         <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center" }}>
           <View style={{ flexDirection: "row", alignItems: "flex-end" }}>
-            <Text maxFontSizeMultiplier={1.05} style={{ color: colors.text, fontSize: score >= 100 ? 40 : 48, lineHeight: 52, fontWeight: "900" }}>{score}</Text>
-            <Text maxFontSizeMultiplier={1.05} style={{ color: colors.textDim, fontSize: 16, paddingBottom: 6 }}>/100</Text>
+            <Text style={{ color: colors.text, fontSize: score >= 100 ? 40 : 48, lineHeight: 52, fontWeight: "900" }}>{score}</Text>
+            <Text style={{ color: colors.textDim, fontSize: 16, paddingBottom: 6 }}>/100</Text>
           </View>
         </View>
       </View>
-      <Text numberOfLines={1} maxFontSizeMultiplier={1.1} style={{ color, fontSize: 13, fontWeight: "800", marginTop: 6 }}>
+      <Text numberOfLines={1} style={{ color, fontSize: 13, fontWeight: "800", marginTop: 6 }}>
         {status}
       </Text>
     </View>
@@ -164,7 +164,7 @@ function ActivityTrend({ scans }: { scans: Scan[] | undefined }) {
           <Path d="M8 82 H162" fill="none" stroke={colors.borderHi} strokeWidth="1.5" strokeDasharray="4 6" />
         )}
       </Svg>
-      <Text numberOfLines={1} maxFontSizeMultiplier={1.2} style={{ color: colors.textDim, fontSize: 11, fontWeight: "600", textAlign: "center", marginTop: -2 }}>
+      <Text numberOfLines={1} style={{ color: colors.textDim, fontSize: 11, fontWeight: "600", textAlign: "center", marginTop: -2 }}>
         {hasActivity ? "Scans · last 7 days" : "No scans this week"}
       </Text>
     </View>
@@ -204,8 +204,8 @@ function PrimaryScanCard() {
           <Ionicons name="scan-outline" size={34} color={colors.bg} />
         </View>
         <View style={{ flex: 1, minWidth: 0, marginLeft: 15 }}>
-          <Text numberOfLines={1} maxFontSizeMultiplier={1.2} style={{ color: colors.text, fontSize: 21, fontWeight: "900", letterSpacing: -0.3 }}>Scan something</Text>
-          <Text maxFontSizeMultiplier={1.2} style={{ color: colors.textDim, fontSize: 13, lineHeight: 18, marginTop: 3 }}>
+          <Text numberOfLines={1} style={{ color: colors.text, fontSize: 21, fontWeight: "900", letterSpacing: -0.3 }}>Scan something</Text>
+          <Text style={{ color: colors.textDim, fontSize: 13, lineHeight: 18, marginTop: 3 }}>
             Check a link, message, screenshot, QR code, or phone number.
           </Text>
           <View
@@ -221,7 +221,7 @@ function PrimaryScanCard() {
               gap: 7,
             }}
           >
-            <Text numberOfLines={1} maxFontSizeMultiplier={1.15} style={{ color: colors.bg, fontSize: 13, fontWeight: "900" }}>Start scan</Text>
+            <Text numberOfLines={1} style={{ color: colors.bg, fontSize: 13, fontWeight: "900" }}>Start scan</Text>
             <Ionicons name="arrow-forward" size={15} color={colors.bg} />
           </View>
         </View>
@@ -259,8 +259,8 @@ function ToolCard({ title, subtitle, icon, secondaryIcon, route }: (typeof tools
         <Ionicons name={secondaryIcon} size={20} color={colors.accent} />
       </View>
       <View pointerEvents="none">
-        <Text numberOfLines={1} maxFontSizeMultiplier={1.15} style={{ color: colors.text, fontWeight: "800", fontSize: 14 }}>{title}</Text>
-        <Text numberOfLines={2} maxFontSizeMultiplier={1.1} style={{ color: colors.textDim, fontSize: 11, lineHeight: 14, marginTop: 2 }}>{subtitle}</Text>
+        <Text numberOfLines={1} style={{ color: colors.text, fontWeight: "800", fontSize: 14 }}>{title}</Text>
+        <Text numberOfLines={2} style={{ color: colors.textDim, fontSize: 11, lineHeight: 14, marginTop: 2 }}>{subtitle}</Text>
       </View>
       <Pressable
         onPress={() => router.push(route as any)}
@@ -356,11 +356,11 @@ function ActivityRow({ scan, isLast }: { scan: Scan; isLast: boolean }) {
         <Ionicons name={meta.icon} size={17} color={meta.color} />
       </View>
       <View pointerEvents="none" style={{ flex: 1, minWidth: 0, marginLeft: 10, marginRight: 8 }}>
-        <Text numberOfLines={1} maxFontSizeMultiplier={1.2} style={{ color: colors.text, fontWeight: "700", fontSize: 14 }}>{title}</Text>
-        <Text numberOfLines={1} maxFontSizeMultiplier={1.2} style={{ color: colors.textDim, fontSize: 12, marginTop: 2 }}>{detail}</Text>
+        <Text numberOfLines={1} style={{ color: colors.text, fontWeight: "700", fontSize: 14 }}>{title}</Text>
+        <Text numberOfLines={1} style={{ color: colors.textDim, fontSize: 12, marginTop: 2 }}>{detail}</Text>
       </View>
       <View pointerEvents="none" style={{ flexShrink: 0, backgroundColor: `${meta.color}1a`, borderRadius: 999, paddingHorizontal: 7, paddingVertical: 3 }}>
-        <Text numberOfLines={1} maxFontSizeMultiplier={1.15} style={{ color: meta.color, fontSize: 11, fontWeight: "800" }}>{meta.verdict}</Text>
+        <Text numberOfLines={1} style={{ color: meta.color, fontSize: 11, fontWeight: "800" }}>{meta.verdict}</Text>
       </View>
       <Ionicons pointerEvents="none" name="chevron-forward" size={14} color={colors.textMuted} style={{ marginLeft: 6 }} />
       <Pressable
@@ -378,15 +378,18 @@ export default function Dashboard() {
   const insets = useSafeAreaInsets();
   const user = useAuth((state) => state.user);
   const { data: scans } = useQuery({ queryKey: ["scans"], queryFn: ShieldAPI.listScans, staleTime: 30_000 });
-  const { data: protection } = useQuery({ queryKey: ["protection-score"], queryFn: ShieldAPI.protectionScore, staleTime: 300_000 });
+  const { data: protection, isLoading: protectionLoading, isError: protectionError } = useQuery({ queryKey: ["protection-score"], queryFn: ShieldAPI.protectionScore, staleTime: 300_000 });
   const threatsBlocked = scans?.filter((scan) => scan.report && ["suspicious", "high", "critical"].includes(scan.report.risk_level)).length ?? 0;
-  const score = protection?.score ?? (scans?.length ? Math.max(42, Math.round(100 - (threatsBlocked / scans.length) * 58)) : 85);
+  const score = protection?.score;
   const recent = scans?.slice(0, 3) ?? [];
   const topFix = protection?.fixes?.[0];
   const firstName = user?.display_name?.split(" ")[0] || "";
   // The hero should tell the truth: tie its copy to the actual score.
-  const heroStatus =
-    score >= 70
+  const heroStatus = score == null
+    ? protectionLoading
+      ? "Checking your current protection…"
+      : "Protection status is unavailable."
+    : score >= 70
       ? "Your digital footprint is low risk."
       : score >= 45
         ? "A few protections still need setup."
@@ -426,11 +429,13 @@ export default function Dashboard() {
         <View style={{ minHeight: 88, borderRadius: radius.md, backgroundColor: "rgba(112,151,169,0.20)", borderWidth: 1, borderColor: `${colors.primaryBright}40`, padding: 11, flexDirection: "row", alignItems: "center", ...glow(colors.primaryBright, "sm") }}>
           <BrandMark size={58} />
           <View style={{ flex: 1, marginLeft: 12 }}>
-            <Text numberOfLines={1} maxFontSizeMultiplier={1.2} style={{ color: colors.text, fontSize: 20, fontWeight: "900" }}>
+            <Text numberOfLines={1} style={{ color: colors.text, fontSize: 20, fontWeight: "900" }}>
               {firstName ? `Hello, ${firstName}.` : "Hello."}
             </Text>
-            <Text numberOfLines={1} maxFontSizeMultiplier={1.2} style={{ color: colors.textDim, fontSize: 13, lineHeight: 18, marginTop: 2 }}>{heroStatus}</Text>
-            <Text numberOfLines={1} maxFontSizeMultiplier={1.2} style={{ color: colors.textDim, fontSize: 13, lineHeight: 18 }}>Monitoring is active.</Text>
+            <Text numberOfLines={1} style={{ color: colors.textDim, fontSize: 13, lineHeight: 18, marginTop: 2 }}>{heroStatus}</Text>
+            <Text numberOfLines={1} style={{ color: colors.textDim, fontSize: 13, lineHeight: 18 }}>
+              {protectionError ? "No status was assumed while offline." : "Open Identity Protection for monitoring details."}
+            </Text>
           </View>
         </View>
 
@@ -438,7 +443,7 @@ export default function Dashboard() {
         <Pressable
           onPress={() => router.push("/protection" as any)}
           accessibilityRole="button"
-          accessibilityLabel={`View protection details. Score ${score} out of 100.`}
+          accessibilityLabel={score == null ? "View protection details. Current score unavailable." : `View protection details. Score ${score} out of 100.`}
           style={{
             marginTop: 16,
             marginBottom: 26,
@@ -453,7 +458,14 @@ export default function Dashboard() {
           <View pointerEvents="none" style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, backgroundColor: "rgba(210,247,255,0.7)" }} />
           <View pointerEvents="none" style={{ flexDirection: "row", alignItems: "center", paddingVertical: 24, paddingHorizontal: 8 }}>
             <View style={{ width: "47%", alignItems: "center" }}>
-              <RiskGauge score={score} />
+              {score == null ? (
+                <View style={{ height: 170, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.md }}>
+                  {protectionLoading ? <ActivityIndicator color={colors.primaryBright} /> : <Ionicons name="cloud-offline-outline" size={28} color={colors.suspicious} />}
+                  <Text style={{ color: colors.textMuted, textAlign: "center", fontSize: 12, marginTop: spacing.sm }}>
+                    {protectionLoading ? "Loading score…" : "Score unavailable"}
+                  </Text>
+                </View>
+              ) : <RiskGauge score={score} />}
             </View>
             <View style={{ width: 1, height: 172, backgroundColor: colors.borderHi }} />
             <View style={{ flex: 1, paddingHorizontal: 10 }}>
@@ -474,7 +486,7 @@ export default function Dashboard() {
                 }}
               >
                 <Ionicons name="shield-checkmark-outline" size={15} color={colors.primaryBright} />
-                <Text numberOfLines={1} maxFontSizeMultiplier={1.15} style={{ color: colors.primaryBright, fontSize: 13, fontWeight: "800" }}>View details</Text>
+                <Text numberOfLines={1} style={{ color: colors.primaryBright, fontSize: 13, fontWeight: "800" }}>View details</Text>
                 <Ionicons name="chevron-forward" size={13} color={colors.primaryBright} />
               </View>
             </View>
@@ -501,12 +513,12 @@ export default function Dashboard() {
           >
             <Ionicons pointerEvents="none" name="trending-up" size={18} color={colors.suspicious} />
             <View pointerEvents="none" style={{ flex: 1, minWidth: 0 }}>
-              <Text numberOfLines={1} maxFontSizeMultiplier={1.2} style={{ color: colors.text, fontWeight: "800", fontSize: 14 }}>
+              <Text numberOfLines={1} style={{ color: colors.text, fontWeight: "800", fontSize: 14 }}>
                 +{topFix.points} to your score
               </Text>
-              <Text numberOfLines={1} maxFontSizeMultiplier={1.2} style={{ color: colors.textDim, fontSize: 12, marginTop: 2 }}>{topFix.hint}</Text>
+              <Text numberOfLines={1} style={{ color: colors.textDim, fontSize: 12, marginTop: 2 }}>{topFix.hint}</Text>
             </View>
-            <Text numberOfLines={1} maxFontSizeMultiplier={1.15} style={{ color: colors.suspicious, fontWeight: "800", fontSize: 12 }}>Fix →</Text>
+            <Text numberOfLines={1} style={{ color: colors.suspicious, fontWeight: "800", fontSize: 12 }}>Fix →</Text>
             <Pressable
               onPress={() => router.push(`/${topFix.screen}` as any)}
               accessibilityRole="button"
@@ -521,8 +533,8 @@ export default function Dashboard() {
         </View>
 
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 14, marginBottom: 4 }}>
-          <Text maxFontSizeMultiplier={1.2} style={{ color: colors.text, fontSize: 18, fontWeight: "900" }}>Recent Activity</Text>
-          <Pressable onPress={() => router.push("/(tabs)/history")} hitSlop={10}><Text maxFontSizeMultiplier={1.2} style={{ color: colors.primaryBright, fontSize: 13, fontWeight: "800" }}>View all</Text></Pressable>
+          <Text style={{ color: colors.text, fontSize: 18, fontWeight: "900" }}>Recent Activity</Text>
+          <Pressable onPress={() => router.push("/(tabs)/history")} hitSlop={10}><Text style={{ color: colors.primaryBright, fontSize: 13, fontWeight: "800" }}>View all</Text></Pressable>
         </View>
         <View style={{ borderRadius: radius.md, borderWidth: 1, borderColor: `${colors.primaryBright}25`, backgroundColor: colors.glassDeep, overflow: "hidden" }}>
           {recent.length ? recent.map((scan, index) => <ActivityRow key={scan.id} scan={scan} isLast={index === recent.length - 1} />) : (
@@ -530,8 +542,8 @@ export default function Dashboard() {
               <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: `${colors.primaryBright}1a`, alignItems: "center", justifyContent: "center", marginBottom: 8 }}>
                 <Ionicons name="scan-outline" size={20} color={colors.primaryBright} />
               </View>
-              <Text maxFontSizeMultiplier={1.2} style={{ color: colors.text, fontSize: 15, fontWeight: "800" }}>Your scans will appear here</Text>
-              <Text maxFontSizeMultiplier={1.25} style={{ color: colors.textDim, fontSize: 13, lineHeight: 19, marginTop: 4, textAlign: "center" }}>
+              <Text style={{ color: colors.text, fontSize: 15, fontWeight: "800" }}>Your scans will appear here</Text>
+              <Text style={{ color: colors.textDim, fontSize: 13, lineHeight: 19, marginTop: 4, textAlign: "center" }}>
                 Your latest checks and verdicts will show up here.
               </Text>
             </View>

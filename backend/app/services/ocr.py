@@ -26,11 +26,20 @@ def _preprocess_for_ocr(img):
     most for scam detection. Converting to high-contrast black-on-white at
     2x resolution recovers most of that text.
     """
-    from PIL import ImageEnhance, ImageOps
+    import math
+
+    from PIL import Image, ImageEnhance, ImageOps
 
     gray = ImageOps.grayscale(img.convert("RGB"))
     w, h = gray.size
-    gray = gray.resize((w * 2, h * 2))
+    # Upscaling helps small screenshots, but blindly doubling a maximum-size
+    # upload turns 25 MP into 100 MP before Tesseract even starts. Cap the OCR
+    # working image so decompression and preprocessing have a fixed ceiling.
+    max_work_pixels = 16_000_000
+    scale = min(2.0, math.sqrt(max_work_pixels / max(1, w * h)))
+    target = (max(1, round(w * scale)), max(1, round(h * scale)))
+    if target != (w, h):
+        gray = gray.resize(target, Image.Resampling.LANCZOS)
     gray = ImageEnhance.Contrast(gray).enhance(2.0)
     return gray.point(lambda p: 255 if p > 140 else 0)
 
