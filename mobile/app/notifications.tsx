@@ -65,7 +65,7 @@ export default function NotificationsScreen() {
   const qc = useQueryClient();
   const [filter, setFilter] = useState<AlertFilter>("All");
 
-  const { data: notifications, isLoading } = useQuery({
+  const { data: notifications, isLoading, isError, refetch } = useQuery({
     queryKey: ["notifications"],
     queryFn: () => ShieldAPI.listNotifications(),
     staleTime: 10_000,
@@ -90,14 +90,6 @@ export default function NotificationsScreen() {
     if (item.scan_id) router.push(`/result?id=${item.scan_id}`);
   };
 
-  if (isLoading) {
-    return (
-      <View style={{ flex: 1, backgroundColor: colors.bg, justifyContent: "center" }}>
-        <ActivityIndicator color={colors.primaryBright} />
-      </View>
-    );
-  }
-
   const unreadCount = notifications?.filter((n) => !n.is_read).length ?? 0;
   const visible = useMemo(
     () =>
@@ -107,12 +99,43 @@ export default function NotificationsScreen() {
     [notifications, filter]
   );
 
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.bg, justifyContent: "center" }}>
+        <ActivityIndicator color={colors.primaryBright} />
+      </View>
+    );
+  }
+
+  if (isError) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.bg, justifyContent: "center", padding: spacing.lg }}>
+        <Ionicons name="cloud-offline-outline" size={34} color={colors.suspicious} style={{ alignSelf: "center" }} />
+        <Text style={{ color: colors.text, fontSize: 20, fontWeight: "900", textAlign: "center", marginTop: 12 }}>
+          Alerts didn’t load
+        </Text>
+        <Text style={{ color: colors.textMuted, textAlign: "center", marginVertical: 12 }}>
+          Check your connection and try again.
+        </Text>
+        <Button label="Try Again" icon="refresh" onPress={() => void refetch()} />
+        <Button label="Go Back" variant="ghost" onPress={() => router.back()} style={{ marginTop: 8 }} />
+      </View>
+    );
+  }
+
   const header = (
     <View>
       <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
         <Pressable onPress={() => router.back()} hitSlop={12}><Ionicons name="chevron-back" size={22} color={colors.primaryBright} /></Pressable>
         <Text style={{ color: colors.text, fontSize: 17, fontWeight: "900" }}>Security Alerts Center</Text>
-        <Ionicons name="person-circle-outline" size={23} color={colors.textDim} />
+        <Pressable
+          onPress={() => router.push("/notification-settings" as never)}
+          accessibilityRole="button"
+          accessibilityLabel="Open notification settings"
+          hitSlop={12}
+        >
+          <Ionicons name="settings-outline" size={22} color={colors.primaryBright} />
+        </Pressable>
       </View>
       <View style={{ flexDirection: "row", height: 34, backgroundColor: colors.surface, borderRadius: 9, padding: 3, marginBottom: 14 }}>
         {(["All", "Critical", "Info"] as AlertFilter[]).map((label) => {

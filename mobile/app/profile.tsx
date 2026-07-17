@@ -158,7 +158,7 @@ export default function Profile() {
 
         <MenuRow icon="shield-checkmark-outline" label="Account Security" onPress={() => router.push("/privacy")} />
         <MenuRow icon="lock-closed-outline" label="Privacy Preferences" onPress={() => router.push("/privacy")} />
-        <MenuRow icon="notifications-outline" label="Notification Settings" onPress={() => router.push("/notifications")} />
+        <MenuRow icon="notifications-outline" label="Notification Settings" onPress={() => router.push("/notification-settings" as never)} />
         <MenuRow icon="phone-portrait-outline" label="Linked Devices" onPress={() => router.push("/developer")} />
 
         <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 16 }} />
