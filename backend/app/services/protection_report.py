@@ -16,13 +16,12 @@ from app.models.models import (
     BrowserTelemetryEvent,
     ExtensionTelemetryEvent,
     IdentityAlert,
-    Notification,
     RiskLevel,
     RiskReport,
     ScanHistory,
     User,
 )
-from app.services.notification_delivery import send_email_alert, send_push_to_devices
+from app.services.subscription import is_premium_active
 
 REPORT_PERIOD_DAYS = 7
 
@@ -128,24 +127,30 @@ def summarize(report: dict) -> str:
 
 def run_weekly_reports(db: Session) -> int:
     """Generate and deliver the digest for every active, premium user. Returns count sent."""
+    from app.services.monitoring import create_alert
+
     sent = 0
-    for (user_id,) in (
-        db.query(User.id).filter(User.is_active.is_(True), User.is_premium.is_(True)).all()
+    for user in (
+        db.query(User).filter(User.is_active.is_(True), User.is_premium.is_(True)).all()
     ):
-        report = build_report(db, user_id)
+        if not is_premium_active(user):
+            continue
+        report = build_report(db, user.id)
         if not _has_activity(report):
             # No digest spam for dormant accounts; the dashboard endpoint
             # still shows the live numbers whenever they return.
             continue
         body = summarize(report)
-        db.add(Notification(user_id=user_id, title="Your Weekly Protection Report", body=body))
-        db.commit()
-        send_push_to_devices(
-            db, user_id,
-            "Your Weekly Protection Report", body,
-            severity="low", topic="account",
-            data={"screen": "report"},
+        notification = create_alert(
+            db,
+            user.id,
+            "Your Weekly Protection Report",
+            body,
+            severity="low",
+            topic="account",
+            route="/report",
+            dedupe_for=timedelta(days=6),
         )
-        send_email_alert(db, user_id, "Your Weekly Protection Report", body)
-        sent += 1
+        if notification:
+            sent += 1
     return sent

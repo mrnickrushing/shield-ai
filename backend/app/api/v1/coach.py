@@ -11,6 +11,7 @@ from app.api.deps import get_current_user
 from app.core.config import settings
 from app.models.models import User
 from app.schemas.schemas import CoachChatRequest, CoachChatResponse
+from app.services.subscription import is_premium_active
 
 router = APIRouter(prefix="/coach", tags=["coach"])
 
@@ -28,7 +29,7 @@ How to respond:
 
 @router.post("/chat", response_model=CoachChatResponse)
 def coach_chat(payload: CoachChatRequest, user: User = Depends(get_current_user)):
-    if not user.is_premium:
+    if not is_premium_active(user):
         raise HTTPException(
             status.HTTP_402_PAYMENT_REQUIRED,
             "The scam coach requires Shield AI Premium.",

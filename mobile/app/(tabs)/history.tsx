@@ -6,6 +6,7 @@ import { FlatList, Pressable, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { GlowBackground } from "@/components/GlowBackground";
+import { QueryErrorState } from "@/components/QueryErrorState";
 import { ScanCard } from "@/components/ScanCard";
 import { ShieldAPI, type ScanType } from "@/lib/api";
 import { colors, glow, radius, spacing } from "@/theme/theme";
@@ -76,7 +77,7 @@ export default function History() {
   const [typeFilter, setTypeFilter] = useState<ScanType | "all">("all");
   const [riskFilter, setRiskFilter] = useState("all");
 
-  const { data, isLoading, refetch, isRefetching } = useQuery({
+  const { data, isLoading, isError, refetch, isRefetching } = useQuery({
     queryKey: ["scans"],
     queryFn: ShieldAPI.listScans,
   });
@@ -224,7 +225,11 @@ export default function History() {
         )}
         onRefresh={refetch}
         refreshing={isRefetching}
-        ListEmptyComponent={
+        ListEmptyComponent={isError ? (
+          <View style={{ paddingTop: spacing.xl }}>
+            <QueryErrorState message="Your scan history could not be loaded." onRetry={() => refetch()} />
+          </View>
+        ) : (
           <View style={{ alignItems: "center", paddingTop: spacing.xxl }}>
             <View
               style={{
@@ -259,7 +264,7 @@ export default function History() {
               </Text>
             )}
           </View>
-        }
+        )}
       />
     </View>
   );

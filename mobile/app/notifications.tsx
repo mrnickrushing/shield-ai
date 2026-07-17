@@ -7,21 +7,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Button, FadeIn, Surface } from "@/components/ui";
 import { Notification, ShieldAPI } from "@/lib/api";
+import { isCriticalAlert, safeNotificationRoute } from "@/lib/notificationPolicy";
 import { colors, spacing } from "@/theme/theme";
 
 type AlertFilter = "All" | "Critical" | "Info";
-
-// Scan notifications encode the verdict in the title ("… — <level> risk"), so
-// classify from that, never the body — a *safe* scan's explanation often
-// contains words like "suspicious" or "scam" and must not be miscounted as
-// critical. Non-scan alerts (breach, fraud) are matched on the title alone.
-const TITLE_THREAT_PATTERN = /critical|high risk|suspicious|breach|fraud|scam|exposed|malicious|urgent|warning/i;
-
-function isCriticalAlert(item: Notification): boolean {
-  const level = /—\s*(safe|low|suspicious|high|critical)\s+risk/i.exec(item.title)?.[1]?.toLowerCase();
-  if (level) return level === "suspicious" || level === "high" || level === "critical";
-  return TITLE_THREAT_PATTERN.test(item.title);
-}
 
 function NotifItem({ item, onPress, onClear }: { item: Notification; onPress: () => void; onClear: () => void }) {
   return (
@@ -87,7 +76,7 @@ export default function NotificationsScreen() {
 
   const handlePress = (item: Notification) => {
     if (!item.is_read) markRead.mutate(item.id);
-    if (item.scan_id) router.push(`/result?id=${item.scan_id}`);
+    router.push(safeNotificationRoute(item.route, item.scan_id) as any);
   };
 
   const unreadCount = notifications?.filter((n) => !n.is_read).length ?? 0;

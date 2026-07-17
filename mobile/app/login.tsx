@@ -1,5 +1,4 @@
 import * as AppleAuthentication from "expo-apple-authentication";
-import * as Linking from "expo-linking";
 import * as SecureStore from "expo-secure-store";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
@@ -105,6 +104,20 @@ function sha256Hex(input: string) {
   return h.map((value) => value.toString(16).padStart(8, "0")).join("");
 }
 
+function hexToBase64Url(hex: string) {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  const bytes = Array.from({ length: hex.length / 2 }, (_, index) => parseInt(hex.slice(index * 2, index * 2 + 2), 16));
+  let output = "";
+  for (let i = 0; i < bytes.length; i += 3) {
+    const chunk = (bytes[i] << 16) | ((bytes[i + 1] ?? 0) << 8) | (bytes[i + 2] ?? 0);
+    output += alphabet[(chunk >>> 18) & 63];
+    output += alphabet[(chunk >>> 12) & 63];
+    output += i + 1 < bytes.length ? alphabet[(chunk >>> 6) & 63] : "=";
+    output += i + 2 < bytes.length ? alphabet[chunk & 63] : "=";
+  }
+  return output.replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+}
+
 function extractErrorMessage(error: any, fallback: string) {
   const detail = error?.response?.data?.detail;
   if (typeof detail === "string" && detail.trim()) return detail;
@@ -174,12 +187,14 @@ export default function Login() {
   };
 
   const handleGoogle = async () => {
-    const returnUrl = Linking.createURL("google-auth");
+    const returnUrl = ShieldAPI.googleAuthReturnUrl;
+    const codeVerifier = generateNonce(64);
+    const codeChallenge = hexToBase64Url(sha256Hex(codeVerifier));
     setError(null);
     setLoading(true);
     try {
       const result = await WebBrowser.openAuthSessionAsync(
-        ShieldAPI.googleAuthStartUrl(returnUrl),
+        ShieldAPI.googleAuthStartUrl(returnUrl, codeChallenge),
         returnUrl
       );
 
@@ -190,27 +205,21 @@ export default function Login() {
         return;
       }
 
-      const parsed = Linking.parse(result.url);
-      const accessToken = Array.isArray(parsed.queryParams?.access_token)
-        ? parsed.queryParams?.access_token[0]
-        : parsed.queryParams?.access_token;
-      const refreshToken = Array.isArray(parsed.queryParams?.refresh_token)
-        ? parsed.queryParams?.refresh_token[0]
-        : parsed.queryParams?.refresh_token;
-      const authError = Array.isArray(parsed.queryParams?.error)
-        ? parsed.queryParams?.error[0]
-        : parsed.queryParams?.error;
+      const parsed = new URL(result.url);
+      const code = parsed.searchParams.get("code");
+      const authError = parsed.searchParams.get("error");
 
       if (typeof authError === "string" && authError.trim()) {
         setError(decodeURIComponent(authError));
         return;
       }
-      if (typeof accessToken !== "string" || typeof refreshToken !== "string") {
-        setError("Google sign-in did not return valid session tokens.");
+      if (!code) {
+        setError("Google sign-in did not return a valid one-time code.");
         return;
       }
 
-      await acceptTokens(accessToken, refreshToken);
+      const tokens = await ShieldAPI.googleAuthExchange(code, codeVerifier);
+      await acceptTokens(tokens.access_token, tokens.refresh_token);
       router.replace("/");
     } catch (e: any) {
       setError(extractErrorMessage(e, "Google sign-in failed."));

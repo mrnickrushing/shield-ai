@@ -20,6 +20,9 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.shieldai.app",
       "usesAppleSignIn": true,
+      "associatedDomains": [
+        "applinks:api.shieldai.rushingtechnologies.com"
+      ],
       "infoPlist": {
         "NSCameraUsageDescription": "Shield AI uses the camera to scan QR codes for threat analysis.",
         "NSPhotoLibraryUsageDescription": "Shield AI accesses your photo library to scan screenshots for scam detection.",
@@ -30,6 +33,23 @@
     },
     "android": {
       "package": "com.shieldai.app",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "api.shieldai.rushingtechnologies.com",
+              "pathPrefix": "/google-auth"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#020617"
@@ -95,9 +115,12 @@
       "./plugins/withCallDirectoryExtension.js",
       "./plugins/withWidgetExtension.js",
       "./plugins/withMessageFilterExtension.js",
-      "./plugins/withSafariExtension.js"
+      "./plugins/withSafariExtension.js",
+      "expo-asset"
     ],
-    "runtimeVersion": "1.2.0",
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
     "updates": {
       "url": "https://u.expo.dev/80d9208f-a5e9-47c3-bf6a-a20105e6bb60",
       "enabled": true,

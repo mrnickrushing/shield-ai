@@ -5,6 +5,7 @@ import React from "react";
 import { ActivityIndicator, ScrollView, Text, View } from "react-native";
 
 import { Eyebrow, FadeIn, GlowOrb, Surface } from "@/components/ui";
+import { QueryErrorState } from "@/components/QueryErrorState";
 import { ShieldAPI } from "@/lib/api";
 import { colors, radius, spacing, withAlpha } from "@/theme/theme";
 
@@ -17,12 +18,12 @@ const boostColor = (boost: number) => {
 
 export default function CommunityScreen() {
   const router = useRouter();
-  const { data: patterns, isLoading } = useQuery({
+  const { data: patterns, isLoading, isError: patternsError, refetch: refetchPatterns } = useQuery({
     queryKey: ["community-patterns"],
     queryFn: ShieldAPI.listPublicPatterns,
     staleTime: 300_000,
   });
-  const { data: myReports } = useQuery({
+  const { data: myReports, isError: reportsError, refetch: refetchReports } = useQuery({
     queryKey: ["my-reports"],
     queryFn: ShieldAPI.listMyReports,
     staleTime: 60_000,
@@ -79,6 +80,8 @@ export default function CommunityScreen() {
 
         {isLoading ? (
           <ActivityIndicator color={colors.primaryBright} style={{ marginTop: spacing.xl }} />
+        ) : patternsError ? (
+          <QueryErrorState message="Community threat patterns could not be loaded." onRetry={() => refetchPatterns()} />
         ) : (patterns ?? []).length === 0 ? (
           <Surface style={{ alignItems: "center", paddingVertical: spacing.xl }}>
             <Ionicons name="shield-outline" size={40} color={colors.textMuted} style={{ marginBottom: spacing.md }} />
@@ -122,7 +125,13 @@ export default function CommunityScreen() {
         )}
       </FadeIn>
 
-      {(myReports ?? []).length > 0 && (
+      {reportsError && (
+        <View style={{ marginTop: spacing.xl }}>
+          <QueryErrorState message="Your submitted reports could not be loaded." onRetry={() => refetchReports()} />
+        </View>
+      )}
+
+      {!reportsError && (myReports ?? []).length > 0 && (
         <FadeIn delay={140}>
           <Eyebrow style={{ marginTop: spacing.xl, marginBottom: spacing.sm }}>Your Reports</Eyebrow>
           {(myReports ?? []).map((r: any) => (

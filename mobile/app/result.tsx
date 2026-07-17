@@ -147,11 +147,21 @@ export default function Result() {
   const [correctedContext, setCorrectedContext] = useState("");
   const [feedbackEvidence, setFeedbackEvidence] = useState("");
   const [submittingFeedback, setSubmittingFeedback] = useState(false);
-  const { data: scan, isLoading, refetch, isRefetching } = useQuery({
+  const [pollingTimeout, setPollingTimeout] = useState<{ id?: string; timedOut: boolean }>({ id, timedOut: false });
+  const pollingTimedOut = pollingTimeout.id === id && pollingTimeout.timedOut;
+  useEffect(() => {
+    const timer = setTimeout(() => setPollingTimeout({ id, timedOut: true }), 120_000);
+    return () => clearTimeout(timer);
+  }, [id]);
+  const { data: scan, isLoading, isError, refetch, isRefetching } = useQuery({
     queryKey: ["scan", id],
     queryFn: () => ShieldAPI.getScan(id!),
     enabled: !!id,
-    refetchInterval: (query) => (query.state.data?.report ? false : 2500),
+    refetchInterval: (query) => (
+      query.state.data?.report || query.state.data?.status === "failed" || pollingTimedOut
+        ? false
+        : 2500
+    ),
   });
 
   // A high-risk verdict is a "we just caught this for you" moment — the right
@@ -164,6 +174,19 @@ export default function Result() {
     return () => clearTimeout(timer);
   }, [verdictLevel, scanId]);
 
+  if (!id || isError) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.bg, padding: spacing.lg, justifyContent: "center", alignItems: "center" }}>
+        <Ionicons name="cloud-offline-outline" size={44} color={colors.suspicious} />
+        <Text style={{ color: colors.text, fontSize: 20, fontWeight: "900", marginTop: spacing.md }}>Report unavailable</Text>
+        <Text style={{ color: colors.textMuted, textAlign: "center", lineHeight: 21, marginVertical: spacing.md }}>
+          {id ? "We couldn't load this report. Check your connection and try again." : "This report link is invalid or incomplete."}
+        </Text>
+        {id ? <GradientButton label="Try Again" onPress={() => refetch()} /> : null}
+      </View>
+    );
+  }
+
   if (isLoading || !scan) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.bg, justifyContent: "center", alignItems: "center" }}>
@@ -174,6 +197,8 @@ export default function Result() {
 
   const report = scan.report;
   if (!report) {
+    const failed = scan.status === "failed";
+    const delayed = pollingTimedOut;
     return (
       <View style={{ flex: 1, backgroundColor: colors.bg, padding: spacing.lg, justifyContent: "center" }}>
         <View
@@ -186,15 +211,25 @@ export default function Result() {
             alignItems: "center",
           }}
         >
-          <ActivityIndicator color={colors.primaryBright} size="large" />
+          {failed ? (
+            <Ionicons name="alert-circle-outline" size={46} color={colors.critical} />
+          ) : delayed ? (
+            <Ionicons name="time-outline" size={46} color={colors.suspicious} />
+          ) : (
+            <ActivityIndicator color={colors.primaryBright} size="large" />
+          )}
           <Text style={{ color: colors.text, fontSize: 22, fontWeight: "900", marginTop: spacing.lg, marginBottom: spacing.sm }}>
-            Building your verdict
+            {failed ? "Analysis couldn't finish" : delayed ? "Analysis is taking longer" : "Building your verdict"}
           </Text>
           <Text style={{ color: colors.textMuted, textAlign: "center", lineHeight: 22, marginBottom: spacing.lg }}>
-            We are still collecting evidence and generating next-step guidance. This screen refreshes automatically.
+            {failed
+              ? "No verdict was produced, so we won't guess. Return to the scanner and try again."
+              : delayed
+                ? "The automatic wait has stopped. You can safely leave this screen and check again later."
+                : "We are still collecting evidence and generating next-step guidance. This screen refreshes automatically."}
           </Text>
           <Pressable
-            onPress={() => refetch()}
+            onPress={() => failed ? router.replace("/(tabs)/scan") : refetch()}
             style={{
               backgroundColor: colors.primaryBright,
               borderRadius: radius.md,
@@ -203,7 +238,7 @@ export default function Result() {
             }}
           >
             <Text style={{ color: "#08111f", fontWeight: "800" }}>
-              {isRefetching ? "Refreshing..." : "Refresh now"}
+              {failed ? "Return to Scanner" : isRefetching ? "Refreshing..." : "Refresh now"}
             </Text>
           </Pressable>
         </View>

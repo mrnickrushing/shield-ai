@@ -7,7 +7,9 @@ os.environ["ENVIRONMENT"] = "development"
 import base64
 import io
 import json
+import secrets
 import uuid
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from fastapi.testclient import TestClient
@@ -17,7 +19,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.db.session import Base, get_db
 from app.main import app
-from app.models.models import User
+from app.models.models import BillingWebhookEvent, OAuthAuthorizationCode, PushReceipt, User
 
 # Shared in-memory SQLite for the test session.
 engine = create_engine(
@@ -56,6 +58,16 @@ def test_health():
     assert r.json()["status"] == "ok"
 
 
+def test_oversized_request_is_rejected_before_parsing():
+    oversized = b"x" * (14 * 1024 * 1024)
+    response = client.post(
+        "/api/v1/auth/login",
+        content=oversized,
+        headers={"Content-Type": "application/json"},
+    )
+    assert response.status_code == 413
+
+
 def test_register_login_flow():
     r = client.post(
         "/api/v1/auth/register",
@@ -71,6 +83,111 @@ def test_register_login_flow():
     )
     assert me.status_code == 200
     assert me.json()["email"] == "test@example.com"
+
+
+def test_logout_revokes_refresh_session():
+    registered = client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": f"logout-{uuid.uuid4().hex}@example.com",
+            "password": "supersecret1",
+            "display_name": "Logout Test",
+        },
+    )
+    assert registered.status_code == 201, registered.text
+    refresh_token = registered.json()["refresh_token"]
+
+    logged_out = client.post("/api/v1/auth/logout", json={"refresh_token": refresh_token})
+    assert logged_out.status_code == 204, logged_out.text
+
+    refreshed = client.post("/api/v1/auth/refresh", json={"refresh_token": refresh_token})
+    assert refreshed.status_code == 401, refreshed.text
+
+
+def test_inactive_account_cannot_login_or_refresh():
+    email = f"inactive-{uuid.uuid4().hex}@example.com"
+    registered = client.post(
+        "/api/v1/auth/register",
+        json={"email": email, "password": "supersecret1", "display_name": "Inactive"},
+    )
+    assert registered.status_code == 201, registered.text
+    refresh_token = registered.json()["refresh_token"]
+
+    db = TestingSession()
+    try:
+        user = db.query(User).filter(User.email == email).one()
+        user.is_active = False
+        db.commit()
+    finally:
+        db.close()
+
+    login = client.post("/api/v1/auth/login", json={"email": email, "password": "supersecret1"})
+    refreshed = client.post("/api/v1/auth/refresh", json={"refresh_token": refresh_token})
+    assert login.status_code == 401
+    assert refreshed.status_code == 401
+
+
+def test_refresh_tokens_have_unique_jti():
+    from app.core.security import create_refresh_token, decode_token
+
+    first = create_refresh_token("same-user", "same-session")
+    second = create_refresh_token("same-user", "same-session")
+    assert first != second
+    assert decode_token(first)["jti"] != decode_token(second)["jti"]
+
+
+def test_google_authorization_code_is_pkce_bound_and_one_time():
+    from app.api.v1.auth import _hash_token, _pkce_challenge
+
+    registered = client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": f"pkce-{uuid.uuid4().hex}@example.com",
+            "password": "supersecret1",
+            "display_name": "PKCE Test",
+        },
+    )
+    access = registered.json()["access_token"]
+    user_id = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {access}"}).json()["id"]
+    verifier = "v" * 43
+    code = secrets.token_urlsafe(48)
+
+    db = TestingSession()
+    try:
+        db.add(OAuthAuthorizationCode(
+            user_id=user_id,
+            code_hash=_hash_token(code),
+            code_challenge=_pkce_challenge(verifier),
+            redirect_uri="https://api.shieldai.rushingtechnologies.com/google-auth",
+            expires_at=datetime.now(timezone.utc) + timedelta(minutes=5),
+        ))
+        db.commit()
+    finally:
+        db.close()
+
+    wrong = client.post("/api/v1/auth/google/exchange", json={"code": code, "code_verifier": "x" * 43})
+    assert wrong.status_code == 401
+    exchanged = client.post("/api/v1/auth/google/exchange", json={"code": code, "code_verifier": verifier})
+    assert exchanged.status_code == 200, exchanged.text
+    assert "refresh_token" in exchanged.json()
+    replay = client.post("/api/v1/auth/google/exchange", json={"code": code, "code_verifier": verifier})
+    assert replay.status_code == 401
+
+
+def test_google_social_auth_requires_verified_email(monkeypatch):
+    class _Response:
+        status_code = 200
+
+        @staticmethod
+        def json():
+            return {"sub": "google-unverified", "email": "victim@example.com", "email_verified": "false"}
+
+    monkeypatch.setattr("app.api.v1.auth.httpx.get", lambda *args, **kwargs: _Response())
+    response = client.post(
+        "/api/v1/auth/social",
+        json={"provider": "google", "token": "g" * 40},
+    )
+    assert response.status_code == 400
 
 
 def test_register_normalizes_email():
@@ -100,7 +217,11 @@ def test_apple_social_auth_reuses_identity_without_email(monkeypatch):
 
     raw_nonce = "raw-apple-nonce-for-test"
     claims_by_token = {
-        "verified-apple-token-1": {"sub": "apple-user-123", "email": "apple-user@example.com"},
+        "verified-apple-token-1": {
+            "sub": "apple-user-123",
+            "email": "apple-user@example.com",
+            "email_verified": True,
+        },
         "verified-apple-token-2": {"sub": "apple-user-123"},
     }
 
@@ -163,6 +284,34 @@ def test_apple_social_auth_requires_nonce(monkeypatch):
     )
     assert r.status_code == 400, r.text
     assert r.json()["detail"] == "Apple nonce is required"
+
+
+def test_apple_social_auth_never_links_client_supplied_email(monkeypatch):
+    from app.api.v1 import auth as auth_routes
+
+    victim_email = f"victim-{uuid.uuid4().hex}@example.com"
+    victim = client.post(
+        "/api/v1/auth/register",
+        json={"email": victim_email, "password": "supersecret1", "display_name": "Victim"},
+    )
+    assert victim.status_code == 201, victim.text
+
+    monkeypatch.setattr(
+        auth_routes,
+        "_verify_apple_identity_token",
+        lambda _token, _nonce: {"sub": f"managed-apple-{uuid.uuid4().hex}"},
+    )
+    attempted = client.post(
+        "/api/v1/auth/social",
+        json={
+            "provider": "apple",
+            "token": "verified-managed-apple-token",
+            "nonce": "raw-apple-nonce-for-test",
+            "email": victim_email,
+        },
+    )
+    assert attempted.status_code == 400, attempted.text
+    assert "verified email" in attempted.json()["detail"]
 
 
 def test_update_profile():
@@ -251,6 +400,32 @@ def test_account_export_purge_and_delete_controls():
     devices = client.get("/api/v1/auth/me/devices", headers=headers)
     assert devices.status_code == 200, devices.text
     assert devices.json()[0]["label"] == "Test iPhone"
+    user_id = client.get("/api/v1/auth/me", headers=headers).json()["id"]
+    db = TestingSession()
+    try:
+        db.add(OAuthAuthorizationCode(
+            user_id=user_id,
+            code_hash=secrets.token_hex(32),
+            code_challenge="c" * 43,
+            redirect_uri="https://api.shieldai.rushingtechnologies.com/google-auth",
+            expires_at=datetime.now(timezone.utc) + timedelta(minutes=5),
+        ))
+        db.add(BillingWebhookEvent(
+            event_id=f"export-{uuid.uuid4()}",
+            user_id=user_id,
+            event_type="INITIAL_PURCHASE",
+            event_at=datetime.now(timezone.utc),
+            handled=True,
+            detail={"test": True},
+        ))
+        db.add(PushReceipt(
+            user_id=user_id,
+            device_id=devices.json()[0]["id"],
+            ticket_id=f"ticket-{uuid.uuid4()}",
+        ))
+        db.commit()
+    finally:
+        db.close()
     revoke_device = client.delete(f"/api/v1/auth/me/devices/{devices.json()[0]['id']}", headers=headers)
     assert revoke_device.status_code == 204, revoke_device.text
 
@@ -300,8 +475,16 @@ def test_account_export_purge_and_delete_controls():
     assert exported["user"]["email"]
     assert exported["privacy_preferences"]["retention_days"] == 30
     assert len(exported["sessions"]) >= 1
+    assert "refresh_token_hash" not in exported["sessions"][0]
     assert any(item["id"] == scan_id for item in exported["scans"])
+    assert len(exported["risk_reports"]) >= 1
+    assert len(exported["message_scans"]) >= 1
+    assert len(exported["api_usage"]) >= 1
+    assert len(exported["push_receipts"]) >= 1
+    assert len(exported["billing_events"]) >= 1
     assert len(exported["incidents"]) >= 1
+    assert len(exported["case_pack_shares"]) >= 1
+    assert "token_hash" not in exported["case_pack_shares"][0]
     assert len(exported["community_reports"]) >= 1
     assert len(exported["scan_feedback_details"]) >= 1
 
@@ -800,26 +983,34 @@ def test_identity_alerts_list():
     assert isinstance(r.json(), list)
 
 
-def test_password_check_clean():
+def test_password_check_returns_only_requested_k_anonymity_range(monkeypatch):
+    from app.services import breach_check
+
+    monkeypatch.setattr(
+        breach_check,
+        "fetch_password_range",
+        lambda prefix: {"A" * 35: 42} if prefix == "ABCDE" else {},
+    )
     headers = _auth_headers(premium=True)
     r = client.post(
         "/api/v1/identity/password-check",
-        json={"password": "some-password-to-check"},
+        json={"sha1_prefix": "abcde"},
         headers=headers,
     )
-    # Returns 200 with result if HIBP is reachable, or 503 when network is unavailable.
-    assert r.status_code in (200, 503)
-    if r.status_code == 200:
-        data = r.json()
-        assert "pwned_count" in data
-        assert "is_compromised" in data
-        assert "recommendation" in data
+    assert r.status_code == 200, r.text
+    assert r.json() == {"suffixes": {"A" * 35: 42}}
 
 
-def test_password_check_requires_password_field():
+def test_password_check_requires_valid_sha1_prefix():
     headers = _auth_headers(premium=True)
     r = client.post("/api/v1/identity/password-check", json={}, headers=headers)
     assert r.status_code == 422
+    plaintext = client.post(
+        "/api/v1/identity/password-check",
+        json={"password": "this-must-never-leave-device"},
+        headers=headers,
+    )
+    assert plaintext.status_code == 422
 
 
 # ---------------------------------------------------------------------------

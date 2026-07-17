@@ -5,6 +5,7 @@ import React, { useState } from "react";
 import { ActivityIndicator, ScrollView, Text, View } from "react-native";
 
 import { Chip, Eyebrow, FadeIn, GlowOrb, Surface } from "@/components/ui";
+import { QueryErrorState } from "@/components/QueryErrorState";
 import { ShieldAPI } from "@/lib/api";
 import { colors, radius, spacing, withAlpha } from "@/theme/theme";
 
@@ -26,7 +27,7 @@ const CATEGORIES = [
 export default function EducationScreen() {
   const router = useRouter();
   const [category, setCategory] = useState<string | undefined>(undefined);
-  const { data: lessons, isLoading } = useQuery({
+  const { data: lessons, isLoading, isError, refetch } = useQuery({
     queryKey: ["lessons", category],
     queryFn: () => ShieldAPI.listLessons(category),
   });
@@ -69,6 +70,8 @@ export default function EducationScreen() {
       <FadeIn delay={100}>
         {isLoading ? (
           <ActivityIndicator color={colors.primaryBright} style={{ marginTop: spacing.xl }} />
+        ) : isError ? (
+          <QueryErrorState message="Lessons could not be loaded." onRetry={() => refetch()} />
         ) : (lessons ?? []).length === 0 ? (
           <View style={{ alignItems: "center", paddingTop: spacing.xl }}>
             <Ionicons name="book-outline" size={40} color={colors.textMuted} style={{ marginBottom: spacing.md }} />

@@ -1,4 +1,5 @@
 import * as SecureStore from "expo-secure-store";
+import * as StoreReview from "expo-store-review";
 
 const LAST_ASK_KEY = "shield.review.lastAskAt";
 const WINS_KEY = "shield.review.wins";
@@ -8,20 +9,6 @@ const SEEN_KEYS_KEY = "shield.review.seenWinKeys";
 const MIN_DAYS_BETWEEN_ASKS = 122;
 const MIN_WINS_BEFORE_ASK = 2;
 const MAX_SEEN_KEYS = 12; // SecureStore values are size-capped
-
-/**
- * Lazily load expo-store-review. It's a native module, so on an older binary
- * that shipped before it was added (JS arrives via OTA ahead of the native
- * build) importing it at module top would throw and crash any screen that
- * imports this file. Requiring it inside a try keeps that failure contained.
- */
-function loadStoreReview(): typeof import("expo-store-review") | null {
-  try {
-    return require("expo-store-review");
-  } catch {
-    return null;
-  }
-}
 
 /**
  * Call at a "win" moment — the app just caught something for the user (a
@@ -53,8 +40,7 @@ export async function recordWinAndMaybeAskForReview(winKey: string): Promise<voi
     const lastAsk = parseInt((await SecureStore.getItemAsync(LAST_ASK_KEY)) ?? "0", 10);
     if (Date.now() - lastAsk < MIN_DAYS_BETWEEN_ASKS * 86_400_000) return;
 
-    const StoreReview = loadStoreReview();
-    if (!StoreReview || !(await StoreReview.hasAction())) return;
+    if (!(await StoreReview.hasAction())) return;
 
     await SecureStore.setItemAsync(LAST_ASK_KEY, String(Date.now()));
     await StoreReview.requestReview();

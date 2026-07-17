@@ -77,3 +77,16 @@ export async function registerDeviceForPush({
   );
   return state;
 }
+
+export async function unregisterDeviceForPush(): Promise<void> {
+  if (Platform.OS === "web" || !Constants.isDevice) return;
+  try {
+    const projectId = Constants.easConfig?.projectId ?? Constants.expoConfig?.extra?.eas?.projectId;
+    const tokenResponse = projectId
+      ? await Notifications.getExpoPushTokenAsync({ projectId })
+      : await Notifications.getExpoPushTokenAsync();
+    await ShieldAPI.unregisterDevice(tokenResponse.data);
+  } catch {
+    // Session revocation still proceeds if Expo or the network is unavailable.
+  }
+}

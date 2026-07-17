@@ -8,12 +8,13 @@ from app.api.deps import get_current_user
 from app.db.session import get_db
 from app.models.models import TrustedContact, User
 from app.schemas.schemas import TrustedContactCreate, TrustedContactOut
+from app.services.subscription import is_premium_active
 
 router = APIRouter(prefix="/family", tags=["family"])
 
 
 def _require_premium(user: User) -> None:
-    if not user.is_premium:
+    if not is_premium_active(user):
         raise HTTPException(
             status.HTTP_402_PAYMENT_REQUIRED,
             "Family Protection requires Shield AI Premium.",

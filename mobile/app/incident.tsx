@@ -22,7 +22,11 @@ const INCIDENT_LABELS: Record<string, string> = {
 export default function IncidentScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { data: incident, isLoading } = useQuery({ queryKey: ["incident", id], queryFn: () => ShieldAPI.getIncident(id) });
+  const { data: incident, isLoading, isError, refetch } = useQuery({
+    queryKey: ["incident", id],
+    queryFn: () => ShieldAPI.getIncident(id),
+    enabled: Boolean(id),
+  });
   const { data: steps } = useQuery({
     queryKey: ["wizard", (incident as any)?.incident_type],
     queryFn: () => ShieldAPI.getWizardSteps((incident as any).incident_type),
@@ -50,7 +54,18 @@ export default function IncidentScreen() {
       </View>
     );
   }
-  if (!incident) return null;
+  if (!id || isError || !incident) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.bg, justifyContent: "center", alignItems: "center", padding: spacing.lg }}>
+        <Ionicons name="document-outline" size={42} color={colors.suspicious} />
+        <Text style={{ color: colors.text, fontSize: 20, fontWeight: "900", marginTop: spacing.md }}>Recovery case unavailable</Text>
+        <Text style={{ color: colors.textMuted, textAlign: "center", marginVertical: spacing.md }}>
+          {id ? "We couldn't load this case. Check your connection and try again." : "This case link is invalid."}
+        </Text>
+        {id ? <Button label="Try Again" onPress={() => refetch()} /> : <Button label="Go Back" onPress={() => router.back()} />}
+      </View>
+    );
+  }
 
   const inc = incident as any;
   const completed = new Set<string>(inc.steps_completed ?? []);

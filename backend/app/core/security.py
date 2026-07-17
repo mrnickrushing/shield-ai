@@ -1,4 +1,5 @@
 """Password hashing and JWT helpers."""
+import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -31,6 +32,7 @@ def _create_token(subject: str, expires_delta: timedelta, token_type: str, sessi
         "iat": now,
         "exp": now + expires_delta,
         "type": token_type,
+        "jti": secrets.token_urlsafe(24),
     }
     if session_id:
         payload["sid"] = session_id

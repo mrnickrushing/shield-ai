@@ -42,12 +42,6 @@ function hostOf(url: string): string {
   }
 }
 
-// "google.com" vs "www.google.com" should count as the same site so a plain
-// canonicalization redirect doesn't get treated as an unverified navigation.
-function baseDomain(host: string): string {
-  return host.toLowerCase().replace(/^www\./, "");
-}
-
 type PageState = {
   url: string;
   verdict: UrlVerdict["verdict"] | "unverified";
@@ -64,6 +58,7 @@ export default function BrowserScreen() {
   const [page, setPage] = useState<PageState | null>(null); // what the WebView is showing
   const [checking, setChecking] = useState(false);
   const [blocked, setBlocked] = useState<UrlVerdict | null>(null); // interstitial
+  const [verificationError, setVerificationError] = useState<string | null>(null);
   const [canGoBack, setCanGoBack] = useState(false);
 
   // Every verdict this session, so in-page clicks resolve instantly on revisit.
@@ -79,7 +74,7 @@ export default function BrowserScreen() {
       verdictCache.current.set(url, verdict);
       return verdict;
     } catch {
-      return null; // offline / timeout -> fail open as "unverified"
+      return null; // offline / timeout -> fail closed behind a retry screen
     }
   }, []);
 
@@ -92,31 +87,38 @@ export default function BrowserScreen() {
       const url = normalize(rawUrl);
       if (!url) return;
       setBlocked(null);
+      setVerificationError(null);
       setChecking(true);
       setInputUrl(url);
       const verdict = await getVerdict(url);
       setChecking(false);
 
-      if (verdict && DANGEROUS.has(verdict.verdict) && !overrides.current.has(url)) {
+      if (!verdict) {
+        setVerificationError(url);
+        recordTelemetry(url, "unverified", "blocked", "Reputation service unavailable");
+        return;
+      }
+
+      if (DANGEROUS.has(verdict.verdict) && !overrides.current.has(url)) {
         setBlocked(verdict);
         recordTelemetry(url, verdict.verdict, "blocked", verdict.reason);
         return;
       }
       setPage({
         url,
-        verdict: verdict?.verdict ?? "unverified",
-        reason: verdict?.reason ?? "Couldn't verify this site right now.",
+        verdict: verdict.verdict,
+        reason: verdict.reason,
       });
-      recordTelemetry(url, verdict?.verdict ?? "unverified", verdict ? "allowed" : "viewed", verdict?.reason ?? "");
+      recordTelemetry(url, verdict.verdict, "allowed", verdict.reason);
     },
     [getVerdict, recordTelemetry]
   );
 
   useEffect(() => {
-    if (params.url) navigateTo(decodeURIComponent(params.url));
-    // Only respond to the incoming deep-link param.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.url]);
+    if (!params.url) return;
+    const task = requestAnimationFrame(() => navigateTo(decodeURIComponent(params.url as string)));
+    return () => cancelAnimationFrame(task);
+  }, [navigateTo, params.url]);
 
   /** Gatekeeper for every navigation started inside the WebView. */
   const onShouldStartLoadWithRequest = useCallback(
@@ -135,17 +137,7 @@ export default function BrowserScreen() {
       }
       if (overrides.current.has(url)) return true;
 
-      // Same-site redirect (e.g. bare domain → www, or http → https
-      // canonicalization) — the destination is already covered by the
-      // check we just ran, so let it through instead of cancelling the
-      // in-flight navigation and forcing a fresh reload.
-      if (page && baseDomain(hostOf(url)) === baseDomain(hostOf(page.url))) {
-        setPage({ url, verdict: page.verdict, reason: page.reason });
-        setInputUrl(url);
-        return true;
-      }
-
-      // Unknown or dangerous: hold the navigation, check it, then decide.
+      // Every destination, including same-host redirects, gets its own verdict.
       navigateTo(url);
       return false;
     },
@@ -256,6 +248,25 @@ export default function BrowserScreen() {
         </View>
       )}
 
+      {/* Verification outage interstitial — Safe Browser fails closed. */}
+      {verificationError && (
+        <View style={{ flex: 1, justifyContent: "center", padding: spacing.lg }}>
+          <FadeIn>
+            <Surface accent={colors.suspicious}>
+              <Ionicons name="cloud-offline-outline" size={42} color={colors.suspicious} style={{ alignSelf: "center", marginBottom: spacing.md }} />
+              <Text style={{ color: colors.text, fontSize: 22, fontWeight: "900", textAlign: "center", marginBottom: spacing.sm }}>Site not opened</Text>
+              <Text style={{ color: colors.textMuted, lineHeight: 21, textAlign: "center", marginBottom: spacing.lg }}>
+                Shield AI could not verify {hostOf(verificationError) || "this address"}. For your safety, the page stayed blocked. Check your connection and try again.
+              </Text>
+              <Button label="Try Again" icon="refresh-outline" onPress={() => navigateTo(verificationError)} />
+              <Pressable onPress={() => router.back()} style={{ padding: spacing.md, alignItems: "center" }}>
+                <Text style={{ color: colors.textMuted, fontWeight: "700" }}>Exit Safe Browser</Text>
+              </Pressable>
+            </Surface>
+          </FadeIn>
+        </View>
+      )}
+
       {/* Danger interstitial */}
       {blocked && (
         <View style={{ padding: spacing.lg }}>
@@ -308,7 +319,7 @@ export default function BrowserScreen() {
       )}
 
       {/* Live-protected WebView */}
-      {page && !blocked && (
+      {page && !blocked && !verificationError && (
         <WebView
           ref={webRef}
           source={{ uri: page.url }}
@@ -325,7 +336,7 @@ export default function BrowserScreen() {
       )}
 
       {/* Empty state */}
-      {!page && !blocked && !checking && (
+      {!page && !blocked && !verificationError && !checking && (
         <View style={{ flex: 1, justifyContent: "center", alignItems: "center", padding: spacing.xl }}>
           <View
             style={{
@@ -351,7 +362,7 @@ export default function BrowserScreen() {
       )}
 
       {/* Full-screen checking state (first load) */}
-      {!page && checking && !blocked && (
+      {!page && checking && !blocked && !verificationError && (
         <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
           <ActivityIndicator color={colors.primaryBright} size="large" />
           <Text style={{ color: colors.textMuted, fontSize: 13, marginTop: spacing.sm }}>Checking site safety…</Text>

@@ -11,6 +11,7 @@ import {
 } from "react-native";
 
 import { Button, Eyebrow, FadeIn, Surface } from "@/components/ui";
+import { QueryErrorState } from "@/components/QueryErrorState";
 import { ShieldAPI } from "@/lib/api";
 import { colors, radius, spacing, withAlpha } from "@/theme/theme";
 
@@ -20,7 +21,7 @@ export default function DeveloperScreen() {
   const [keyName, setKeyName] = useState("");
   const [newKey, setNewKey] = useState<string | null>(null);
 
-  const { data: keys, isLoading } = useQuery({
+  const { data: keys, isLoading, isError, refetch } = useQuery({
     queryKey: ["api-keys"],
     queryFn: () => ShieldAPI.listApiKeys(),
     staleTime: 60_000,
@@ -103,8 +104,9 @@ export default function DeveloperScreen() {
             Your Keys
           </Text>
           {isLoading && <ActivityIndicator color={colors.primaryBright} />}
-          {keys?.length === 0 && <Text style={{ color: colors.textMuted }}>No active keys.</Text>}
-          {keys?.map((key) => (
+          {isError && <QueryErrorState message="Your API keys could not be loaded." onRetry={() => refetch()} />}
+          {!isError && keys?.length === 0 && <Text style={{ color: colors.textMuted }}>No active keys.</Text>}
+          {!isError && keys?.map((key) => (
             <View
               key={key.id}
               style={{

@@ -1,5 +1,6 @@
 """Celery application for async scan processing (used for heavier jobs)."""
 from celery import Celery
+from celery.signals import worker_process_init
 
 from app.core.config import settings
 
@@ -13,8 +14,30 @@ celery_app.conf.update(
     result_serializer="json",
     accept_content=["json"],
     task_track_started=True,
-    task_time_limit=120,
+    task_acks_late=True,
+    task_reject_on_worker_lost=True,
+    worker_prefetch_multiplier=1,
+    task_soft_time_limit=840,
+    task_time_limit=900,
+    broker_connection_retry_on_startup=True,
 )
+
+
+@worker_process_init.connect
+def _init_worker_sentry(**_kwargs) -> None:
+    if not settings.SENTRY_DSN:
+        return
+    try:
+        import sentry_sdk
+
+        sentry_sdk.init(
+            dsn=settings.SENTRY_DSN,
+            environment=settings.ENVIRONMENT,
+            traces_sample_rate=0.05,
+            send_default_pii=False,
+        )
+    except Exception:
+        pass
 celery_app.conf.beat_schedule = {
     **getattr(celery_app.conf, "beat_schedule", {}),
     "privacy-retention-daily": {
@@ -49,7 +72,77 @@ celery_app.conf.beat_schedule = {
         "task": "feeds.blocklist_growth_push",
         "schedule": 7 * 24 * 60 * 60,
     },
+    "push-receipts-every-15-minutes": {
+        "task": "notifications.check_push_receipts",
+        "schedule": 15 * 60,
+    },
 }
+
+
+@celery_app.task(
+    bind=True,
+    name="scans.process",
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_backoff_max=60,
+    retry_kwargs={"max_retries": 2},
+)
+def process_scan_task(self, scan_id: str, scan_kind: str, payload: dict) -> str:
+    """Idempotent production entry point for all provider-backed scans."""
+    from app.db.session import SessionLocal
+    from app.models.models import ApiUsage, ScanHistory, ScanStatus
+    from app.services import ocr, scan_service
+
+    db = SessionLocal()
+    try:
+        scan = db.get(ScanHistory, scan_id)
+        if not scan or scan.status == ScanStatus.completed or scan.report is not None:
+            return scan_id
+
+        provider: str | None = None
+        if scan_kind == "link":
+            scan_service.process_link_scan(db, scan, payload["url"])
+            provider = "safe_browsing"
+        elif scan_kind == "image":
+            image_bytes = ocr.decode_base64_image(payload["image_base64"])
+            scan_service.process_image_scan(db, scan, image_bytes, payload.get("storage_key", ""))
+            provider = "anthropic"
+        elif scan_kind == "qr":
+            scan_service.process_qr_scan(db, scan, payload["qr_content"])
+            provider = "safe_browsing"
+        elif scan_kind == "message":
+            scan_service.process_message_scan(db, scan, payload["message_text"], payload.get("platform_hint", ""))
+            provider = "anthropic"
+        elif scan_kind == "voice":
+            scan_service.process_voice_scan(db, scan, payload["transcript"], payload.get("caller_number", ""))
+            provider = "anthropic"
+        elif scan_kind == "email":
+            scan_service.process_email_scan(db, scan, **payload)
+            provider = "anthropic"
+        elif scan_kind == "phone":
+            scan_service.process_phone_scan(db, scan, payload["phone_number"])
+        elif scan_kind == "marketplace":
+            scan_service.process_marketplace_scan(db, scan, payload["content_text"], payload.get("platform_hint", ""))
+            provider = "anthropic"
+        elif scan_kind == "social":
+            scan_service.process_social_scan(db, scan, payload["content_text"], payload.get("platform", ""))
+            provider = "anthropic"
+        else:
+            raise ValueError(f"Unsupported scan kind: {scan_kind}")
+
+        if provider:
+            db.add(ApiUsage(user_id=scan.user_id, provider=provider))
+            db.commit()
+        return scan_id
+    except Exception:
+        db.rollback()
+        failed_scan = db.get(ScanHistory, scan_id)
+        if failed_scan and failed_scan.status != ScanStatus.completed:
+            failed_scan.status = ScanStatus.failed
+            db.commit()
+        raise
+    finally:
+        db.close()
 
 
 @celery_app.task(name="scans.process_link")
@@ -84,6 +177,41 @@ def process_image_task(scan_id: str, image_bytes: bytes, storage_key: str = "") 
         db.close()
 
 
+@celery_app.task(name="notifications.check_push_receipts")
+def check_push_receipts_task() -> dict[str, int]:
+    from app.db.session import SessionLocal
+    from app.services.notification_delivery import check_pending_push_receipts
+
+    db = SessionLocal()
+    try:
+        return check_pending_push_receipts(db)
+    finally:
+        db.close()
+
+
+@celery_app.task(name="notifications.deliver_alert")
+def deliver_alert_task(
+    user_id: str,
+    title: str,
+    body: str,
+    *,
+    severity: str = "suspicious",
+    topic: str = "account",
+    data: dict | None = None,
+) -> dict[str, int | bool]:
+    from app.db.session import SessionLocal
+    from app.services.notification_delivery import send_email_alert, send_push_to_devices
+
+    db = SessionLocal()
+    try:
+        return {
+            "push": send_push_to_devices(db, user_id, title, body, severity=severity, topic=topic, data=data),
+            "email": send_email_alert(db, user_id, title, body, severity=severity, topic=topic),
+        }
+    finally:
+        db.close()
+
+
 @celery_app.task(name="privacy.apply_retention")
 def apply_retention_task() -> int:
     from app.db.session import SessionLocal
@@ -101,12 +229,14 @@ def apply_retention_task() -> int:
 @celery_app.task(name="monitoring.identity_targets")
 def monitor_identity_targets_task() -> int:
     from app.db.session import SessionLocal
-    from app.services.monitoring import run_identity_monitors
+    from app.services.monitoring import due_identity_monitor_count, run_identity_monitors
 
     db = SessionLocal()
     try:
         alerts = run_identity_monitors(db)
         db.commit()
+        if due_identity_monitor_count(db) > 0:
+            monitor_identity_targets_task.apply_async(countdown=5)
         return alerts
     finally:
         db.close()

@@ -2,6 +2,7 @@
 import enum
 import uuid
 from datetime import datetime, timezone
+from decimal import Decimal
 
 from sqlalchemy import (
     JSON,
@@ -12,6 +13,7 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     LargeBinary,
+    Numeric,
     String,
     Text,
     UniqueConstraint,
@@ -84,6 +86,7 @@ class User(Base):
     is_premium: Mapped[bool] = mapped_column(Boolean, default=False)
     premium_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     rc_product_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    rc_last_event_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
     is_developer: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
@@ -134,14 +137,33 @@ class SocialIdentity(Base):
 
 class Device(Base):
     __tablename__ = "devices"
+    __table_args__ = (
+        UniqueConstraint("push_token", name="uq_devices_push_token"),
+    )
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
     platform: Mapped[str] = mapped_column(String, default="")
-    push_token: Mapped[str] = mapped_column(String, default="")
+    push_token: Mapped[str] = mapped_column(String, nullable=False)
     label: Mapped[str] = mapped_column(String, default="")
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class PushReceipt(Base):
+    """Expo ticket tracked until the downstream APNs/FCM receipt is known."""
+
+    __tablename__ = "push_receipts"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    device_id: Mapped[str] = mapped_column(ForeignKey("devices.id"), index=True)
+    ticket_id: Mapped[str] = mapped_column(String, unique=True, index=True)
+    status: Mapped[str] = mapped_column(String, default="pending", index=True)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    last_error: Mapped[str] = mapped_column(Text, default="")
+    checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
 
@@ -158,6 +180,32 @@ class AuthSession(Base):
     last_used_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class OAuthAuthorizationCode(Base):
+    __tablename__ = "oauth_authorization_codes"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    code_hash: Mapped[str] = mapped_column(String, unique=True, index=True)
+    code_challenge: Mapped[str] = mapped_column(String, nullable=False)
+    redirect_uri: Mapped[str] = mapped_column(String, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class BillingWebhookEvent(Base):
+    __tablename__ = "billing_webhook_events"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    event_id: Mapped[str] = mapped_column(String, unique=True, index=True)
+    user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
+    event_type: Mapped[str] = mapped_column(String, nullable=False)
+    event_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    handled: Mapped[bool] = mapped_column(Boolean, default=False)
+    detail: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
 
 class NotificationPreference(Base):
@@ -361,6 +409,9 @@ class Notification(Base):
     title: Mapped[str] = mapped_column(String)
     body: Mapped[str] = mapped_column(Text, default="")
     scan_id: Mapped[str | None] = mapped_column(ForeignKey("scan_history.id"), nullable=True, index=True)
+    severity: Mapped[str] = mapped_column(String, default="low")
+    topic: Mapped[str] = mapped_column(String, default="account")
+    route: Mapped[str] = mapped_column(String, default="/notifications")
     is_read: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
@@ -473,7 +524,7 @@ class Incident(Base):
     incident_type: Mapped[IncidentType] = mapped_column(Enum(IncidentType))
     status: Mapped[IncidentStatus] = mapped_column(Enum(IncidentStatus), default=IncidentStatus.open)
     title: Mapped[str] = mapped_column(String, default="")
-    amount_lost: Mapped[float | None] = mapped_column(Float, nullable=True)
+    amount_lost: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
     currency: Mapped[str] = mapped_column(String, default="USD")
     notes: Mapped[str] = mapped_column(Text, default="")
     linked_scan_id: Mapped[str | None] = mapped_column(ForeignKey("scan_history.id"), nullable=True, index=True)
@@ -540,6 +591,9 @@ class EducationLesson(Base):
 
 class EducationProgress(Base):
     __tablename__ = "education_progress"
+    __table_args__ = (
+        UniqueConstraint("user_id", "lesson_id", name="uq_education_progress_user_lesson"),
+    )
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)

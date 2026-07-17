@@ -120,3 +120,46 @@ def test_unknown_user_is_acknowledged_not_retried():
     res = client.post(WEBHOOK, json=_event("INITIAL_PURCHASE", "no-such-user"), headers=AUTH)
     assert res.status_code == 200
     assert res.json()["handled"] is False
+
+
+def test_duplicate_event_id_is_idempotent():
+    user_id, token = _register_user()
+    payload = _event(
+        "INITIAL_PURCHASE",
+        user_id,
+        id=f"event-{uuid.uuid4()}",
+        expiration_at_ms=4102444800000,
+    )
+    first = client.post(WEBHOOK, json=payload, headers=AUTH)
+    second = client.post(WEBHOOK, json=payload, headers=AUTH)
+    assert first.status_code == 200 and first.json()["handled"] is True
+    assert second.status_code == 200 and second.json()["duplicate"] is True
+    assert _me_is_premium(token) is True
+
+
+def test_older_event_cannot_overwrite_newer_entitlement_state():
+    user_id, token = _register_user()
+    renewed = client.post(
+        WEBHOOK,
+        json=_event(
+            "RENEWAL",
+            user_id,
+            id=f"renew-{uuid.uuid4()}",
+            event_timestamp_ms=2_000_000,
+            expiration_at_ms=4102444800000,
+        ),
+        headers=AUTH,
+    )
+    stale_expiration = client.post(
+        WEBHOOK,
+        json=_event(
+            "EXPIRATION",
+            user_id,
+            id=f"expire-{uuid.uuid4()}",
+            event_timestamp_ms=1_000_000,
+        ),
+        headers=AUTH,
+    )
+    assert renewed.status_code == 200 and renewed.json()["handled"] is True
+    assert stale_expiration.status_code == 200 and stale_expiration.json()["stale"] is True
+    assert _me_is_premium(token) is True

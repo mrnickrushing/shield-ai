@@ -14,17 +14,19 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException, status
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.models.models import ScanHistory, User
+from app.services.subscription import is_premium_active
 
 
 def require_active_subscription(db: Session, user: User) -> None:
     """Raise 402 without an active subscription (or trial), or 429 once a
     subscriber exceeds the fair-use daily scan ceiling. The cap is set well
     above any genuine usage, so real users never see it."""
-    if not user.is_premium:
+    if not is_premium_active(user):
         raise HTTPException(
             status.HTTP_402_PAYMENT_REQUIRED,
             "Shield AI requires an active subscription. Start your free trial to run scans.",
@@ -42,26 +44,17 @@ def require_active_subscription(db: Session, user: User) -> None:
 def _daily_scan_count(db: Session, user_id: str) -> int:
     """Scans charged to this user in the current window.
 
-    Prefers an atomic Redis counter so a burst of concurrent requests can't all
-    read the same sub-limit count and slip past the cap (a plain DB COUNT is
-    read-then-act and races under load). Falls back to a rolling-24h DB count
-    when Redis is unavailable.
+    Uses durable scan history for the actual rolling 24-hour window. PostgreSQL
+    callers take a transaction-scoped per-user advisory lock so concurrent
+    requests cannot all observe the same sub-limit count.
     """
-    from app.services.llm_cache import get_redis
+    if db.get_bind().dialect.name == "postgresql":
+        import hashlib
 
-    r = get_redis()
-    if r is not None:
-        try:
-            day = datetime.now(timezone.utc).strftime("%Y%m%d")
-            key = f"scancount:{user_id}:{day}"
-            count = r.incr(key)
-            if count == 1:
-                r.expire(key, 86400)
-            # incr counts this attempt too; report the prior total so the caller
-            # compares "already used" against the limit.
-            return count - 1
-        except Exception:
-            pass
+        lock_key = int.from_bytes(
+            hashlib.sha256(user_id.encode()).digest()[:8], "big", signed=True
+        )
+        db.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": lock_key})
 
     day_ago = datetime.now(timezone.utc) - timedelta(hours=24)
     return (

@@ -13,6 +13,7 @@ from app.db.session import SessionLocal, get_db
 from app.models.models import AuditLog, BrowserTelemetryEvent, ExtensionTelemetryEvent, IdentityAlert, MonitoredIdentity, Notification, User
 from app.schemas.schemas import BrowserTelemetryCreate, ClientErrorReport, ExtensionTelemetryCreate, MonitoredIdentityCreate, MonitoredIdentityOut
 from app.services import monitoring
+from app.services.subscription import is_premium_active
 
 router = APIRouter(prefix="/monitoring", tags=["monitoring"])
 
@@ -25,12 +26,12 @@ def _payment_required(feature: str) -> None:
 
 
 def _enforce_monitor_entitlement(user: User) -> None:
-    if not user.is_premium:
+    if not is_premium_active(user):
         _payment_required("Continuous identity monitoring")
 
 
 def _require_live_protection(user: User) -> None:
-    if not user.is_premium:
+    if not is_premium_active(user):
         _payment_required("Live browser and extension protection")
 
 
@@ -157,7 +158,7 @@ def monitoring_summary(db: Session = Depends(get_db), user: User = Depends(get_c
         "identity_alerts": db.query(IdentityAlert).filter(IdentityAlert.user_id == user.id, IdentityAlert.is_read.is_(False)).count(),
         "browser_events_24h": db.query(BrowserTelemetryEvent).filter(BrowserTelemetryEvent.user_id == user.id, BrowserTelemetryEvent.created_at >= since).count(),
         "extension_events_24h": db.query(ExtensionTelemetryEvent).filter(ExtensionTelemetryEvent.user_id == user.id, ExtensionTelemetryEvent.created_at >= since).count(),
-        "premium_required_for_live_protection": not user.is_premium,
+        "premium_required_for_live_protection": not is_premium_active(user),
         "server_time": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -175,7 +176,7 @@ def weekly_protection_report(db: Session = Depends(get_db), user: User = Depends
     """Live view of the same numbers the weekly digest sends."""
     from app.services.protection_report import build_report, summarize
 
-    if not user.is_premium:
+    if not is_premium_active(user):
         _payment_required("The Weekly Protection Report")
 
     report = build_report(db, user.id)
@@ -207,6 +208,7 @@ async def alert_stream(user: User = Depends(get_current_user)):
                         "title": row.title,
                         "body": row.body,
                         "scan_id": row.scan_id,
+                        "route": row.route,
                         "created_at": row.created_at.isoformat(),
                     }
                     yield f"event: notification\ndata: {json.dumps(payload)}\n\n"
