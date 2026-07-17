@@ -24,6 +24,7 @@ import subprocess
 import sys
 import time
 from urllib.error import HTTPError
+from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 
 BASE = "https://api.appstoreconnect.apple.com"
@@ -72,8 +73,12 @@ def _jwt_token():
 
 
 def api(method, path, body=None):
+    url = BASE + path
+    parsed = urlsplit(url)
+    if parsed.scheme != "https" or parsed.hostname != "api.appstoreconnect.apple.com":
+        raise RuntimeError("Refusing a non-App-Store-Connect URL")
     req = Request(
-        BASE + path,
+        url,
         data=json.dumps(body).encode() if body else None,
         headers={
             "Authorization": f"Bearer {_jwt_token()}",
@@ -82,13 +87,12 @@ def api(method, path, body=None):
         method=method,
     )
     try:
-        # BASE is a fixed HTTPS App Store Connect origin; callers supply only a path.
-        with urlopen(req) as r:  # nosemgrep -- fixed HTTPS Apple origin above
-            raw = r.read()
+        with urlopen(req, timeout=30) as response:  # nosemgrep -- URL is pinned and validated above
+            raw = response.read()
             return json.loads(raw) if raw else {}
-    except HTTPError as e:
-        body_text = e.read().decode()[:600]
-        raise RuntimeError(f"HTTP {e.code} {method} {path}: {body_text}") from None
+    except HTTPError as exc:
+        detail = exc.read().decode(errors="replace")[:600]
+        raise RuntimeError(f"HTTP {exc.code} {method} {path}: {detail}") from None
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
