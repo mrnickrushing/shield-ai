@@ -109,6 +109,12 @@ jobs:
       - name: Install pinned Railway CLI
         run: npm install --global @railway/cli@4.40.0
 
+      - name: Link Railway project
+        run: |
+          railway link \
+            --project 9410157d-7061-44cc-b069-61934f4fdaf7 \
+            --environment production
+
       - name: Confirm API deployment is healthy
         run: |
           set -euo pipefail
