@@ -343,10 +343,19 @@ def social_auth(payload: SocialAuthRequest, request: Request, db: Session = Depe
 
     if not user:
         if not email:
-            raise HTTPException(
-                status.HTTP_400_BAD_REQUEST,
-                "Apple did not provide a verified email. Sign in with another method.",
-            )
+            # Apple only includes a verified email claim on a user's
+            # first-ever authorization for this app; every repeat sign-in (a
+            # new device, a reinstall, or Apple's own review pass reusing an
+            # already-authorized test account) omits it entirely. Fall back
+            # to a stable placeholder keyed on Apple's immutable subject so
+            # account creation never depends on an email Apple may not send.
+            if payload.provider == "apple" and subject:
+                email = f"apple-{subject}@users.shieldai.rushingtechnologies.com"
+            else:
+                raise HTTPException(
+                    status.HTTP_400_BAD_REQUEST,
+                    "Apple did not provide a verified email. Sign in with another method.",
+                )
         user = User(email=email, hashed_password=hash_password(secrets.token_urlsafe(32)))
         db.add(user)
         db.flush()
