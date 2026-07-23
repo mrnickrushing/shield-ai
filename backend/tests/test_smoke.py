@@ -297,6 +297,7 @@ def test_apple_social_auth_creates_account_without_email(monkeypatch):
         "/api/v1/auth/me",
         headers={"Authorization": f"Bearer {r2.json()['access_token']}"},
     )
+    assert me2.status_code == 200, me2.text
     assert me2.json()["email"] == me.json()["email"]
 
 
@@ -343,10 +344,12 @@ def test_apple_social_auth_never_links_client_supplied_email(monkeypatch):
         json={"email": victim_email, "password": "supersecret1", "display_name": "Victim"},
     )
     assert victim.status_code == 201, victim.text
-    victim_id = client.get(
+    victim_me = client.get(
         "/api/v1/auth/me",
         headers={"Authorization": f"Bearer {victim.json()['access_token']}"},
-    ).json()["id"]
+    )
+    assert victim_me.status_code == 200, victim_me.text
+    victim_id = victim_me.json()["id"]
 
     monkeypatch.setattr(
         auth_routes,
@@ -363,10 +366,12 @@ def test_apple_social_auth_never_links_client_supplied_email(monkeypatch):
         },
     )
     assert attempted.status_code == 200, attempted.text
-    attacker = client.get(
+    attacker_resp = client.get(
         "/api/v1/auth/me",
         headers={"Authorization": f"Bearer {attempted.json()['access_token']}"},
-    ).json()
+    )
+    assert attacker_resp.status_code == 200, attacker_resp.text
+    attacker = attacker_resp.json()
     assert attacker["id"] != victim_id
     assert attacker["email"] != victim_email
 

@@ -354,7 +354,7 @@ def social_auth(payload: SocialAuthRequest, request: Request, db: Session = Depe
             else:
                 raise HTTPException(
                     status.HTTP_400_BAD_REQUEST,
-                    "Apple did not provide a verified email. Sign in with another method.",
+                    "We could not verify an email for this account. Sign in with another method.",
                 )
         user = User(email=email, hashed_password=hash_password(secrets.token_urlsafe(32)))
         db.add(user)
