@@ -257,6 +257,50 @@ def test_apple_social_auth_reuses_identity_without_email(monkeypatch):
     assert me.json()["email"] == "apple-user@example.com"
 
 
+def test_apple_social_auth_creates_account_without_email(monkeypatch):
+    """Apple omits the email claim on any repeat authorization — including a
+    first attempt from Apple's own review devices, which may have already
+    authorized this bundle ID during an earlier review pass. Account
+    creation must not depend on an email Apple may never send."""
+    from app.api.v1 import auth as auth_routes
+
+    raw_nonce = "raw-apple-nonce-for-test"
+
+    def verify_apple_token(token: str, nonce: str):
+        assert nonce == raw_nonce
+        return {"sub": "apple-user-no-email-456"}
+
+    monkeypatch.setattr(auth_routes, "_verify_apple_identity_token", verify_apple_token)
+
+    r = client.post(
+        "/api/v1/auth/social",
+        json={"provider": "apple", "token": "verified-apple-token-no-email", "nonce": raw_nonce},
+    )
+    assert r.status_code == 200, r.text
+    tokens = r.json()
+
+    me = client.get(
+        "/api/v1/auth/me",
+        headers={"Authorization": f"Bearer {tokens['access_token']}"},
+    )
+    assert me.status_code == 200
+    assert me.json()["email"] == "apple-apple-user-no-email-456@users.shieldai.rushingtechnologies.com"
+
+    # Signing in again with the same subject (still no email) must reuse the
+    # same account rather than erroring or creating a duplicate.
+    r2 = client.post(
+        "/api/v1/auth/social",
+        json={"provider": "apple", "token": "verified-apple-token-no-email", "nonce": raw_nonce},
+    )
+    assert r2.status_code == 200, r2.text
+    me2 = client.get(
+        "/api/v1/auth/me",
+        headers={"Authorization": f"Bearer {r2.json()['access_token']}"},
+    )
+    assert me2.status_code == 200, me2.text
+    assert me2.json()["email"] == me.json()["email"]
+
+
 def test_apple_social_auth_rejects_unsigned_forged_token():
     token1 = _fake_apple_token("apple-user-123", "apple-user@example.com")
     r1 = client.post(
@@ -287,6 +331,11 @@ def test_apple_social_auth_requires_nonce(monkeypatch):
 
 
 def test_apple_social_auth_never_links_client_supplied_email(monkeypatch):
+    """A client-supplied `email` must never be trusted for account linking.
+    Without a verified email from Apple, a sign-in with no matching identity
+    creates its own independent account (keyed on Apple's subject) instead
+    of erroring — but it must land on a brand-new account, never the
+    victim's, regardless of what `email` the request claims."""
     from app.api.v1 import auth as auth_routes
 
     victim_email = f"victim-{uuid.uuid4().hex}@example.com"
@@ -295,6 +344,12 @@ def test_apple_social_auth_never_links_client_supplied_email(monkeypatch):
         json={"email": victim_email, "password": "supersecret1", "display_name": "Victim"},
     )
     assert victim.status_code == 201, victim.text
+    victim_me = client.get(
+        "/api/v1/auth/me",
+        headers={"Authorization": f"Bearer {victim.json()['access_token']}"},
+    )
+    assert victim_me.status_code == 200, victim_me.text
+    victim_id = victim_me.json()["id"]
 
     monkeypatch.setattr(
         auth_routes,
@@ -310,8 +365,15 @@ def test_apple_social_auth_never_links_client_supplied_email(monkeypatch):
             "email": victim_email,
         },
     )
-    assert attempted.status_code == 400, attempted.text
-    assert "verified email" in attempted.json()["detail"]
+    assert attempted.status_code == 200, attempted.text
+    attacker_resp = client.get(
+        "/api/v1/auth/me",
+        headers={"Authorization": f"Bearer {attempted.json()['access_token']}"},
+    )
+    assert attacker_resp.status_code == 200, attacker_resp.text
+    attacker = attacker_resp.json()
+    assert attacker["id"] != victim_id
+    assert attacker["email"] != victim_email
 
 
 def test_update_profile():
